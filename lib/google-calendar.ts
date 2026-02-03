@@ -210,13 +210,14 @@ export async function fetchUpcomingEvents(userId: string): Promise<CalendarEvent
 }
 
 /**
- * Attach note content to calendar event as a Google Drive file
+ * Attach note content to calendar event as a Google Doc
  */
 export async function attachNoteToCalendarEvent(
   userId: string,
   eventId: string,
   noteTitle: string,
-  noteContent: string
+  noteContent: string,
+  userEmail: string
 ): Promise<void> {
   try {
     const refreshToken = await getUserRefreshToken(userId);
@@ -235,13 +236,13 @@ export async function attachNoteToCalendarEvent(
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
     
-    // Create HTML file in Google Drive
+    // Create Google Doc in Drive
     const timestamp = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }).replace(/[/:]/g, '-');
-    const fileName = `Meeting Notes - ${noteTitle} - ${timestamp}.html`;
+    const fileName = `Meeting Notes - ${noteTitle} - ${timestamp}`;
     
     const fileMetadata = {
       name: fileName,
-      mimeType: 'text/html',
+      mimeType: 'application/vnd.google-apps.document', // Creates a Google Doc
     };
     
     const media = {
@@ -249,7 +250,7 @@ export async function attachNoteToCalendarEvent(
       body: noteContent,
     };
     
-    // Upload file to Drive
+    // Upload file to Drive (HTML will be converted to Google Doc)
     const driveFile = await drive.files.create({
       requestBody: fileMetadata,
       media: media,
@@ -260,27 +261,53 @@ export async function attachNoteToCalendarEvent(
     const fileLink = driveFile.data.webViewLink;
     
     if (!fileId || !fileLink) {
-      throw new Error('Failed to create Drive file');
+      throw new Error('Failed to create Google Doc');
     }
     
-    // Make file accessible to anyone with link
-    await drive.permissions.create({
-      fileId: fileId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone',
-      },
-    });
-    
-    // Get existing event
+    // Get event attendees first
     const event = await calendar.events.get({
       calendarId: 'primary',
       eventId: eventId,
     });
     
-    // Add file link to event description
+    const attendees = event.data.attendees || [];
+    
+    // Add comment permissions for each attendee (restricted access - only attendees)
+    for (const attendee of attendees) {
+      if (attendee.email) {
+        try {
+          await drive.permissions.create({
+            fileId: fileId,
+            requestBody: {
+              role: 'commenter',
+              type: 'user',
+              emailAddress: attendee.email,
+            },
+            sendNotificationEmail: false, // Don't spam attendees with notification
+          });
+        } catch (error) {
+          // Continue if one attendee fails
+          logger.warn('Failed to add permission for attendee', error as Error, {
+            email: attendee.email,
+          });
+        }
+      }
+    }
+    
+    // Add comment permission for the note creator
+    await drive.permissions.create({
+      fileId: fileId,
+      requestBody: {
+        role: 'writer',
+        type: 'user',
+        emailAddress: (await calendar.events.get({ calendarId: 'primary', eventId })).data.creator?.email || '',
+      },
+      sendNotificationEmail: false,
+    });
+    
+    // Add file link to event description (simple format)
     const existingDescription = event.data.description || '';
-    const noteLink = `<p><strong>📝 Meeting Notes:</strong> <a href="${fileLink}">${fileName}</a></p>`;
+    const noteLink = `📝 <a href="${fileLink}">${noteTitle}</a>`;
     const separator = existingDescription ? '<br><br>' : '';
     const updatedDescription = `${existingDescription}${separator}${noteLink}`;
     
@@ -293,7 +320,7 @@ export async function attachNoteToCalendarEvent(
       },
     });
     
-    logger.info('Note attached to calendar event as file', {
+    logger.info('Note attached to calendar event as Google Doc', {
       userId,
       eventId,
       fileId,

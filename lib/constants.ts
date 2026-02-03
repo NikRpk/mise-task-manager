@@ -173,12 +173,25 @@ export const DEFAULT_DATETIME_FORMAT = 'dd.MM.yyyy HH:mm';
 export const DEFAULT_NOTE_TEMPLATE = {
   id: 'default',
   name: 'Meeting Notes',
-  sections: [
-    { id: 'agenda', title: 'Agenda', placeholder: 'What topics will be discussed?', order: 1 },
-    { id: 'discussion', title: 'Discussion & Notes', placeholder: 'Key points discussed...', order: 2 },
-    { id: 'decisions', title: 'Decisions Made', placeholder: 'What was decided?', order: 3 },
-    { id: 'action-items', title: 'Action Items', placeholder: 'What needs to be done?', order: 4 },
-  ],
+  content: `<h2>Agenda</h2>
+<ul>
+  <li></li>
+</ul>
+
+<h2>Discussion & Notes</h2>
+<ul>
+  <li></li>
+</ul>
+
+<h2>Decisions Made</h2>
+<ul>
+  <li></li>
+</ul>
+
+<h2>Action Items</h2>
+<ul>
+  <li></li>
+</ul>`,
   isDefault: true,
 } as const;
 
