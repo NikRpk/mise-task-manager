@@ -91,12 +91,6 @@ function HomePage() {
     })
   );
 
-  useEffect(() => {
-    if (user) {
-      fetchProjects();
-    }
-  }, [user]);
-
   // Load tasks and project settings when project changes
   useEffect(() => {
     if (selectedProjectId) {
