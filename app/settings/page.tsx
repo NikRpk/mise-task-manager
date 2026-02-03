@@ -224,6 +224,7 @@ function SettingsContent() {
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<ProjectRole>('EDIT');
+  const [isCalendarConnected, setIsCalendarConnected] = useState(false);
   
   // Dialog state
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'warning' | 'info' | 'success' }>({ isOpen: false, title: '', message: '', type: 'info' });
@@ -246,8 +247,18 @@ function SettingsContent() {
   useEffect(() => {
     if (user) {
       fetchUserSettings();
+      checkCalendarConnection();
     }
   }, [user]);
+
+  const checkCalendarConnection = async () => {
+    try {
+      const res = await authenticatedFetch('/api/calendar/events');
+      setIsCalendarConnected(res.ok);
+    } catch (error) {
+      setIsCalendarConnected(false);
+    }
+  };
 
   useEffect(() => {
     if (projectId && section.startsWith('project-')) {
@@ -924,8 +935,13 @@ function SettingsContent() {
             {/* Google Calendar Connection */}
             <div className="rounded-lg shadow-sm border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
               <div className="mb-4">
-                <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+                <h3 className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
                   Google Calendar
+                  {isCalendarConnected && (
+                    <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium">
+                      Connected
+                    </span>
+                  )}
                 </h3>
                 <p className="text-sm text-gray-500 mt-1">
                   Connect your Google Calendar to link notes to meetings
@@ -933,54 +949,62 @@ function SettingsContent() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button
-                  onClick={async () => {
-                    if (!user?.uid) return;
-                    window.location.href = `/api/auth/google?userId=${user.uid}`;
-                  }}
-                  className="px-4 py-2 text-sm rounded-md flex items-center gap-2 text-white font-medium"
-                  style={{ backgroundColor: 'var(--color-primary)' }}
-                >
-                  <Calendar size={16} />
-                  Connect Google Calendar
-                </button>
-
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await authenticatedFetch('/api/calendar/disconnect', {
-                        method: 'POST',
-                      });
-                      
-                      if (res.ok) {
+                {!isCalendarConnected ? (
+                  <button
+                    onClick={async () => {
+                      if (!user?.uid) return;
+                      window.location.href = `/api/auth/google?userId=${user.uid}`;
+                    }}
+                    className="px-4 py-2 text-sm rounded-md flex items-center gap-2 text-white font-medium"
+                    style={{ backgroundColor: 'var(--color-primary)' }}
+                  >
+                    <Calendar size={16} />
+                    Connect Google Calendar
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await authenticatedFetch('/api/calendar/disconnect', {
+                          method: 'POST',
+                        });
+                        
+                        if (res.ok) {
+                          setIsCalendarConnected(false);
+                          setAlertDialog({
+                            isOpen: true,
+                            title: 'Disconnected',
+                            message: 'Google Calendar has been disconnected. You can reconnect anytime to grant updated permissions.',
+                            type: 'success',
+                          });
+                        }
+                      } catch (error) {
                         setAlertDialog({
                           isOpen: true,
-                          title: 'Disconnected',
-                          message: 'Google Calendar has been disconnected',
-                          type: 'success',
+                          title: 'Error',
+                          message: 'Failed to disconnect Google Calendar',
+                          type: 'error',
                         });
                       }
-                    } catch (error) {
-                      setAlertDialog({
-                        isOpen: true,
-                        title: 'Error',
-                        message: 'Failed to disconnect Google Calendar',
-                        type: 'error',
-                      });
-                    }
-                  }}
-                  className="px-4 py-2 text-sm border-2 rounded-md flex items-center gap-2 font-medium transition-colors hover:bg-red-50"
-                  style={{ borderColor: '#f30047', color: '#f30047' }}
-                >
-                  <X size={16} />
-                  Disconnect
-                </button>
+                    }}
+                    className="px-4 py-2 text-sm border-2 rounded-md flex items-center gap-2 font-medium transition-colors hover:bg-red-50"
+                    style={{ borderColor: '#f30047', color: '#f30047' }}
+                  >
+                    <X size={16} />
+                    Disconnect Calendar
+                  </button>
+                )}
               </div>
 
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                <p className="font-medium mb-1">Note:</p>
-                <p>If you recently connected, click Disconnect and then Connect again to grant Drive file permissions for note attachments.</p>
-              </div>
+              {!isCalendarConnected && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                  <p className="font-medium mb-1">Permissions needed:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>View your calendar events</li>
+                    <li>Create files in Google Drive (for note attachments)</li>
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         );
