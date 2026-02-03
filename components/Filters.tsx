@@ -113,7 +113,7 @@ export default function Filters({ filters, onChange, owners }: FiltersProps) {
           className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all font-medium"
           style={{
             borderColor: filters.status?.[0] ? statusColors[filters.status[0]] || '#cbd5e1' : '#cbd5e1',
-            backgroundColor: filters.status?.[0] ? `${statusColors[filters.status[0]]}15` || '#ffffff' : '#ffffff',
+            backgroundColor: '#ffffff',
             color: filters.status?.[0] ? statusColors[filters.status[0]] || '#0f172a' : '#0f172a',
           }}
           onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px var(--color-primary)'}

@@ -43,6 +43,7 @@ export function getAuthorizationUrl(): string {
     scope: [
       'https://www.googleapis.com/auth/calendar.readonly',
       'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/drive.file', // Access to create files in Drive
     ],
     prompt: 'consent', // Force consent screen to get refresh token
   });
@@ -209,11 +210,12 @@ export async function fetchUpcomingEvents(userId: string): Promise<CalendarEvent
 }
 
 /**
- * Attach note content to calendar event
+ * Attach note content to calendar event as a Google Drive file
  */
 export async function attachNoteToCalendarEvent(
   userId: string,
   eventId: string,
+  noteTitle: string,
   noteContent: string
 ): Promise<void> {
   try {
@@ -230,7 +232,45 @@ export async function attachNoteToCalendarEvent(
       refresh_token: refreshToken,
     });
     
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+    
+    // Create HTML file in Google Drive
+    const timestamp = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }).replace(/[/:]/g, '-');
+    const fileName = `Meeting Notes - ${noteTitle} - ${timestamp}.html`;
+    
+    const fileMetadata = {
+      name: fileName,
+      mimeType: 'text/html',
+    };
+    
+    const media = {
+      mimeType: 'text/html',
+      body: noteContent,
+    };
+    
+    // Upload file to Drive
+    const driveFile = await drive.files.create({
+      requestBody: fileMetadata,
+      media: media,
+      fields: 'id,webViewLink',
+    });
+    
+    const fileId = driveFile.data.id;
+    const fileLink = driveFile.data.webViewLink;
+    
+    if (!fileId || !fileLink) {
+      throw new Error('Failed to create Drive file');
+    }
+    
+    // Make file accessible to anyone with link
+    await drive.permissions.create({
+      fileId: fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
     
     // Get existing event
     const event = await calendar.events.get({
@@ -238,13 +278,13 @@ export async function attachNoteToCalendarEvent(
       eventId: eventId,
     });
     
-    // Append note to description
+    // Add file link to event description
     const existingDescription = event.data.description || '';
-    const separator = existingDescription ? '\n\n---\n\n' : '';
-    const timestamp = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' });
-    const updatedDescription = `${existingDescription}${separator}**Meeting Notes** (${timestamp})\n\n${noteContent}`;
+    const noteLink = `<p><strong>📝 Meeting Notes:</strong> <a href="${fileLink}">${fileName}</a></p>`;
+    const separator = existingDescription ? '<br><br>' : '';
+    const updatedDescription = `${existingDescription}${separator}${noteLink}`;
     
-    // Update event
+    // Update event with link to notes file
     await calendar.events.patch({
       calendarId: 'primary',
       eventId: eventId,
@@ -253,9 +293,10 @@ export async function attachNoteToCalendarEvent(
       },
     });
     
-    logger.info('Note attached to calendar event', {
+    logger.info('Note attached to calendar event as file', {
       userId,
       eventId,
+      fileId,
     });
   } catch (error) {
     logger.error('Failed to attach note to calendar', error as Error, {

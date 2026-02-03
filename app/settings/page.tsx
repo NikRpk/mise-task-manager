@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Save, Info, Check, Plus, Trash2, GripVertical, Mail, Shield, X, Lock } from 'lucide-react';
+import { Save, Info, Check, Plus, Trash2, GripVertical, Mail, Shield, X, Lock, Calendar } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
@@ -918,6 +918,68 @@ function SettingsContent() {
                   />
                   <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Google Calendar Connection */}
+            <div className="rounded-lg shadow-sm border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+                  Google Calendar
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Connect your Google Calendar to link notes to meetings
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={async () => {
+                    if (!user?.uid) return;
+                    window.location.href = `/api/auth/google?userId=${user.uid}`;
+                  }}
+                  className="px-4 py-2 text-sm rounded-md flex items-center gap-2 text-white font-medium"
+                  style={{ backgroundColor: 'var(--color-primary)' }}
+                >
+                  <Calendar size={16} />
+                  Connect Google Calendar
+                </button>
+
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await authenticatedFetch('/api/calendar/disconnect', {
+                        method: 'POST',
+                      });
+                      
+                      if (res.ok) {
+                        setAlertDialog({
+                          isOpen: true,
+                          title: 'Disconnected',
+                          message: 'Google Calendar has been disconnected',
+                          type: 'success',
+                        });
+                      }
+                    } catch (error) {
+                      setAlertDialog({
+                        isOpen: true,
+                        title: 'Error',
+                        message: 'Failed to disconnect Google Calendar',
+                        type: 'error',
+                      });
+                    }
+                  }}
+                  className="px-4 py-2 text-sm border-2 rounded-md flex items-center gap-2 font-medium transition-colors hover:bg-red-50"
+                  style={{ borderColor: '#f30047', color: '#f30047' }}
+                >
+                  <X size={16} />
+                  Disconnect
+                </button>
+              </div>
+
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                <p className="font-medium mb-1">Note:</p>
+                <p>If you recently connected, click Disconnect and then Connect again to grant Drive file permissions for note attachments.</p>
               </div>
             </div>
           </div>

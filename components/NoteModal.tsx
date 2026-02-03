@@ -16,11 +16,12 @@ interface NoteModalProps {
   note: Note | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (noteData: Partial<Note>) => Promise<void>;
+  onSave: (noteData: Partial<Note>) => Promise<string>; // Returns note ID
   templates: NoteTemplate[];
   projects: Project[];
   calendarEvent?: CalendarEvent | null;
   defaultProjectId?: string;
+  readOnly?: boolean;
 }
 
 export default function NoteModal({
@@ -32,6 +33,7 @@ export default function NoteModal({
   projects,
   calendarEvent,
   defaultProjectId,
+  readOnly = false,
 }: NoteModalProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState<Record<string, string>>({});
@@ -39,6 +41,7 @@ export default function NoteModal({
   const [projectId, setProjectId] = useState<string | null>(null);
   const [templateId, setTemplateId] = useState('default');
   const [isSaving, setIsSaving] = useState(false);
+  const [attachToCalendar, setAttachToCalendar] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
@@ -96,8 +99,46 @@ export default function NoteModal({
         calendarEventLink: note?.calendarEventLink || calendarEvent?.htmlLink || null,
       };
 
-      await onSave(noteData);
-      onClose();
+      // Save the note first and get the ID back
+      const savedNoteId = await onSave(noteData);
+      
+      // If checkbox is enabled and note is linked to calendar, attach it
+      if (attachToCalendar && (note?.calendarEventId || calendarEvent?.id)) {
+        try {
+          const attachRes = await authenticatedFetch(`/api/notes/${savedNoteId}/attach-to-calendar`, {
+            method: 'POST',
+          });
+          
+          if (attachRes.ok) {
+            setAlertDialog({
+              isOpen: true,
+              title: 'Success',
+              message: 'Note saved and attached to calendar event as a file',
+              type: 'success',
+            });
+          } else {
+            setAlertDialog({
+              isOpen: true,
+              title: 'Note Saved',
+              message: 'Note saved, but failed to attach to calendar event',
+              type: 'warning',
+            });
+          }
+        } catch (error) {
+          // Note is saved, just attachment failed
+          console.warn('Failed to attach to calendar:', error);
+          setAlertDialog({
+            isOpen: true,
+            title: 'Note Saved',
+            message: 'Note saved successfully, but failed to attach to calendar event',
+            type: 'warning',
+          });
+        }
+      }
+      
+      setTimeout(() => {
+        onClose();
+      }, attachToCalendar && (note?.calendarEventId || calendarEvent?.id) ? 1500 : 0);
     } catch (error) {
       setAlertDialog({
         isOpen: true,
@@ -209,6 +250,7 @@ export default function NoteModal({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Note title..."
+                disabled={readOnly}
                 className="flex-1 text-xl font-semibold bg-transparent border-none focus:outline-none"
                 style={{ color: 'var(--color-text)' }}
               />
@@ -234,6 +276,7 @@ export default function NoteModal({
                 <select
                   value={templateId}
                   onChange={(e) => handleTemplateChange(e.target.value)}
+                  disabled={readOnly}
                   className="px-3 py-1.5 text-sm border rounded-md"
                   style={{ borderColor: 'var(--color-border)' }}
                 >
@@ -251,6 +294,7 @@ export default function NoteModal({
                 <select
                   value={projectId || ''}
                   onChange={(e) => setProjectId(e.target.value || null)}
+                  disabled={readOnly}
                   className="px-3 py-1.5 text-sm border rounded-md"
                   style={{ borderColor: 'var(--color-border)' }}
                 >
@@ -288,13 +332,15 @@ export default function NoteModal({
                       value={content[section.id] || ''}
                       onChange={(e) => setContent({ ...content, [section.id]: e.target.value })}
                       placeholder={section.placeholder}
+                      disabled={readOnly}
                       className="w-full min-h-[120px] px-4 py-3 border rounded-md focus:outline-none focus:ring-2 transition-all"
                       style={{ 
                         borderColor: 'var(--color-border)',
                         resize: 'vertical',
+                        backgroundColor: readOnly ? '#f9fafb' : '#ffffff',
                       }}
                       onFocus={(e) => {
-                        e.target.style.boxShadow = '0 0 0 2px var(--color-primary)';
+                        if (!readOnly) e.target.style.boxShadow = '0 0 0 2px var(--color-primary)';
                       }}
                       onBlur={(e) => {
                         e.target.style.boxShadow = '';
@@ -419,39 +465,24 @@ export default function NoteModal({
             style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
           >
             <div className="flex items-center gap-3">
-              {note?.calendarEventId && (
-                <button
-                  onClick={async () => {
-                    if (!note?.id) return;
-                    
-                    try {
-                      const res = await authenticatedFetch(`/api/notes/${note.id}/attach-to-calendar`, {
-                        method: 'POST',
-                      });
-                      
-                      if (res.ok) {
-                        setAlertDialog({
-                          isOpen: true,
-                          title: 'Success',
-                          message: 'Note attached to calendar event',
-                          type: 'success',
-                        });
-                      }
-                    } catch (error) {
-                      setAlertDialog({
-                        isOpen: true,
-                        title: 'Error',
-                        message: 'Failed to attach note to calendar',
-                        type: 'error',
-                      });
-                    }
-                  }}
-                  className="px-4 py-2 text-sm border rounded-md flex items-center gap-2 hover:bg-gray-50 transition-colors"
-                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
-                >
-                  <LinkIcon size={16} />
-                  Attach to Calendar
-                </button>
+              {(note?.calendarEventId || calendarEvent) && !readOnly && (
+                <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="attach-to-calendar"
+                    checked={attachToCalendar}
+                    onChange={(e) => setAttachToCalendar(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label 
+                    htmlFor="attach-to-calendar"
+                    className="text-sm font-medium cursor-pointer select-none flex items-center gap-2"
+                    style={{ color: '#1e40af' }}
+                  >
+                    <Calendar size={14} />
+                    <span>Attach to calendar event on save</span>
+                  </label>
+                </div>
               )}
             </div>
 
@@ -461,26 +492,28 @@ export default function NoteModal({
                 className="px-4 py-2 text-sm border rounded-md hover:bg-gray-50 transition-colors"
                 style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
               >
-                Cancel
+                {readOnly ? 'Close' : 'Cancel'}
               </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="px-4 py-2 text-sm rounded-md flex items-center gap-2 text-white font-medium disabled:opacity-50"
-                style={{ backgroundColor: 'var(--color-primary)' }}
-              >
-                {isSaving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save size={16} />
-                    Save Note
-                  </>
-                )}
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm rounded-md flex items-center gap-2 text-white font-medium disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--color-primary)' }}
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      Save Note
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
