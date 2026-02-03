@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Save, Calendar, Plus, Trash2, ArrowLeft, X } from 'lucide-react';
 import { Note, NoteTemplate, NoteTask, CalendarEvent } from '@/types';
@@ -43,6 +43,7 @@ function NewNotePage() {
     message: '',
     type: 'info',
   });
+  const taskInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   // Load template and user settings
   useEffect(() => {
@@ -226,6 +227,14 @@ function NewNotePage() {
       deadline: null,
     };
     setTasks([...tasks, newTask]);
+    
+    // Focus the first input of the new task after render
+    setTimeout(() => {
+      const inputRef = taskInputRefs.current[newTask.id];
+      if (inputRef) {
+        inputRef.focus();
+      }
+    }, 0);
   };
 
   const updateTask = (taskId: string, updates: Partial<NoteTask>) => {
@@ -414,77 +423,111 @@ function NewNotePage() {
             </div>
 
             {tasks.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8 border-2 border-dashed rounded-lg" style={{ borderColor: 'var(--color-border)' }}>
-                No tasks yet. Click "Add Task" to create action items from this note.
-              </p>
+              <div
+                onClick={addTask}
+                className="text-sm text-gray-500 text-center py-8 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                style={{ borderColor: 'var(--color-border)' }}
+              >
+                <Plus size={20} className="mx-auto mb-2 text-gray-400" />
+                <p>Click here to create your first task</p>
+              </div>
             ) : (
-              <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Task Title
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Owner
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Deadline
-                      </th>
-                      <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tasks.map((task) => (
-                      <tr
-                        key={task.id}
-                        className="border-b"
-                        style={{ borderColor: 'var(--color-border)' }}
-                      >
-                        <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            value={task.title}
-                            onChange={(e) => updateTask(task.id, { title: e.target.value })}
-                            placeholder="Task title..."
-                            className="w-full px-2 py-1 border rounded text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            value={task.owner}
-                            onChange={(e) => updateTask(task.id, { owner: e.target.value })}
-                            placeholder="Owner..."
-                            className="w-full px-2 py-1 border rounded text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="date"
-                            value={task.deadline || ''}
-                            onChange={(e) => updateTask(task.id, { deadline: e.target.value || null })}
-                            className="w-full px-2 py-1 border rounded text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => removeTask(task.id)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Remove task"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
+              <div>
+                <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                        <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Task Title
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Owner
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Deadline
+                        </th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Actions
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {tasks.map((task, index) => (
+                        <tr
+                          key={task.id}
+                          className="border-b"
+                          style={{ borderColor: 'var(--color-border)' }}
+                        >
+                          <td className="px-4 py-3">
+                            <input
+                              ref={(el) => { taskInputRefs.current[task.id] = el; }}
+                              type="text"
+                              value={task.title}
+                              onChange={(e) => updateTask(task.id, { title: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && index === tasks.length - 1) {
+                                  e.preventDefault();
+                                  addTask();
+                                }
+                              }}
+                              placeholder="Task title..."
+                              className="w-full px-2 py-1 border rounded text-sm"
+                              style={{ borderColor: 'var(--color-border)' }}
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <input
+                              type="text"
+                              value={task.owner}
+                              onChange={(e) => updateTask(task.id, { owner: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && index === tasks.length - 1) {
+                                  e.preventDefault();
+                                  addTask();
+                                }
+                              }}
+                              placeholder="Owner..."
+                              className="w-full px-2 py-1 border rounded text-sm"
+                              style={{ borderColor: 'var(--color-border)' }}
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <input
+                              type="date"
+                              value={task.deadline || ''}
+                              onChange={(e) => updateTask(task.id, { deadline: e.target.value || null })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && index === tasks.length - 1) {
+                                  e.preventDefault();
+                                  addTask();
+                                }
+                              }}
+                              className="w-full px-2 py-1 border rounded text-sm"
+                              style={{ borderColor: 'var(--color-border)' }}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => removeTask(task.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Remove task"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div
+                  onClick={addTask}
+                  className="mt-2 py-4 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2 text-sm text-gray-500"
+                  style={{ borderColor: 'var(--color-border)' }}
+                >
+                  <Plus size={16} />
+                  <span>Click here or press Enter to add another task</span>
+                </div>
               </div>
             )}
           </div>
