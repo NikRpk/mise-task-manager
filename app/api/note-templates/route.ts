@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         templates.unshift({
           id: DEFAULT_NOTE_TEMPLATE.id,
           name: DEFAULT_NOTE_TEMPLATE.name,
-          content: DEFAULT_NOTE_TEMPLATE.content,
+          sections: [...DEFAULT_NOTE_TEMPLATE.sections],
           createdBy: user.uid,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       
       const newTemplate: Omit<NoteTemplate, 'id'> = {
         name: body.name || 'Untitled Template',
-        content: body.content || '',
+        sections: body.sections || [],
         createdBy: user.uid,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

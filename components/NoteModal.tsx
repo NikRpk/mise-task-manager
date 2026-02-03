@@ -1,17 +1,16 @@
 /**
  * Note Modal Component
- * Editor for meeting notes with single rich text field and task extraction
+ * Editor for meeting notes with template sections and task extraction
  */
 
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Save, Calendar, Link as LinkIcon, FileText, Plus, Trash2, Edit, ChevronDown } from 'lucide-react';
+import { X, Save, Calendar, Link as LinkIcon, FileText, Plus, Trash2, Edit } from 'lucide-react';
 import { Note, NoteTemplate, NoteTask, CalendarEvent, Project } from '@/types';
-import TipTapEditor from './TipTapEditor';
+import RichTextEditor from './RichTextEditor';
 import ConfirmDialog from './ConfirmDialog';
 import AlertDialog from './AlertDialog';
-import MeetingSelectorDropdown from './MeetingSelectorDropdown';
 import { authenticatedFetch } from '@/lib/api-client';
 
 interface NoteModalProps {
@@ -44,10 +43,8 @@ export default function NoteModal({
   const [templateId, setTemplateId] = useState('default');
   const [isSaving, setIsSaving] = useState(false);
   const [attachToCalendar, setAttachToCalendar] = useState(true);
-  const [isEditMode, setIsEditMode] = useState(!readOnly);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showMeetingSelector, setShowMeetingSelector] = useState(false);
-  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(calendarEvent || null);
+  const [isEditMode, setIsEditMode] = useState(!readOnly);
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'success' | 'warning' | 'info' }>({
@@ -59,21 +56,10 @@ export default function NoteModal({
 
   const currentTemplate = templates.find(t => t.id === templateId) || templates[0];
 
-  const handleChangeMeeting = (newEvent: CalendarEvent | null) => {
-    setSelectedCalendarEvent(newEvent);
-    if (newEvent) {
-      setTitle(newEvent.summary);
-    }
-    setShowMeetingSelector(false);
-  };
-
   // Initialize or reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
       setIsEditMode(!readOnly);
-      // Reset alert dialog
-      setAlertDialog({ isOpen: false, title: '', message: '', type: 'info' });
-      
       if (note) {
         // Editing existing note
         setTitle(note.title);
@@ -84,14 +70,14 @@ export default function NoteModal({
       } else {
         // Creating new note - use template content
         setTitle(calendarEvent?.summary || '');
-        const template = templates.find(t => t.id === templateId) || templates[0];
+        const template = templates.find(t => t.id === 'default') || templates[0];
         setContent(template?.content || '');
         setTasks([]);
         setProjectId(defaultProjectId || null);
         setTemplateId('default');
       }
     }
-  }, [isOpen, note, calendarEvent, defaultProjectId, readOnly, templates, templateId]);
+  }, [isOpen, note, calendarEvent, defaultProjectId, readOnly, templates]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -113,15 +99,15 @@ export default function NoteModal({
         tasks,
         projectId,
         templateId,
-        calendarEventId: note?.calendarEventId || selectedCalendarEvent?.id || calendarEvent?.id || null,
-        calendarEventLink: note?.calendarEventLink || selectedCalendarEvent?.htmlLink || calendarEvent?.htmlLink || null,
+        calendarEventId: note?.calendarEventId || calendarEvent?.id || null,
+        calendarEventLink: note?.calendarEventLink || calendarEvent?.htmlLink || null,
       };
 
       // Save the note first and get the ID back
       const savedNoteId = await onSave(noteData);
       
       // If checkbox is enabled and note is linked to calendar, attach it
-      if (attachToCalendar && (note?.calendarEventId || selectedCalendarEvent?.id || calendarEvent?.id)) {
+      if (attachToCalendar && (note?.calendarEventId || calendarEvent?.id)) {
         try {
           const attachRes = await authenticatedFetch(`/api/notes/${savedNoteId}/attach-to-calendar`, {
             method: 'POST',
@@ -131,7 +117,7 @@ export default function NoteModal({
             setAlertDialog({
               isOpen: true,
               title: 'Success',
-              message: 'Note saved and attached to calendar event as a Google Doc',
+              message: 'Note saved and attached to calendar event as a file',
               type: 'success',
             });
           } else {
@@ -143,6 +129,7 @@ export default function NoteModal({
             });
           }
         } catch (error) {
+          // Note is saved, just attachment failed
           console.warn('Failed to attach to calendar:', error);
           setAlertDialog({
             isOpen: true,
@@ -155,7 +142,7 @@ export default function NoteModal({
       
       setTimeout(() => {
         onClose();
-      }, attachToCalendar && (note?.calendarEventId || selectedCalendarEvent?.id || calendarEvent?.id) ? 1500 : 0);
+      }, attachToCalendar && (note?.calendarEventId || calendarEvent?.id) ? 1500 : 0);
     } catch (error) {
       setAlertDialog({
         isOpen: true,
@@ -169,6 +156,7 @@ export default function NoteModal({
   };
 
   const handleTemplateChange = (newTemplateId: string) => {
+    // Warn if there's content
     const hasContent = content.trim() && content !== currentTemplate?.content;
     
     if (hasContent) {
@@ -227,6 +215,7 @@ export default function NoteModal({
             message: `${tasksToCreate.length} task(s) created successfully`,
             type: 'success',
           });
+          // Refresh to get updated task IDs
           setTimeout(() => window.location.reload(), 1500);
         }
       } catch (error) {
@@ -281,122 +270,90 @@ export default function NoteModal({
             </button>
           </div>
 
-          {/* Consolidated Toolbar */}
+          {/* Toolbar */}
           <div
-            className="px-6 py-3 border-b"
+            className="flex items-center justify-between px-6 py-3 border-b"
             style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
           >
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              {/* Left side - Project and Event */}
-              <div className="flex items-center gap-4">
-                {/* Project Selector */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Project:</span>
-                  <select
-                    value={projectId || ''}
-                    onChange={(e) => setProjectId(e.target.value || null)}
-                    disabled={!isEditMode}
-                    className="px-3 py-1.5 text-sm border rounded-md"
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    <option value="">No Project</option>
-                    {projects.map(project => (
-                      <option key={project.id} value={project.id}>
-                        {project.icon} {project.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-              {/* Right side - Event Info */}
-              <div className="relative">
-                {selectedCalendarEvent || calendarEvent ? (
-                  <>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-md">
-                      <Calendar size={14} className="text-blue-600 flex-shrink-0" />
-                      <div className="text-sm">
-                        <span className="font-medium text-blue-900">{(selectedCalendarEvent || calendarEvent)?.summary}</span>
-                        <span className="text-xs text-blue-600 ml-2">
-                          {new Date((selectedCalendarEvent || calendarEvent)!.start).toLocaleString('de-DE', {
-                            weekday: 'short',
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'Europe/Berlin'
-                          })}
-                        </span>
-                      </div>
-                      {isEditMode && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowMeetingSelector(!showMeetingSelector);
-                          }}
-                          className="ml-2 p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                          title="Change meeting"
-                          type="button"
-                        >
-                          <ChevronDown size={14} />
-                        </button>
-                      )}
-                    </div>
-                    
-                    {/* Meeting Selector Dropdown */}
-                    {showMeetingSelector && (
-                      <MeetingSelectorDropdown
-                        isOpen={showMeetingSelector}
-                        onClose={() => setShowMeetingSelector(false)}
-                        onSelect={handleChangeMeeting}
-                        currentEventId={(selectedCalendarEvent || calendarEvent)?.id}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {isEditMode && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowMeetingSelector(!showMeetingSelector);
-                        }}
-                        className="px-3 py-1.5 text-sm border-2 border-dashed rounded-md flex items-center gap-2 hover:bg-blue-50 transition-colors"
-                        style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
-                        type="button"
-                      >
-                        <Calendar size={14} />
-                        <span>Link to Meeting</span>
-                      </button>
-                    )}
-                    
-                    {/* Meeting Selector Dropdown */}
-                    {showMeetingSelector && (
-                      <MeetingSelectorDropdown
-                        isOpen={showMeetingSelector}
-                        onClose={() => setShowMeetingSelector(false)}
-                        onSelect={handleChangeMeeting}
-                        currentEventId={null}
-                      />
-                    )}
-                  </>
-                )}
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Template Selector */}
+              <div className="flex items-center gap-2">
+                <FileText size={16} className="text-gray-500" />
+                <select
+                  value={templateId}
+                  onChange={(e) => handleTemplateChange(e.target.value)}
+                  disabled={!isEditMode}
+                  className="px-3 py-1.5 text-sm border rounded-md"
+                  style={{ borderColor: 'var(--color-border)' }}
+                >
+                  {templates.map(template => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {/* Project Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Project:</span>
+                <select
+                  value={projectId || ''}
+                  onChange={(e) => setProjectId(e.target.value || null)}
+                  disabled={!isEditMode}
+                  className="px-3 py-1.5 text-sm border rounded-md"
+                  style={{ borderColor: 'var(--color-border)' }}
+                >
+                  <option value="">No Project</option>
+                  {projects.map(project => (
+                    <option key={project.id} value={project.id}>
+                      {project.icon} {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Calendar Event Badge */}
+              {(note?.calendarEventId || calendarEvent) && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-sm">
+                  <Calendar size={14} />
+                  <span>Linked to meeting</span>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-4xl mx-auto space-y-6">
-              {/* Stable Rich Text Editor */}
-              <div>
-                <TipTapEditor
-                  value={content}
-                  onChange={setContent}
-                  placeholder="Start taking notes..."
-                  disabled={!isEditMode}
-                  attendees={[]} // TODO: Extract from calendar event
-                />
-              </div>
+              {/* Template Sections */}
+              {currentTemplate?.sections
+                .sort((a, b) => a.order - b.order)
+                .map(section => (
+                  <div key={section.id}>
+                    <label className="block text-sm font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>
+                      {section.title}
+                    </label>
+                    <textarea
+                      value={content[section.id] || ''}
+                      onChange={(e) => setContent({ ...content, [section.id]: e.target.value })}
+                      placeholder={section.placeholder}
+                      disabled={isEditMode}
+                      className="w-full min-h-[120px] px-4 py-3 border rounded-md focus:outline-none focus:ring-2 transition-all"
+                      style={{ 
+                        borderColor: 'var(--color-border)',
+                        resize: 'vertical',
+                        backgroundColor: isEditMode ? '#ffffff' : '#f9fafb',
+                      }}
+                      onFocus={(e) => {
+                        if (isEditMode) e.target.style.boxShadow = '0 0 0 2px var(--color-primary)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.boxShadow = '';
+                      }}
+                    />
+                  </div>
+                ))}
 
               {/* Tasks Section */}
               <div className="mt-8">
@@ -404,16 +361,14 @@ export default function NoteModal({
                   <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>
                     Tasks
                   </h3>
-                  {isEditMode && (
-                    <button
-                      onClick={addTask}
-                      className="px-3 py-1.5 text-sm rounded-md flex items-center gap-2 text-white"
-                      style={{ backgroundColor: 'var(--color-primary)' }}
-                    >
-                      <Plus size={14} />
-                      Add Task
-                    </button>
-                  )}
+                  <button
+                    onClick={addTask}
+                    className="px-3 py-1.5 text-sm rounded-md flex items-center gap-2 text-white"
+                    style={{ backgroundColor: 'var(--color-primary)' }}
+                  >
+                    <Plus size={14} />
+                    Add Task
+                  </button>
                 </div>
 
                 {tasks.length === 0 ? (
@@ -435,11 +390,9 @@ export default function NoteModal({
                             <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                               Deadline
                             </th>
-                            {isEditMode && (
-                              <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                Actions
-                              </th>
-                            )}
+                            <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Actions
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -455,12 +408,8 @@ export default function NoteModal({
                                   value={task.title}
                                   onChange={(e) => updateTask(task.id, { title: e.target.value })}
                                   placeholder="Task title..."
-                                  disabled={!isEditMode}
                                   className="w-full px-2 py-1 border rounded text-sm"
-                                  style={{ 
-                                    borderColor: 'var(--color-border)',
-                                    backgroundColor: isEditMode ? '#ffffff' : '#f9fafb',
-                                  }}
+                                  style={{ borderColor: 'var(--color-border)' }}
                                 />
                               </td>
                               <td className="px-4 py-3">
@@ -469,12 +418,8 @@ export default function NoteModal({
                                   value={task.owner}
                                   onChange={(e) => updateTask(task.id, { owner: e.target.value })}
                                   placeholder="Owner..."
-                                  disabled={!isEditMode}
                                   className="w-full px-2 py-1 border rounded text-sm"
-                                  style={{ 
-                                    borderColor: 'var(--color-border)',
-                                    backgroundColor: isEditMode ? '#ffffff' : '#f9fafb',
-                                  }}
+                                  style={{ borderColor: 'var(--color-border)' }}
                                 />
                               </td>
                               <td className="px-4 py-3">
@@ -482,25 +427,19 @@ export default function NoteModal({
                                   type="date"
                                   value={task.deadline || ''}
                                   onChange={(e) => updateTask(task.id, { deadline: e.target.value || null })}
-                                  disabled={!isEditMode}
                                   className="w-full px-2 py-1 border rounded text-sm"
-                                  style={{ 
-                                    borderColor: 'var(--color-border)',
-                                    backgroundColor: isEditMode ? '#ffffff' : '#f9fafb',
-                                  }}
+                                  style={{ borderColor: 'var(--color-border)' }}
                                 />
                               </td>
-                              {isEditMode && (
-                                <td className="px-4 py-3 text-center">
-                                  <button
-                                    onClick={() => removeTask(task.id)}
-                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                    title="Remove task"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </td>
-                              )}
+                              <td className="px-4 py-3 text-center">
+                                <button
+                                  onClick={() => removeTask(task.id)}
+                                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Remove task"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -508,11 +447,8 @@ export default function NoteModal({
                     </div>
                     
                     {/* Create Tasks Button */}
-                    {isEditMode && projectId && note?.id && tasks.some(t => !t.createdTaskId && t.title.trim()) && (
-                      <div className="mt-3 flex items-center justify-between">
-                        <p className="text-xs text-gray-500">
-                          💡 Tasks will be created in your project's task board and linked back to this note
-                        </p>
+                    {projectId && note?.id && tasks.some(t => !t.createdTaskId && t.title.trim()) && (
+                      <div className="mt-3 flex justify-end">
                         <button
                           onClick={handleCreateTasks}
                           className="px-4 py-2 text-sm rounded-md flex items-center gap-2 font-medium border-2 hover:bg-green-50 transition-colors"
@@ -535,7 +471,7 @@ export default function NoteModal({
             style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
           >
             <div className="flex items-center gap-3">
-              {(note?.calendarEventId || selectedCalendarEvent || calendarEvent) && isEditMode && (
+              {(note?.calendarEventId || calendarEvent) && !readOnly && (
                 <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
                   <input
                     type="checkbox"

@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       
       const newNote: Omit<Note, 'id'> = {
         title: body.title || 'Untitled Note',
-        content: body.content || '',
+        content: body.content || {},
         tasks: body.tasks || [],
         projectId: body.projectId || null,
         calendarEventId: body.calendarEventId || null,

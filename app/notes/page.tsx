@@ -38,7 +38,6 @@ function NotesPage() {
   const [filterProject, setFilterProject] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [isReadOnly, setIsReadOnly] = useState(false);
   const [isCalendarSelectorOpen, setIsCalendarSelectorOpen] = useState(false);
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [userTimezone, setUserTimezone] = useState(DEFAULT_TIMEZONE);
@@ -91,19 +90,11 @@ function NotesPage() {
 
   const handleCalendarEventSelected = (event: CalendarEvent | null) => {
     setSelectedCalendarEvent(event);
-    setIsReadOnly(false);
-    setIsNoteModalOpen(true);
-  };
-
-  const handleViewNote = (note: Note) => {
-    setSelectedNote(note);
-    setIsReadOnly(true);
     setIsNoteModalOpen(true);
   };
 
   const handleEditNote = (note: Note) => {
     setSelectedNote(note);
-    setIsReadOnly(false);
     setIsNoteModalOpen(true);
   };
 
@@ -122,12 +113,12 @@ function NotesPage() {
     if (noteData.id) {
       // Update existing note
       await updateNote(noteData.id, noteData);
-      return noteData.id;
     } else {
-      // Create new note and return the new note with ID
-      const newNote = await createNote(noteData);
-      return newNote.id;
+      // Create new note
+      await createNote(noteData);
     }
+    setIsNoteModalOpen(false);
+    setSelectedNote(null);
   };
 
   const getProjectName = (projectId: string | null) => {
@@ -268,15 +259,12 @@ function NotesPage() {
                         style={{ borderColor: 'var(--color-border)' }}
                       >
                         <td className="px-6 py-4">
-                          <button
-                            onClick={() => handleViewNote(note)}
-                            className="flex items-center gap-2 hover:underline text-left"
-                          >
+                          <div className="flex items-center gap-2">
                             <FileText size={16} className="text-gray-400" />
                             <span className="font-medium" style={{ color: 'var(--color-text)' }}>
                               {note.title}
                             </span>
-                          </button>
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           {projectName ? (
@@ -355,14 +343,12 @@ function NotesPage() {
           setIsNoteModalOpen(false);
           setSelectedNote(null);
           setSelectedCalendarEvent(null);
-          setIsReadOnly(false);
         }}
         onSave={handleSaveNote}
         templates={templates}
         projects={projects}
         calendarEvent={selectedCalendarEvent}
         defaultProjectId={filterProject || undefined}
-        readOnly={isReadOnly}
       />
 
       {/* Confirm Dialog */}

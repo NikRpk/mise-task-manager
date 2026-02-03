@@ -8,6 +8,10 @@ import { logger } from '@/lib/logger';
 interface UserSettings {
   colorScheme: string;
   displayName?: string;
+  timezone?: string;
+  noteTemplate?: string;
+  googleCalendarRefreshToken?: string;
+  googleCalendarConnectedAt?: string;
   notifications?: {
     email: boolean;
     desktop: boolean;
@@ -27,6 +31,7 @@ export async function GET(request: NextRequest) {
         const defaultSettings: UserSettings = {
           colorScheme: 'hellofresh',
           displayName: user.displayName,
+          timezone: 'Europe/Berlin',
           notifications: {
             email: true,
             desktop: true,
@@ -68,10 +73,15 @@ export async function PUT(request: NextRequest) {
       const settings: UserSettings = {
         colorScheme: body.colorScheme || 'hellofresh',
         displayName: body.displayName || user.displayName,
+        timezone: body.timezone || 'Europe/Berlin',
+        noteTemplate: body.noteTemplate,
         notifications: body.notifications || {
           email: true,
           desktop: true,
         },
+        // Preserve calendar tokens if they exist
+        googleCalendarRefreshToken: body.googleCalendarRefreshToken,
+        googleCalendarConnectedAt: body.googleCalendarConnectedAt,
       };
 
       await userSettingsRef.set(settings, { merge: true });

@@ -47,10 +47,10 @@ export async function POST(
       }
       
       // Format note content for calendar
-      const formattedContent = formatNoteForCalendar(noteData, user.email);
+      const formattedContent = formatNoteForCalendar(noteData);
       
-      // Attach to calendar event (creates Google Doc and links it)
-      await attachNoteToCalendarEvent(user.uid, noteData.calendarEventId, noteData.title, formattedContent, user.email);
+      // Attach to calendar event
+      await attachNoteToCalendarEvent(user.uid, noteData.calendarEventId, formattedContent);
       
       return NextResponse.json({
         success: true,
@@ -67,32 +67,33 @@ export async function POST(
 }
 
 /**
- * Format note content for Google Doc
+ * Format note content for calendar event description
  */
-function formatNoteForCalendar(note: Note, userEmail: string): string {
-  let html = `<h1>${note.title}</h1>\n`;
-  html += `<p><em>Created: ${new Date(note.createdAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}</em></p>\n`;
-  html += `<hr>\n\n`;
+function formatNoteForCalendar(note: Note): string {
+  let formatted = `# ${note.title}\n\n`;
   
-  // Add note content (already formatted HTML from RichTextEditor)
-  html += note.content;
-  html += `\n\n`;
+  // Add each section
+  for (const [sectionId, content] of Object.entries(note.content)) {
+    if (content.trim()) {
+      // Convert HTML to plain text (simple version)
+      const plainText = content
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n\n')
+        .replace(/<[^>]+>/g, '')
+        .trim();
+      
+      formatted += `## ${sectionId.toUpperCase()}\n${plainText}\n\n`;
+    }
+  }
   
   // Add tasks section
   if (note.tasks.length > 0) {
-    html += `<hr>\n`;
-    html += `<h2>Tasks</h2>\n`;
-    html += `<ul>\n`;
-    note.tasks.forEach((task) => {
-      const deadline = task.deadline ? ` <em>(Due: ${new Date(task.deadline).toLocaleDateString('de-DE')})</em>` : '';
-      const status = task.createdTaskId ? ' ✓' : '';
-      html += `<li><strong>${task.title}</strong> - ${task.owner}${deadline}${status}</li>\n`;
+    formatted += `## TASKS\n`;
+    note.tasks.forEach((task, index) => {
+      const deadline = task.deadline ? ` (Due: ${new Date(task.deadline).toLocaleDateString('de-DE')})` : '';
+      formatted += `${index + 1}. ${task.title} - ${task.owner}${deadline}\n`;
     });
-    html += `</ul>\n`;
   }
   
-  html += `<hr>\n`;
-  html += `<p><small>Added by ${userEmail}</small></p>`;
-  
-  return html;
+  return formatted;
 }

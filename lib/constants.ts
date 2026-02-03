@@ -173,17 +173,25 @@ export const DEFAULT_DATETIME_FORMAT = 'dd.MM.yyyy HH:mm';
 export const DEFAULT_NOTE_TEMPLATE = {
   id: 'default',
   name: 'Meeting Notes',
-  content: `AGENDA
-• 
+  content: `<h2>Agenda</h2>
+<ul>
+  <li></li>
+</ul>
 
-DISCUSSION & NOTES
-• 
+<h2>Discussion & Notes</h2>
+<ul>
+  <li></li>
+</ul>
 
-DECISIONS MADE
-• 
+<h2>Decisions Made</h2>
+<ul>
+  <li></li>
+</ul>
 
-ACTION ITEMS
-• `,
+<h2>Action Items</h2>
+<ul>
+  <li></li>
+</ul>`,
   isDefault: true,
 } as const;
 

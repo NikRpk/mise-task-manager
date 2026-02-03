@@ -47,7 +47,7 @@ export async function PUT(
       // Update template
       const updatedTemplate = {
         name: body.name,
-        content: body.content,
+        sections: body.sections,
         updatedAt: new Date().toISOString(),
       };
       
