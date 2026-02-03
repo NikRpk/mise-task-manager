@@ -128,6 +128,13 @@ export async function POST(
 function formatNoteForGoogleDoc(note: Note, userEmail: string): string {
   let html = `<h1>${note.title}</h1>\n`;
   html += `<p><em>Created: ${new Date(note.createdAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}</em></p>\n`;
+  
+  // Add meeting information if available (compact format)
+  if (note.calendarEventData) {
+    html += `<p><strong>Event:</strong> ${note.calendarEventData.summary}</p>\n`;
+    html += `<p><strong>Time:</strong> ${new Date(note.calendarEventData.start).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}</p>\n`;
+  }
+  
   html += `<hr>\n\n`;
   
   // Add note content (already HTML from TipTap)

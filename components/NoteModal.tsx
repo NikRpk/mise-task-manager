@@ -12,6 +12,9 @@ import TipTapEditor from './TipTapEditor';
 import ConfirmDialog from './ConfirmDialog';
 import AlertDialog from './AlertDialog';
 import { authenticatedFetch } from '@/lib/api-client';
+import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+import { DEFAULT_TIMEZONE } from '@/lib/constants';
 
 interface NoteModalProps {
   note: Note | null;
@@ -40,6 +43,7 @@ export default function NoteModal({
   const [attachToCalendar, setAttachToCalendar] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isEditMode, setIsEditMode] = useState(!readOnly);
+  const [userTimezone, setUserTimezone] = useState(DEFAULT_TIMEZONE);
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'success' | 'warning' | 'info' }>({
@@ -55,6 +59,28 @@ export default function NoteModal({
   useEffect(() => {
     if (isOpen) {
       setIsEditMode(!readOnly);
+      
+      // Fetch user timezone
+      (async () => {
+        try {
+          const token = await (await import('@/lib/firebase')).auth.currentUser?.getIdToken();
+          const res = await fetch('/api/settings', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.timezone) {
+              setUserTimezone(data.timezone);
+            }
+          }
+        } catch (error) {
+          // Use default timezone
+        }
+      })();
+      
       if (note) {
         // Editing existing note
         setTitle(note.title);
@@ -249,39 +275,42 @@ ACTION ITEMS
         >
           {/* Header */}
           <div
-            className="flex items-center justify-between px-6 py-4 border-b"
+            className="px-6 py-4 border-b"
             style={{ borderColor: 'var(--color-border)' }}
           >
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Note title..."
-              disabled={!isEditMode}
-              className="flex-1 text-xl font-semibold bg-transparent border-none focus:outline-none"
-              style={{ color: 'var(--color-text)' }}
-            />
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              title="Close"
-            >
-              <X size={20} style={{ color: 'var(--color-text)' }} />
-            </button>
+            <div className="flex items-center justify-between mb-2">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Note title..."
+                disabled={!isEditMode}
+                className="flex-1 text-xl font-semibold bg-transparent border-none focus:outline-none"
+                style={{ color: 'var(--color-text)' }}
+              />
+              <button
+                onClick={onClose}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Close"
+              >
+                <X size={20} style={{ color: 'var(--color-text)' }} />
+              </button>
+            </div>
+            
+            {/* Meeting Info */}
+            {(note?.calendarEventId || calendarEvent) && calendarEvent && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Calendar size={14} className="text-blue-600" />
+                <span className="font-medium">{calendarEvent.summary}</span>
+                <span>•</span>
+                <span>
+                  {format(toZonedTime(new Date(calendarEvent.start), userTimezone), 'dd.MM.yyyy, HH:mm')}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Consolidated Toolbar */}
-          {(note?.calendarEventId || calendarEvent) && (
-            <div
-              className="px-6 py-3 border-b"
-              style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
-            >
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-sm w-fit">
-                <Calendar size={14} />
-                <span>Linked to meeting</span>
-              </div>
-            </div>
-          )}
+          {/* Consolidated Toolbar removed - meeting info now in header */}
 
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-6">

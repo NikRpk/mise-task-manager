@@ -215,6 +215,20 @@ export async function fetchUpcomingEvents(userId: string): Promise<CalendarEvent
         end: event.end?.dateTime || '',
         htmlLink: event.htmlLink || '',
         description: event.description || null,
+        attendees: event.attendees?.map(attendee => ({
+          email: attendee.email || '',
+          displayName: attendee.displayName,
+          responseStatus: attendee.responseStatus as 'accepted' | 'declined' | 'tentative' | 'needsAction' | undefined,
+          organizer: attendee.organizer || false,
+          self: attendee.self || false,
+        })) || [],
+        hangoutLink: event.hangoutLink,
+        conferenceData: event.conferenceData ? {
+          entryPoints: event.conferenceData.entryPoints?.map(ep => ({
+            uri: ep.uri || '',
+            entryPointType: ep.entryPointType || '',
+          })),
+        } : undefined,
       }));
   } catch (error) {
     console.error('Failed to fetch calendar events', error as Error, { userId });

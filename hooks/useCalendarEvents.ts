@@ -11,6 +11,7 @@ interface UseCalendarEventsResult {
   events: CalendarEvent[];
   loading: boolean;
   connected: boolean;
+  checkedConnection: boolean;
   fetchEvents: () => Promise<void>;
   connectCalendar: () => void;
   disconnectCalendar: () => Promise<void>;
@@ -25,8 +26,40 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [checkedConnection, setCheckedConnection] = useState(false);
 
-  const fetchEvents = useCallback(async () => {
+  // Check connection status on mount
+  useEffect(() => {
+    if (userId && !checkedConnection) {
+      checkConnection();
+    }
+  }, [userId, checkedConnection]);
+
+  const checkConnection = useCallback(async () => {
+    if (!userId) return;
+    
+    try {
+      const res = await authenticatedFetch('/api/settings');
+      if (res.ok) {
+        const data = await res.json();
+        const isConnected = !!data.googleCalendarRefreshToken;
+        setConnected(isConnected);
+        setCheckedConnection(true);
+        
+        // Auto-fetch events if connected
+        if (isConnected) {
+          fetchEventsInternal();
+        }
+      } else {
+        setCheckedConnection(true);
+      }
+    } catch (error) {
+      logger.error('Failed to check calendar connection', error as Error, { userId });
+      setCheckedConnection(true);
+    }
+  }, [userId]);
+
+  const fetchEventsInternal = async () => {
     if (!userId) return;
 
     try {
@@ -48,6 +81,10 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchEvents = useCallback(async () => {
+    await fetchEventsInternal();
   }, [userId]);
 
   const connectCalendar = useCallback(() => {
@@ -73,17 +110,11 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
     }
   }, [userId]);
 
-  // Check connection status on mount
-  useEffect(() => {
-    if (userId) {
-      fetchEvents();
-    }
-  }, [userId, fetchEvents]);
-
   return {
     events,
     loading,
     connected,
+    checkedConnection,
     fetchEvents,
     connectCalendar,
     disconnectCalendar,

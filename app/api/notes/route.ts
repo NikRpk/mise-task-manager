@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
         tasks: body.tasks || [],
         calendarEventId: body.calendarEventId || null,
         calendarEventLink: body.calendarEventLink || null,
+        calendarEventData: body.calendarEventData || null,
         templateId: body.templateId || 'default',
         createdBy: user.uid,
         createdAt: new Date().toISOString(),

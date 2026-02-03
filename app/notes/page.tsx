@@ -13,8 +13,6 @@ import { useAuth } from '@/lib/auth-context';
 import { useNoteData } from '@/hooks/useNoteData';
 import { useNoteTemplates } from '@/hooks/useNoteTemplates';
 import { authenticatedFetch } from '@/lib/api-client';
-import NoteModal from '@/components/NoteModal';
-import CalendarEventSelector from '@/components/CalendarEventSelector';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import AuthGuard from '@/components/AuthGuard';
 import UserProfile from '@/components/UserProfile';
@@ -32,12 +30,6 @@ function NotesPage() {
   const { templates } = useNoteTemplates(user?.uid);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [isCalendarSelectorOpen, setIsCalendarSelectorOpen] = useState(false);
-  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
-  const [isReadOnly, setIsReadOnly] = useState(false);
-  const [userTimezone, setUserTimezone] = useState(DEFAULT_TIMEZONE);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; message: string; onConfirm: () => void }>({
     isOpen: false,
     message: '',
@@ -45,6 +37,7 @@ function NotesPage() {
   });
 
   // Fetch user's timezone setting
+  const [userTimezone, setUserTimezone] = useState(DEFAULT_TIMEZONE);
   useEffect(() => {
     if (user) {
       const fetchUserSettings = async () => {
@@ -80,27 +73,15 @@ function NotesPage() {
   }, [notes, searchQuery]);
 
   const handleNewNote = () => {
-    setSelectedNote(null);
-    setSelectedCalendarEvent(null);
-    setIsCalendarSelectorOpen(true);
-  };
-
-  const handleCalendarEventSelected = (event: CalendarEvent | null) => {
-    setSelectedCalendarEvent(event);
-    setIsReadOnly(false);
-    setIsNoteModalOpen(true);
+    router.push('/notes/new');
   };
 
   const handleViewNote = (note: Note) => {
-    setSelectedNote(note);
-    setIsReadOnly(true);
-    setIsNoteModalOpen(true);
+    router.push(`/notes/${note.id}`);
   };
 
   const handleEditNote = (note: Note) => {
-    setSelectedNote(note);
-    setIsReadOnly(false);
-    setIsNoteModalOpen(true);
+    router.push(`/notes/${note.id}`);
   };
 
   const handleDeleteNote = (note: Note) => {
@@ -112,18 +93,6 @@ function NotesPage() {
         setConfirmDialog({ ...confirmDialog, isOpen: false });
       },
     });
-  };
-
-  const handleSaveNote = async (noteData: Partial<Note>): Promise<string> => {
-    if (noteData.id) {
-      // Update existing note
-      await updateNote(noteData.id, noteData);
-      return noteData.id;
-    } else {
-      // Create new note
-      const newNote = await createNote(noteData);
-      return newNote.id;
-    }
   };
 
   if (loading && notes.length === 0) {
@@ -308,27 +277,6 @@ function NotesPage() {
           )}
         </div>
       </main>
-
-      {/* Calendar Event Selector */}
-      <CalendarEventSelector
-        isOpen={isCalendarSelectorOpen}
-        onClose={() => setIsCalendarSelectorOpen(false)}
-        onSelectEvent={handleCalendarEventSelected}
-      />
-
-      {/* Note Modal */}
-      <NoteModal
-        note={selectedNote}
-        isOpen={isNoteModalOpen}
-        onClose={() => {
-          setIsNoteModalOpen(false);
-          setSelectedNote(null);
-          setSelectedCalendarEvent(null);
-        }}
-        onSave={handleSaveNote}
-        templates={templates}
-        calendarEvent={selectedCalendarEvent}
-      />
 
       {/* Confirm Dialog */}
       <ConfirmDialog

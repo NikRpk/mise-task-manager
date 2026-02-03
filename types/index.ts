@@ -56,6 +56,7 @@ export interface Note {
   tasks: NoteTask[];
   calendarEventId: string | null; // Google Calendar event ID
   calendarEventLink: string | null;
+  calendarEventData?: CalendarEvent | null; // Full calendar event data including attendees
   templateId: string;
   createdBy: string;
   createdAt: string;
@@ -79,4 +80,18 @@ export interface CalendarEvent {
   end: string;
   htmlLink: string;
   description?: string | null;
+  attendees?: Array<{
+    email: string;
+    displayName?: string;
+    responseStatus?: 'accepted' | 'declined' | 'tentative' | 'needsAction';
+    organizer?: boolean;
+    self?: boolean;
+  }>;
+  hangoutLink?: string;
+  conferenceData?: {
+    entryPoints?: Array<{
+      uri: string;
+      entryPointType: string;
+    }>;
+  };
 }

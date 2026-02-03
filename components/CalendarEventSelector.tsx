@@ -27,7 +27,7 @@ export default function CalendarEventSelector({
   onSelectEvent,
 }: CalendarEventSelectorProps) {
   const { user } = useAuth();
-  const { events, loading, connected, fetchEvents, connectCalendar } = useCalendarEvents(user?.uid);
+  const { events, loading, connected, checkedConnection, connectCalendar } = useCalendarEvents(user?.uid);
   const [searchQuery, setSearchQuery] = useState('');
   const [userTimezone, setUserTimezone] = useState(DEFAULT_TIMEZONE);
 
@@ -50,12 +50,6 @@ export default function CalendarEventSelector({
       fetchUserTimezone();
     }
   }, [user]);
-
-  useEffect(() => {
-    if (isOpen && user && connected) {
-      fetchEvents();
-    }
-  }, [isOpen, user, connected, fetchEvents]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -146,7 +140,13 @@ export default function CalendarEventSelector({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {!connected ? (
+          {!checkedConnection ? (
+            /* Initial Load - checking connection status */
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: 'var(--color-primary)' }}></div>
+              <p className="text-sm text-gray-500">Checking connection...</p>
+            </div>
+          ) : !connected ? (
             /* Not Connected State */
             <div className="text-center py-12">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50 mb-4">
@@ -175,14 +175,8 @@ export default function CalendarEventSelector({
                 </button>
               </div>
             </div>
-          ) : loading ? (
-            /* Loading State */
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: 'var(--color-primary)' }}></div>
-              <p className="text-sm text-gray-500">Loading meetings...</p>
-            </div>
-          ) : events.length === 0 ? (
-            /* No Events State */
+          ) : events.length === 0 && !loading ? (
+            /* No Events State - only show if not loading */
             <div className="text-center py-12">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
                 <AlertCircle size={32} className="text-gray-400" />
@@ -201,8 +195,14 @@ export default function CalendarEventSelector({
                 Create Note Without Meeting
               </button>
             </div>
+          ) : events.length === 0 && loading ? (
+            /* Loading State - only when explicitly loading and no cached events */
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: 'var(--color-primary)' }}></div>
+              <p className="text-sm text-gray-500">Loading meetings...</p>
+            </div>
           ) : (
-            /* Events List */
+            /* Events List - show immediately if we have any events */
             <div>
               {/* Search Bar */}
               <input
@@ -213,6 +213,14 @@ export default function CalendarEventSelector({
                 className="w-full px-4 py-2 border rounded-lg mb-4"
                 style={{ borderColor: 'var(--color-border)' }}
               />
+
+              {/* Optional: Show a subtle loading indicator if refreshing events */}
+              {loading && (
+                <div className="flex items-center justify-center gap-2 py-2 mb-4 text-sm text-gray-500">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: 'var(--color-primary)' }}></div>
+                  <span>Refreshing...</span>
+                </div>
+              )}
 
               {/* Events Grouped by Day */}
               <div className="space-y-4">

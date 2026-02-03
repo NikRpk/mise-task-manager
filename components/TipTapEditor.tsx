@@ -435,6 +435,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         .ProseMirror li {
           margin: 0.25rem 0;
           display: list-item;
+          min-height: 1.5em; /* Ensure list items have minimum height */
         }
         .ProseMirror ul:not([data-type="taskList"]) li {
           list-style: disc;
@@ -443,6 +444,20 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         .ProseMirror ol li {
           list-style: decimal;
           list-style-position: outside;
+        }
+        /* Fix cursor visibility in empty list items - multiple approaches */
+        .ProseMirror li:empty::after,
+        .ProseMirror li p:empty::after {
+          content: '';
+          display: inline-block;
+          width: 0;
+          height: 1em;
+          vertical-align: top;
+        }
+        .ProseMirror li br:only-child::after {
+          content: '';
+          display: inline-block;
+          width: 0;
         }
         .ProseMirror a {
           color: #3b82f6;
@@ -517,6 +532,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           display: flex;
           align-items: flex-start;
           gap: 0.5rem;
+          min-height: 1.5em; /* Ensure task items have minimum height */
         }
         .ProseMirror ul[data-type="taskList"] li label {
           flex: 0 0 auto;
@@ -524,6 +540,12 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         }
         .ProseMirror ul[data-type="taskList"] li input[type="checkbox"] {
           cursor: pointer;
+        }
+        /* Fix cursor visibility in empty task list items */
+        .ProseMirror ul[data-type="taskList"] li > div:empty::after,
+        .ProseMirror ul[data-type="taskList"] li > p:empty::after {
+          content: '\\u200B'; /* Zero-width space */
+          display: inline;
         }
         .ProseMirror .mention {
           background: #dbeafe;
