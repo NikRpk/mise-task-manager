@@ -6,11 +6,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Save, Calendar, Link as LinkIcon, FileText, Plus, Trash2, Edit } from 'lucide-react';
+import { X, Save, Calendar, Link as LinkIcon, FileText, Plus, Trash2, Edit, ChevronDown } from 'lucide-react';
 import { Note, NoteTemplate, NoteTask, CalendarEvent, Project } from '@/types';
-import RichTextEditor from './RichTextEditor';
+import TipTapEditor from './TipTapEditor';
 import ConfirmDialog from './ConfirmDialog';
 import AlertDialog from './AlertDialog';
+import MeetingSelectorDropdown from './MeetingSelectorDropdown';
 import { authenticatedFetch } from '@/lib/api-client';
 
 interface NoteModalProps {
@@ -68,13 +69,56 @@ export default function NoteModal({
         setProjectId(note.projectId);
         setTemplateId(note.templateId);
       } else {
-        // Creating new note - use template content
+        // Creating new note - load user's saved template
         setTitle(calendarEvent?.summary || '');
-        const template = templates.find(t => t.id === 'default') || templates[0];
-        setContent(template?.content || '');
         setTasks([]);
         setProjectId(defaultProjectId || null);
         setTemplateId('default');
+        
+        // Load template asynchronously
+        (async () => {
+          try {
+            const token = await (await import('@/lib/firebase')).auth.currentUser?.getIdToken();
+            const res = await fetch('/api/settings', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.noteTemplate) {
+                setContent(data.noteTemplate);
+              } else {
+                // Use default template
+                setContent(`AGENDA
+• 
+
+DISCUSSION & NOTES
+• 
+
+DECISIONS MADE
+• 
+
+ACTION ITEMS
+• `);
+              }
+            }
+          } catch (error) {
+            // Use default on error
+            setContent(`AGENDA
+• 
+
+DISCUSSION & NOTES
+• 
+
+DECISIONS MADE
+• 
+
+ACTION ITEMS
+• `);
+          }
+        })();
       }
     }
   }, [isOpen, note, calendarEvent, defaultProjectId, readOnly, templates]);
@@ -117,32 +161,34 @@ export default function NoteModal({
             setAlertDialog({
               isOpen: true,
               title: 'Success',
-              message: 'Note saved and attached to calendar event as a file',
+              message: 'Note saved and attached to calendar event as a Google Doc',
               type: 'success',
             });
+            // Close after success message
+            setTimeout(() => onClose(), 1500);
           } else {
             setAlertDialog({
               isOpen: true,
               title: 'Note Saved',
-              message: 'Note saved, but failed to attach to calendar event',
+              message: 'Note saved, but failed to attach to calendar event. You may need to reconnect Google Calendar with Drive permissions.',
               type: 'warning',
             });
+            // Don't auto-close - let user read the warning
           }
         } catch (error) {
-          // Note is saved, just attachment failed
           console.warn('Failed to attach to calendar:', error);
           setAlertDialog({
             isOpen: true,
             title: 'Note Saved',
-            message: 'Note saved successfully, but failed to attach to calendar event',
+            message: 'Note saved successfully, but failed to attach to calendar event. Check your Google Calendar connection.',
             type: 'warning',
           });
+          // Don't auto-close - let user read the warning
         }
-      }
-      
-      setTimeout(() => {
+      } else {
+        // No attachment needed, just close
         onClose();
-      }, attachToCalendar && (note?.calendarEventId || calendarEvent?.id) ? 1500 : 0);
+      }
     } catch (error) {
       setAlertDialog({
         isOpen: true,
@@ -250,17 +296,15 @@ export default function NoteModal({
             className="flex items-center justify-between px-6 py-4 border-b"
             style={{ borderColor: 'var(--color-border)' }}
           >
-            <div className="flex-1 flex items-center gap-4">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Note title..."
-                disabled={!isEditMode}
-                className="flex-1 text-xl font-semibold bg-transparent border-none focus:outline-none"
-                style={{ color: 'var(--color-text)' }}
-              />
-            </div>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Note title..."
+              disabled={!isEditMode}
+              className="flex-1 text-xl font-semibold bg-transparent border-none focus:outline-none"
+              style={{ color: 'var(--color-text)' }}
+            />
             <button
               onClick={onClose}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -270,47 +314,31 @@ export default function NoteModal({
             </button>
           </div>
 
-          {/* Toolbar */}
+          {/* Consolidated Toolbar */}
           <div
-            className="flex items-center justify-between px-6 py-3 border-b"
+            className="px-6 py-3 border-b"
             style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
           >
-            <div className="flex items-center gap-4 flex-wrap">
-              {/* Template Selector */}
-              <div className="flex items-center gap-2">
-                <FileText size={16} className="text-gray-500" />
-                <select
-                  value={templateId}
-                  onChange={(e) => handleTemplateChange(e.target.value)}
-                  disabled={!isEditMode}
-                  className="px-3 py-1.5 text-sm border rounded-md"
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  {templates.map(template => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Project Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Project:</span>
-                <select
-                  value={projectId || ''}
-                  onChange={(e) => setProjectId(e.target.value || null)}
-                  disabled={!isEditMode}
-                  className="px-3 py-1.5 text-sm border rounded-md"
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  <option value="">No Project</option>
-                  {projects.map(project => (
-                    <option key={project.id} value={project.id}>
-                      {project.icon} {project.name}
-                    </option>
-                  ))}
-                </select>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              {/* Left side - Project */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Project:</span>
+                  <select
+                    value={projectId || ''}
+                    onChange={(e) => setProjectId(e.target.value || null)}
+                    disabled={!isEditMode}
+                    className="px-3 py-1.5 text-sm border rounded-md"
+                    style={{ borderColor: 'var(--color-border)' }}
+                  >
+                    <option value="">No Project</option>
+                    {projects.map(project => (
+                      <option key={project.id} value={project.id}>
+                        {project.icon} {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Calendar Event Badge */}
@@ -326,34 +354,16 @@ export default function NoteModal({
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-4xl mx-auto space-y-6">
-              {/* Template Sections */}
-              {currentTemplate?.sections
-                .sort((a, b) => a.order - b.order)
-                .map(section => (
-                  <div key={section.id}>
-                    <label className="block text-sm font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>
-                      {section.title}
-                    </label>
-                    <textarea
-                      value={content[section.id] || ''}
-                      onChange={(e) => setContent({ ...content, [section.id]: e.target.value })}
-                      placeholder={section.placeholder}
-                      disabled={isEditMode}
-                      className="w-full min-h-[120px] px-4 py-3 border rounded-md focus:outline-none focus:ring-2 transition-all"
-                      style={{ 
-                        borderColor: 'var(--color-border)',
-                        resize: 'vertical',
-                        backgroundColor: isEditMode ? '#ffffff' : '#f9fafb',
-                      }}
-                      onFocus={(e) => {
-                        if (isEditMode) e.target.style.boxShadow = '0 0 0 2px var(--color-primary)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.boxShadow = '';
-                      }}
-                    />
-                  </div>
-                ))}
+              {/* Stable Rich Text Editor */}
+              <div>
+                <TipTapEditor
+                  value={content}
+                  onChange={setContent}
+                  placeholder="Start taking notes..."
+                  disabled={!isEditMode}
+                  attendees={[]}
+                />
+              </div>
 
               {/* Tasks Section */}
               <div className="mt-8">

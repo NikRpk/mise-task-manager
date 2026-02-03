@@ -109,16 +109,16 @@ function NotesPage() {
     });
   };
 
-  const handleSaveNote = async (noteData: Partial<Note>) => {
+  const handleSaveNote = async (noteData: Partial<Note>): Promise<string> => {
     if (noteData.id) {
       // Update existing note
       await updateNote(noteData.id, noteData);
+      return noteData.id;
     } else {
       // Create new note
-      await createNote(noteData);
+      const newNote = await createNote(noteData);
+      return newNote.id;
     }
-    setIsNoteModalOpen(false);
-    setSelectedNote(null);
   };
 
   const getProjectName = (projectId: string | null) => {

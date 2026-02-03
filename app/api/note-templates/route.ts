@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         templates.unshift({
           id: DEFAULT_NOTE_TEMPLATE.id,
           name: DEFAULT_NOTE_TEMPLATE.name,
-          sections: [...DEFAULT_NOTE_TEMPLATE.sections],
+          content: DEFAULT_NOTE_TEMPLATE.content,
           createdBy: user.uid,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

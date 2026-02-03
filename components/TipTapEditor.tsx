@@ -93,7 +93,8 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        codeBlock: false, // Disable default to use custom
+        codeBlock: false, // Using custom CodeBlock
+        horizontalRule: false, // Using custom HorizontalRule
       }),
       Link.configure({
         openOnClick: false,

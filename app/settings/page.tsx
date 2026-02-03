@@ -20,6 +20,9 @@ import { ProjectSettings, StatusOption, PriorityOption, CustomField, ProjectMemb
 interface UserSettings {
   colorScheme: string;
   displayName?: string;
+  timezone?: string;
+  noteTemplate?: string;
+  driveFolderId?: string;
   notifications?: {
     email: boolean;
     desktop: boolean;
@@ -915,6 +918,22 @@ function SettingsContent() {
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
                     All dates and times will be displayed in this timezone
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                    Google Drive Folder ID
+                  </label>
+                  <input
+                    type="text"
+                    value={userSettings.driveFolderId || ''}
+                    onChange={(e) => setUserSettings({ ...userSettings, driveFolderId: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md font-mono text-sm"
+                    style={{ borderColor: 'var(--color-border)' }}
+                    placeholder="Optional: Folder ID for saving meeting notes"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    If set, all meeting notes will be saved in this Drive folder. Find folder ID in the URL when viewing the folder.
                   </p>
                 </div>
                 <div>

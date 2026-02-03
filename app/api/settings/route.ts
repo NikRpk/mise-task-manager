@@ -10,6 +10,7 @@ interface UserSettings {
   displayName?: string;
   timezone?: string;
   noteTemplate?: string;
+  driveFolderId?: string;
   googleCalendarRefreshToken?: string;
   googleCalendarConnectedAt?: string;
   notifications?: {
@@ -75,6 +76,7 @@ export async function PUT(request: NextRequest) {
         displayName: body.displayName || user.displayName,
         timezone: body.timezone || 'Europe/Berlin',
         noteTemplate: body.noteTemplate,
+        driveFolderId: body.driveFolderId,
         notifications: body.notifications || {
           email: true,
           desktop: true,
