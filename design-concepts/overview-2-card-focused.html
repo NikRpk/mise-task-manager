@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Overview 2: Card Focused</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #fafbfc;
+      padding: 32px;
+      min-height: 100vh;
+    }
+    
+    .concept-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    
+    .concept-title {
+      font-size: 28px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    
+    .concept-subtitle {
+      font-size: 14px;
+      color: #64748b;
+    }
+    
+    .page-header {
+      margin-bottom: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    
+    .header-left {
+      flex: 1;
+    }
+    
+    .page-title {
+      font-size: 32px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    
+    .page-subtitle {
+      font-size: 14px;
+      color: #64748b;
+    }
+    
+    .header-actions {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary {
+      background: #009646;
+      color: white;
+      box-shadow: 0 2px 4px rgba(0, 150, 70, 0.2);
+    }
+    
+    .btn-primary:hover {
+      background: #00a61c;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0, 150, 70, 0.3);
+    }
+    
+    .btn-secondary {
+      background: white;
+      border: 1px solid #e2e8f0;
+      color: #0f172a;
+    }
+    
+    .btn-secondary:hover {
+      background: #f8fafc;
+    }
+    
+    .kanban-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+    
+    .kanban-column {
+      background: transparent;
+    }
+    
+    .column-header {
+      padding: 16px 8px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .column-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .column-count {
+      background: #e2e8f0;
+      color: #475569;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    .task-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    
+    .task-card:hover {
+      border-color: #cbd5e1;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transform: translateY(-2px);
+    }
+    
+    .task-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    
+    .task-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #0f172a;
+      line-height: 1.5;
+      flex: 1;
+      margin-right: 12px;
+    }
+    
+    .priority-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    
+    .priority-high {
+      background: #fef2f2;
+      color: #f30047;
+      border: 1px solid #fecaca;
+    }
+    
+    .priority-medium {
+      background: #fffbeb;
+      color: #f6c400;
+      border: 1px solid #fde68a;
+    }
+    
+    .priority-low {
+      background: #f0fdf4;
+      color: #00a61c;
+      border: 1px solid #bbf7d0;
+    }
+    
+    .task-meta {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #64748b;
+    }
+    
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .task-progress {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #f1f5f9;
+    }
+    
+    .progress-label {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+    
+    .progress-bar {
+      height: 6px;
+      background: #f1f5f9;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #009646 0%, #00a61c 100%);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="concept-header">
+    <h1 class="concept-title">Overview 2: Card Focused</h1>
+    <p class="concept-subtitle">Generous spacing, elevated cards with shadows, emphasis on individual tasks</p>
+  </div>
+  
+  <div class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">Task Dashboard</h1>
+      <p class="page-subtitle">Manage and track your projects</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary">⚙️ Settings</button>
+      <button class="btn btn-primary">+ New Task</button>
+    </div>
+  </div>
+  
+  <div class="kanban-container">
+    <div class="kanban-column">
+      <div class="column-header">
+        <span class="column-title">To Do</span>
+        <span class="column-count">3</span>
+      </div>
+      <div class="task-list">
+        <div class="task-card">
+          <div class="task-header">
+            <div class="task-title">Redesign marketing landing page</div>
+            <span class="priority-badge priority-high">High</span>
+          </div>
+          <div class="task-meta">
+            <div class="meta-item">
+              <span>👤</span>
+              <span>Sarah Johnson</span>
+            </div>
+            <div class="meta-item">
+              <span>📅</span>
+              <span>Mar 15</span>
+            </div>
+          </div>
+          <div class="task-progress">
+            <div class="progress-label">3 of 5 sub-tasks completed</div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 60%"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="task-card">
+          <div class="task-header">
+            <div class="task-title">Update API documentation</div>
+            <span class="priority-badge priority-medium">Medium</span>
+          </div>
+          <div class="task-meta">
+            <div class="meta-item">
+              <span>👤</span>
+              <span>Mike Chen</span>
+            </div>
+            <div class="meta-item">
+              <span>📅</span>
+              <span>Mar 18</span>
+            </div>
+          </div>
+          <div class="task-progress">
+            <div class="progress-label">1 of 3 sub-tasks completed</div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 33%"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="task-card">
+          <div class="task-header">
+            <div class="task-title">Q2 Planning Meeting preparation</div>
+            <span class="priority-badge priority-low">Low</span>
+          </div>
+          <div class="task-meta">
+            <div class="meta-item">
+              <span>👤</span>
+              <span>Anna Williams</span>
+            </div>
+            <div class="meta-item">
+              <span>📅</span>
+              <span>Mar 20</span>
+            </div>
+          </div>
+          <div class="task-progress">
+            <div class="progress-label">0 of 2 sub-tasks completed</div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="kanban-column">
+      <div class="column-header">
+        <span class="column-title">In Progress</span>
+        <span class="column-count">2</span>
+      </div>
+      <div class="task-list">
+        <div class="task-card">
+          <div class="task-header">
+            <div class="task-title">Implement user authentication system</div>
+            <span class="priority-badge priority-high">High</span>
+          </div>
+          <div class="task-meta">
+            <div class="meta-item">
+              <span>👤</span>
+              <span>John Davis</span>
+            </div>
+            <div class="meta-item">
+              <span>📅</span>
+              <span>Mar 16</span>
+            </div>
+          </div>
+          <div class="task-progress">
+            <div class="progress-label">2 of 4 sub-tasks completed</div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 50%"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="task-card">
+          <div class="task-header">
+            <div class="task-title">Database query optimization</div>
+            <span class="priority-badge priority-medium">Medium</span>
+          </div>
+          <div class="task-meta">
+            <div class="meta-item">
+              <span>👤</span>
+              <span>Emma Wilson</span>
+            </div>
+            <div class="meta-item">
+              <span>📅</span>
+              <span>Mar 17</span>
+            </div>
+          </div>
+          <div class="task-progress">
+            <div class="progress-label">1 of 2 sub-tasks completed</div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 50%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="kanban-column">
+      <div class="column-header">
+        <span class="column-title">Review</span>
+        <span class="column-count">1</span>
+      </div>
+      <div class="task-list">
+        <div class="task-card">
+          <div class="task-header">
+            <div class="task-title">Mobile app UI mockups</div>
+            <span class="priority-badge priority-medium">Medium</span>
+          </div>
+          <div class="task-meta">
+            <div class="meta-item">
+              <span>👤</span>
+              <span>Lisa Anderson</span>
+            </div>
+            <div class="meta-item">
+              <span>📅</span>
+              <span>Mar 14</span>
+            </div>
+          </div>
+          <div class="task-progress">
+            <div class="progress-label">4 of 4 sub-tasks completed</div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="kanban-column">
+      <div class="column-header">
+        <span class="column-title">Done</span>
+        <span class="column-count">2</span>
+      </div>
+      <div class="task-list">
+        <div class="task-card">
+          <div class="task-header">
+            <div class="task-title">Setup CI/CD pipeline</div>
+            <span class="priority-badge priority-high">High</span>
+          </div>
+          <div class="task-meta">
+            <div class="meta-item">
+              <span>👤</span>
+              <span>Tom Harris</span>
+            </div>
+            <div class="meta-item">
+              <span>📅</span>
+              <span>Mar 10</span>
+            </div>
+          </div>
+          <div class="task-progress">
+            <div class="progress-label">3 of 3 sub-tasks completed</div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

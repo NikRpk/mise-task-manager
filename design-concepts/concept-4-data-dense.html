@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Concept 4: Data Dense Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f8fafc;
+      padding: 40px;
+      min-height: 100vh;
+    }
+    
+    .concept-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    
+    .concept-title {
+      font-size: 32px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    
+    .concept-subtitle {
+      font-size: 14px;
+      color: #64748b;
+    }
+    
+    .modal-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+    }
+    
+    .modal-header {
+      padding: 24px 32px;
+      background: #fafbfc;
+      border-bottom: 2px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .header-left {
+      flex: 1;
+    }
+    
+    .task-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    
+    .task-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: #64748b;
+    }
+    
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .header-stats {
+      display: flex;
+      gap: 24px;
+    }
+    
+    .stat-box {
+      text-align: center;
+      padding: 12px 20px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #009646;
+      display: block;
+    }
+    
+    .stat-label {
+      font-size: 11px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+    
+    .modal-content {
+      padding: 32px;
+    }
+    
+    .grid-layout {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 32px;
+    }
+    
+    .section {
+      margin-bottom: 32px;
+    }
+    
+    .section:last-child {
+      margin-bottom: 0;
+    }
+    
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #f1f5f9;
+    }
+    
+    .section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    /* Sub-tasks - Data Dense Style */
+    .add-subtask-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: #009646;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    
+    .add-subtask-btn:hover {
+      background: #00a61c;
+    }
+    
+    .subtask-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .subtask-row {
+      border-bottom: 1px solid #f1f5f9;
+      transition: background 0.1s;
+    }
+    
+    .subtask-row:hover {
+      background: #fafbfc;
+    }
+    
+    .subtask-row td {
+      padding: 12px 8px;
+    }
+    
+    .subtask-row.completed {
+      opacity: 0.6;
+    }
+    
+    .checkbox-cell {
+      width: 40px;
+      text-align: center;
+    }
+    
+    .subtask-checkbox {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #cbd5e1;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      display: inline-block;
+    }
+    
+    .subtask-checkbox.checked {
+      background: #009646;
+      border-color: #009646;
+    }
+    
+    .subtask-checkbox.checked::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    
+    .text-cell {
+      font-size: 14px;
+      color: #0f172a;
+    }
+    
+    .subtask-row.completed .text-cell {
+      text-decoration: line-through;
+      color: #94a3b8;
+    }
+    
+    .assignee-cell {
+      width: 120px;
+    }
+    
+    .assignee-tag {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #475569;
+    }
+    
+    .date-cell {
+      width: 100px;
+      font-size: 12px;
+      color: #64748b;
+    }
+    
+    .actions-cell {
+      width: 40px;
+      text-align: center;
+    }
+    
+    .delete-btn {
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 16px;
+    }
+    
+    .delete-btn:hover {
+      background: #fee;
+      color: #f30047;
+    }
+    
+    .progress-compact {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    
+    .progress-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: #009646;
+      min-width: 80px;
+    }
+    
+    .progress-bar {
+      flex: 1;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #009646 0%, #00a61c 100%);
+      width: 25%;
+      transition: width 0.3s ease;
+    }
+    
+    .sidebar-section {
+      background: #fafbfc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    
+    .sidebar-item {
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .sidebar-item:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    
+    .sidebar-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    
+    .sidebar-value {
+      font-size: 14px;
+      color: #0f172a;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="concept-header">
+    <h1 class="concept-title">Concept 4: Data Dense Pro</h1>
+    <p class="concept-subtitle">Maximum information density, table-based, professional tool aesthetic</p>
+  </div>
+  
+  <div class="modal-container">
+    <div class="modal-header">
+      <div class="header-left">
+        <h2 class="task-title">Redesign marketing landing page</h2>
+        <div class="task-meta">
+          <div class="meta-item">
+            <span>🎯</span>
+            <span>Marketing</span>
+          </div>
+          <div class="meta-item">
+            <span>•</span>
+          </div>
+          <div class="meta-item">
+            <span>Created 5 days ago</span>
+          </div>
+          <div class="meta-item">
+            <span>•</span>
+          </div>
+          <div class="meta-item">
+            <span>Last updated 2h ago</span>
+          </div>
+        </div>
+      </div>
+      <div class="header-stats">
+        <div class="stat-box">
+          <span class="stat-value">4</span>
+          <span class="stat-label">Tasks</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value">25%</span>
+          <span class="stat-label">Complete</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value">3d</span>
+          <span class="stat-label">Left</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-content">
+      <div class="grid-layout">
+        <div>
+          <div class="section">
+            <div class="section-header">
+              <div class="section-label">Description</div>
+            </div>
+            <div style="font-size: 14px; line-height: 1.6; color: #475569;">
+              Create a modern, conversion-optimized landing page for our Q2 campaign. 
+              Focus on mobile-first design with fast load times and clear CTAs.
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-header">
+              <div class="section-label">Sub-tasks (4)</div>
+              <button class="add-subtask-btn">
+                <span>+</span>
+                <span>Add</span>
+              </button>
+            </div>
+            
+            <table class="subtask-table">
+              <tbody>
+                <tr class="subtask-row completed">
+                  <td class="checkbox-cell">
+                    <div class="subtask-checkbox checked"></div>
+                  </td>
+                  <td class="text-cell">Research competitor landing pages</td>
+                  <td class="assignee-cell">
+                    <span class="assignee-tag">Sarah</span>
+                  </td>
+                  <td class="date-cell">2d ago</td>
+                  <td class="actions-cell">
+                    <div class="delete-btn">×</div>
+                  </td>
+                </tr>
+                
+                <tr class="subtask-row">
+                  <td class="checkbox-cell">
+                    <div class="subtask-checkbox"></div>
+                  </td>
+                  <td class="text-cell">Create wireframes and mockups</td>
+                  <td class="assignee-cell">
+                    <span class="assignee-tag">Mike</span>
+                  </td>
+                  <td class="date-cell">Today</td>
+                  <td class="actions-cell">
+                    <div class="delete-btn">×</div>
+                  </td>
+                </tr>
+                
+                <tr class="subtask-row">
+                  <td class="checkbox-cell">
+                    <div class="subtask-checkbox"></div>
+                  </td>
+                  <td class="text-cell">Implement responsive design</td>
+                  <td class="assignee-cell">
+                    <span class="assignee-tag">Anna</span>
+                  </td>
+                  <td class="date-cell">Mar 14</td>
+                  <td class="actions-cell">
+                    <div class="delete-btn">×</div>
+                  </td>
+                </tr>
+                
+                <tr class="subtask-row">
+                  <td class="checkbox-cell">
+                    <div class="subtask-checkbox"></div>
+                  </td>
+                  <td class="text-cell">A/B testing setup</td>
+                  <td class="assignee-cell">
+                    <span class="assignee-tag">Unassigned</span>
+                  </td>
+                  <td class="date-cell">Mar 15</td>
+                  <td class="actions-cell">
+                    <div class="delete-btn">×</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            
+            <div class="progress-compact">
+              <span class="progress-text">1/4 Done</span>
+              <div class="progress-bar">
+                <div class="progress-fill"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div>
+          <div class="section">
+            <div class="section-header">
+              <div class="section-label">Details</div>
+            </div>
+            <div class="sidebar-section">
+              <div class="sidebar-item">
+                <div class="sidebar-label">Status</div>
+                <div class="sidebar-value">In Progress</div>
+              </div>
+              <div class="sidebar-item">
+                <div class="sidebar-label">Priority</div>
+                <div class="sidebar-value">High</div>
+              </div>
+              <div class="sidebar-item">
+                <div class="sidebar-label">Owner</div>
+                <div class="sidebar-value">Sarah Johnson</div>
+              </div>
+              <div class="sidebar-item">
+                <div class="sidebar-label">Due Date</div>
+                <div class="sidebar-value">Mar 15, 2024</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

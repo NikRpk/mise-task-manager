@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Concept 2: Elevated Cards</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f8fafc;
+      padding: 40px;
+      min-height: 100vh;
+    }
+    
+    .concept-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    
+    .concept-title {
+      font-size: 32px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    
+    .concept-subtitle {
+      font-size: 14px;
+      color: #64748b;
+    }
+    
+    .modal-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+    
+    .modal-header {
+      padding: 32px 40px;
+      background: linear-gradient(135deg, #009646 0%, #00a61c 100%);
+      color: white;
+    }
+    
+    .task-title {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    
+    .task-meta {
+      display: flex;
+      gap: 24px;
+      opacity: 0.95;
+    }
+    
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+    
+    .modal-content {
+      padding: 40px;
+      background: #fafbfc;
+    }
+    
+    .section {
+      margin-bottom: 32px;
+    }
+    
+    .section-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 
+        0 1px 3px rgba(0, 0, 0, 0.06),
+        0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    
+    .section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .label-icon {
+      width: 18px;
+      height: 18px;
+      background: #009646;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 11px;
+    }
+    
+    /* Sub-tasks - Elevated Cards Style */
+    .subtasks-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .add-subtask-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: #009646;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 13px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 150, 70, 0.2);
+    }
+    
+    .add-subtask-btn:hover {
+      background: #00a61c;
+      box-shadow: 0 4px 8px rgba(0, 150, 70, 0.3);
+      transform: translateY(-1px);
+    }
+    
+    .subtask-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .subtask-card {
+      background: #fafbfc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    
+    .subtask-card:hover {
+      border-color: #cbd5e1;
+      background: white;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      transform: translateY(-1px);
+    }
+    
+    .subtask-card.completed {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+    
+    .subtask-checkbox {
+      width: 22px;
+      height: 22px;
+      border: 2.5px solid #cbd5e1;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      position: relative;
+      background: white;
+    }
+    
+    .subtask-checkbox.checked {
+      background: #009646;
+      border-color: #009646;
+    }
+    
+    .subtask-checkbox.checked::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    
+    .subtask-content {
+      flex: 1;
+    }
+    
+    .subtask-text {
+      font-size: 14px;
+      color: #0f172a;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    
+    .subtask-card.completed .subtask-text {
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+    
+    .subtask-meta {
+      font-size: 12px;
+      color: #94a3b8;
+      display: flex;
+      gap: 12px;
+    }
+    
+    .subtask-delete {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      font-size: 20px;
+    }
+    
+    .subtask-delete:hover {
+      background: #fee;
+      color: #f30047;
+    }
+    
+    .progress-section {
+      margin-top: 24px;
+      padding: 20px;
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      border-radius: 10px;
+      border: 1px solid #dcfce7;
+    }
+    
+    .progress-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #00a61c;
+      margin-bottom: 8px;
+    }
+    
+    .progress-bar {
+      height: 8px;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #009646 0%, #00a61c 100%);
+      width: 25%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      box-shadow: 0 0 8px rgba(0, 150, 70, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="concept-header">
+    <h1 class="concept-title">Concept 2: Elevated Cards</h1>
+    <p class="concept-subtitle">Depth through shadows, card-based hierarchy, modern SaaS feel</p>
+  </div>
+  
+  <div class="modal-container">
+    <div class="modal-header">
+      <h2 class="task-title">Redesign marketing landing page</h2>
+      <div class="task-meta">
+        <div class="meta-item">
+          <span>👤</span>
+          <span>Sarah Johnson</span>
+        </div>
+        <div class="meta-item">
+          <span>📅</span>
+          <span>Due Mar 15</span>
+        </div>
+        <div class="meta-item">
+          <span>🎯</span>
+          <span>Marketing</span>
+        </div>
+        <div class="meta-item">
+          <span>⚡</span>
+          <span>High Priority</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-content">
+      <div class="section">
+        <div class="section-card">
+          <div class="section-label">
+            <div class="label-icon">📝</div>
+            <span>Description</span>
+          </div>
+          <div style="font-size: 14px; line-height: 1.6; color: #475569;">
+            Create a modern, conversion-optimized landing page for our Q2 campaign. 
+            Focus on mobile-first design with fast load times and clear CTAs.
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-card">
+          <div class="subtasks-header">
+            <div class="section-label" style="margin-bottom: 0;">
+              <div class="label-icon">✓</div>
+              <span>Sub-tasks</span>
+            </div>
+            <button class="add-subtask-btn">
+              <span>+</span>
+              <span>Add</span>
+            </button>
+          </div>
+          
+          <div class="subtask-list">
+            <div class="subtask-card completed">
+              <div class="subtask-checkbox checked"></div>
+              <div class="subtask-content">
+                <div class="subtask-text">Research competitor landing pages</div>
+                <div class="subtask-meta">
+                  <span>Completed 2 days ago</span>
+                  <span>•</span>
+                  <span>Sarah</span>
+                </div>
+              </div>
+              <div class="subtask-delete">×</div>
+            </div>
+            
+            <div class="subtask-card">
+              <div class="subtask-checkbox"></div>
+              <div class="subtask-content">
+                <div class="subtask-text">Create wireframes and mockups</div>
+                <div class="subtask-meta">
+                  <span>Assigned to Mike</span>
+                </div>
+              </div>
+              <div class="subtask-delete">×</div>
+            </div>
+            
+            <div class="subtask-card">
+              <div class="subtask-checkbox"></div>
+              <div class="subtask-content">
+                <div class="subtask-text">Implement responsive design</div>
+                <div class="subtask-meta">
+                  <span>Assigned to Anna</span>
+                </div>
+              </div>
+              <div class="subtask-delete">×</div>
+            </div>
+            
+            <div class="subtask-card">
+              <div class="subtask-checkbox"></div>
+              <div class="subtask-content">
+                <div class="subtask-text">A/B testing setup</div>
+                <div class="subtask-meta">
+                  <span>Not assigned</span>
+                </div>
+              </div>
+              <div class="subtask-delete">×</div>
+            </div>
+          </div>
+          
+          <div class="progress-section">
+            <div class="progress-label">1 of 4 completed (25%)</div>
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

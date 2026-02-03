@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to get user ID
+    function getUserId() {
+      return request.auth.uid;
+    }
+    
+    // Helper function to check if user is a member of a project
+    function isMemberOfProject(projectId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/projects/$(projectId)) &&
+             getUserId() in get(/databases/$(database)/documents/projects/$(projectId)).data.members[].userId;
+    }
+    
+    // Helper function to get user's role in a project
+    function getUserRoleInProject(projectId) {
+      let project = get(/databases/$(database)/documents/projects/$(projectId)).data;
+      let member = project.members.filter(m => m.userId == getUserId())[0];
+      return member.role;
+    }
+    
+    // Helper function to check if user has at least the required role
+    // Role hierarchy: VIEW < EDIT < ADMIN
+    function hasRole(projectId, requiredRole) {
+      let userRole = getUserRoleInProject(projectId);
+      let roleValue = {
+        'VIEW': 1,
+        'EDIT': 2,
+        'ADMIN': 3
+      };
+      return roleValue[userRole] >= roleValue[requiredRole];
+    }
+    
+    // ========== PROJECTS ==========
+    match /projects/{projectId} {
+      // Anyone authenticated can create a project
+      allow create: if isAuthenticated();
+      
+      // Only members can read the project
+      allow read: if isMemberOfProject(projectId);
+      
+      // Only ADMIN members can update or delete
+      allow update: if isMemberOfProject(projectId) && hasRole(projectId, 'ADMIN');
+      allow delete: if isMemberOfProject(projectId) && hasRole(projectId, 'ADMIN');
+    }
+    
+    // ========== TASKS ==========
+    match /tasks/{taskId} {
+      // Members with EDIT permission can create tasks
+      allow create: if isAuthenticated() && 
+                      isMemberOfProject(request.resource.data.projectId) &&
+                      hasRole(request.resource.data.projectId, 'EDIT');
+      
+      // Members with VIEW permission can read tasks
+      allow read: if isAuthenticated() && 
+                    isMemberOfProject(resource.data.projectId);
+      
+      // Members with EDIT permission can update tasks
+      allow update: if isAuthenticated() && 
+                      isMemberOfProject(resource.data.projectId) &&
+                      hasRole(resource.data.projectId, 'EDIT');
+      
+      // Members with EDIT permission can delete tasks
+      allow delete: if isAuthenticated() && 
+                      isMemberOfProject(resource.data.projectId) &&
+                      hasRole(resource.data.projectId, 'EDIT');
+    }
+    
+    // ========== USER SETTINGS ==========
+    match /userSettings/{userId} {
+      // Users can only read/write their own settings
+      allow read, write: if isAuthenticated() && getUserId() == userId;
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

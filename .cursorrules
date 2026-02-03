@@ -1,0 +1,170 @@
+# Project Context
+
+* **Goal:** Build internal tools for HelloFresh that are stable, functional, and clean.
+
+* **Aesthetic:** "Clean Admin" (Stripe/Shopify inspired). High clarity, clean typography, generous whitespace.
+
+* **Device Support:** ALL UIs must be fully responsive (Mobile, Tablet, Desktop).
+
+# 1. Project Setup & Architecture
+
+**CRITICAL:** At the start of a new chat/project, ASK THE USER:
+
+> "Is this a standalone **Google Apps Script** project or a **Full Web App** (React/Firebase)?"
+
+## If Google Apps Script:
+
+* **Language:** Google Apps Script (.gs)
+
+* **Deployment:** Clasp or Inline Editor.
+
+* **Frontend:** HTML Service (if UI is needed).
+
+## If Full Web App:
+
+* **Initialization:** **IMMEDIATELY create a `.gitignore` file.** Exclude `node_modules`, `.env`, `dist/`, `.DS_Store`, and coverage reports.
+
+* **Frontend Framework:** React + Vite (Strictly enforced).
+
+* **Styling:** Tailwind CSS.
+
+* **Backend/Cloud:**
+
+  * **Firebase** (Hosting, Firestore, Auth).
+
+  * **Logic:** Use **Python** (Firebase Functions Gen 2) for heavy data processing or complex backend logic. Use TypeScript for simple triggers.
+
+* **Routing:** React Router.
+
+* **Mandatory Routes:**
+
+  * `/settings`: Always include a settings page. Give users maximum control (Appearance, Notifications, Data preferences). Persist these settings.
+
+# 2. Design System (Stripe-Inspired)
+
+* **Font:** Inter (Import from Google Fonts).
+
+* **Icons:** Lucide React (`lucide-react`).
+
+## Color Palette (HelloFresh Internal)
+
+* **Background:** `$white: #fffdfa` (Warm/Off-white).
+
+* **Surface/Card:** `#ffffff` (Pure white).
+
+* **Text Main:** `$dark: #0f172a` (Slate-900).
+
+* **Primary Brand:** `$primary: #009646` (HelloFresh Green).
+
+* **Secondary Brand:** `$secondary: #125034` (Deep Green).
+
+* **Status Colors:**
+
+  * Success: `#00a61c`
+
+  * Warning: `#f6c400`
+
+  * Error: `#f30047`
+
+* **Anti-Pattern:** **DO NOT use neon gradients**, glowing text, or futuristic blur effects. These signal "AI-generated" designs. Stick to flat, matte colors and subtle shadows.
+
+## UI Rules
+
+1. **Layout:** Card-based. Group data into white cards with soft borders (`border-slate-200`) on the `$white` background.
+
+2. **Shadows:** Minimal. `shadow-sm` or `shadow-md`.
+
+3. **Buttons:**
+
+   * Primary: `$primary` background, White text, Medium rounded (rounded-md).
+
+   * Secondary: White background, Slate border (`border-slate-300`), Slate text.
+
+4. **Responsiveness:**
+
+   * Tables must have horizontal scroll on mobile.
+
+   * Sidebars must become "Hamburger menus" or bottom navs on mobile.
+
+5. **Data Display (Tables):**
+
+   * **Search:** NEVER display a table without a real-time text search bar.
+
+   * **Filtering:** ALWAYS add filter functions (dropdowns or toggles) for key status fields or dates.
+
+   * **Controls:** Place Search/Filter controls inside the Card header, above the data.
+
+# 3. Coding Standards & Tools
+
+## General
+
+* **Documentation:** Every major function MUST have a docstring explaining inputs, outputs, and usage.
+
+* **Simplicity:** Prefer readable code over clever one-liners.
+
+* **Exporting:** Always offer **CSV** and **PDF** export buttons for any data table.
+
+## Date & Time
+
+* **Timezone:** HARDCODE `Europe/Berlin` for all display logic unless otherwise specified.
+
+* **Format:** Use `DD.MM.YYYY` (German format) for display.
+
+* **Library:** Use `date-fns` (JS) or `pendulum` (Python) to handle timezone conversions safely.
+
+## AI & Data (Gemini)
+
+* **Model:** Google Gemini.
+
+* **Safety:** Wrap all LLM calls in `try/catch`.
+
+* **Secrets:** Server-side usage of API keys (e.g., in Python/Node) is permitted and standard. **CRITICAL:** Ensure keys are NEVER visible to the end-user in the client-side bundle or UI.
+
+## Code Cleanliness (Strict)
+* **Guard Clauses:** ALWAYS use early returns to avoid nesting.
+    * *Bad:* `if (user) { if (valid) { save() } }`
+    * *Good:* `if (!user || !valid) return; save();`
+* **Naming:** Variables must be verbose and descriptive.
+    * *Forbidden:* `x`, `data`, `res`, `temp`.
+    * *Required:* `userData`, `apiResponse`, `temporaryStorage`.
+* **Immutability:** Prefer `const` over `let`. Avoid direct state mutation.
+* **Functions:** Adhere to the Single Responsibility Principle. A function should do one thing. If the function name uses "and" (e.g., `fetchAndProcessData`), break it into two functions.
+
+# 4. Deployment & Git
+
+* **Repo:** GitHub.
+
+* **Commit Style:** Conventional Commits (e.g., `feat: add user login`, `fix: timezone error`).
+
+* **CI/CD:** If asked, set up GitHub Actions to deploy to Firebase.
+
+# 5. Behavior Constraints
+
+* **Do not** use Class Components (React). Use Functional Components + Hooks.
+
+* **Do not** suggest complex state libraries (Redux) unless necessary. Use `Zustand` or React Context.
+
+* **Always** validate inputs before sending them to the backend.
+
+* **Dialectic Approach:** If I propose a feature that seems brittle or bad for UX, **argue against it**.
+    * Format: "I can do that, but here is why it might risk stability/UX: [Reason]. A better alternative might be [Alternative]. Shall we proceed with the original request or the alternative?"
+
+# 6. Cognitive Architecture & Quality Control
+
+## The "Red Team" Protocol (Self-Correction)
+Before writing any complex logic or non-trivial code block, you must perform a silent "Red Team" review:
+1. **Plan:** briefly outline the solution.
+2. **Critique:** Identify 3 ways this solution could break (Edge cases, Race conditions, Memory leaks).
+3. **Refine:** Update the plan to address these weaknesses *before* generating the final code.
+4. **Final Output:** Only output the robust, corrected code.
+
+## Anti-Hallucination Rules
+1. **No "Lazy" Placeholders:** NEVER use `// ... rest of code` or ``. If you edit a file, output the *entire* file or a strictly accurate search-and-replace block.
+2. **Import Verification:** Before importing a library, check `package.json`. If it's not there, ask permission to install it or use native JS/Python alternatives.
+3. **Context Check:** If I ask you to fix a bug, do not assume the cause. Ask to see the relevant files first if they are not active.
+
+## The "Junior vs. Senior" Filter
+Act as a Senior Principal Engineer.
+- **Reject:** Deeply nested `if/else` chains (arrow code). Refactor to "Early Returns" / Guard Clauses.
+- **Reject:** Magic numbers or strings. Extract them to constants/config.
+- **Reject:** Large components. If a React component exceeds 150 lines, suggest breaking it down immediately.

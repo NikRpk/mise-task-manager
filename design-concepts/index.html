@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Manager Design Concepts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #fffdfa;
+      padding: 60px 40px;
+      min-height: 100vh;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 80px;
+    }
+    
+    .title {
+      font-size: 48px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 16px;
+      letter-spacing: -1px;
+    }
+    
+    .subtitle {
+      font-size: 18px;
+      color: #64748b;
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    
+    .concepts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 40px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    .concept-card {
+      background: white;
+      border: 2px solid #e2e8f0;
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+    
+    .concept-card:hover {
+      border-color: #009646;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      transform: translateY(-4px);
+    }
+    
+    .concept-preview {
+      height: 300px;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    .concept-preview iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+      transform: scale(0.5);
+      transform-origin: top left;
+    }
+    
+    .concept-info {
+      padding: 24px;
+    }
+    
+    .concept-name {
+      font-size: 24px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    
+    .concept-desc {
+      font-size: 14px;
+      color: #64748b;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    
+    .view-btn {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #009646;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    
+    .view-btn:hover {
+      background: #00a61c;
+      transform: translateY(-1px);
+    }
+    
+    .tags {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    
+    .tag {
+      padding: 4px 12px;
+      background: #f1f5f9;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #475569;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1 class="title">Design Concepts</h1>
+    <p class="subtitle">
+      Four distinct visual directions for your task manager. Click each card to view the full concept.
+    </p>
+  </div>
+  
+  <div class="concepts-grid">
+    <div class="concept-card" onclick="window.location.href='concept-1-minimal-zen.html'">
+      <div class="concept-preview">
+        <iframe src="concept-1-minimal-zen.html" scrolling="no"></iframe>
+      </div>
+      <div class="concept-info">
+        <h2 class="concept-name">Concept 1: Minimal Zen</h2>
+        <p class="concept-desc">
+          Ultra-clean aesthetic with maximum whitespace. Subtle hover states and calm color palette. 
+          Perfect for focused work environments.
+        </p>
+        <div class="tags">
+          <span class="tag">Spacious</span>
+          <span class="tag">Calm</span>
+          <span class="tag">Simple</span>
+        </div>
+        <a href="concept-1-minimal-zen.html" class="view-btn">View Full Concept →</a>
+      </div>
+    </div>
+    
+    <div class="concept-card" onclick="window.location.href='concept-2-elevated-cards.html'">
+      <div class="concept-preview">
+        <iframe src="concept-2-elevated-cards.html" scrolling="no"></iframe>
+      </div>
+      <div class="concept-info">
+        <h2 class="concept-name">Concept 2: Elevated Cards</h2>
+        <p class="concept-desc">
+          Modern SaaS feel with depth through shadows. Card-based hierarchy with rich metadata. 
+          Great for information-rich interfaces.
+        </p>
+        <div class="tags">
+          <span class="tag">Depth</span>
+          <span class="tag">Modern</span>
+          <span class="tag">Rich</span>
+        </div>
+        <a href="concept-2-elevated-cards.html" class="view-btn">View Full Concept →</a>
+      </div>
+    </div>
+    
+    <div class="concept-card" onclick="window.location.href='concept-3-glass-modern.html'">
+      <div class="concept-preview">
+        <iframe src="concept-3-glass-modern.html" scrolling="no"></iframe>
+      </div>
+      <div class="concept-info">
+        <h2 class="concept-name">Concept 3: Glass Modern</h2>
+        <p class="concept-desc">
+          Contemporary glassmorphism with blur effects. Translucent layers and gradient backgrounds. 
+          Bold and visually striking.
+        </p>
+        <div class="tags">
+          <span class="tag">Glassmorphism</span>
+          <span class="tag">Contemporary</span>
+          <span class="tag">Bold</span>
+        </div>
+        <a href="concept-3-glass-modern.html" class="view-btn">View Full Concept →</a>
+      </div>
+    </div>
+    
+    <div class="concept-card" onclick="window.location.href='concept-4-data-dense.html'">
+      <div class="concept-preview">
+        <iframe src="concept-4-data-dense.html" scrolling="no"></iframe>
+      </div>
+      <div class="concept-info">
+        <h2 class="concept-name">Concept 4: Data Dense Pro</h2>
+        <p class="concept-desc">
+          Professional tool aesthetic with table-based layouts. Maximum information density and efficiency. 
+          Ideal for power users.
+        </p>
+        <div class="tags">
+          <span class="tag">Efficient</span>
+          <span class="tag">Professional</span>
+          <span class="tag">Dense</span>
+        </div>
+        <a href="concept-4-data-dense.html" class="view-btn">View Full Concept →</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
