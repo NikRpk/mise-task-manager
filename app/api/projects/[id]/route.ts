@@ -36,8 +36,11 @@ export async function PUT(
       const { id } = await params;
       const body = await request.json();
 
-      // Check if user has ADMIN permission (throws on failure)
-      await checkProjectPermission(user.uid, id, 'ADMIN');
+      // Check if user has ADMIN permission
+      const hasPermission = await checkProjectPermission(user.uid, id, 'ADMIN');
+      if (!hasPermission) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+      }
 
       const projectRef = adminDb.collection('projects').doc(id);
       const projectDoc = await projectRef.get();
@@ -70,8 +73,11 @@ export async function DELETE(
     try {
       const { id } = await params;
 
-      // Check if user has ADMIN permission (throws on failure)
-      await checkProjectPermission(user.uid, id, 'ADMIN');
+      // Check if user has ADMIN permission
+      const hasPermission = await checkProjectPermission(user.uid, id, 'ADMIN');
+      if (!hasPermission) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+      }
 
       const projectRef = adminDb.collection('projects').doc(id);
       const projectDoc = await projectRef.get();

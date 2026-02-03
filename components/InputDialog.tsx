@@ -58,12 +58,12 @@ export default function InputDialog({
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-white/30 z-50 transition-opacity backdrop-blur-sm"
+        className="fixed inset-0 bg-white/30 z-[200] transition-opacity backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Dialog */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-none">
         <form 
           onSubmit={handleSubmit}
           className="bg-surface rounded-lg shadow-xl max-w-md w-full pointer-events-auto"

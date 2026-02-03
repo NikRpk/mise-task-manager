@@ -292,6 +292,38 @@ function SettingsContent() {
       const res = await authenticatedFetch(`/api/projects/${projectId}/settings`);
       if (res.ok) {
         const data = await res.json();
+        
+        // Ensure default status options are present and marked
+        if (!data.statusOptions || data.statusOptions.length === 0) {
+          data.statusOptions = [
+            { id: 'todo', label: 'To Do', color: '#94a3b8', isDefault: true },
+            { id: 'in-progress', label: 'In Progress', color: '#3b82f6', isDefault: false },
+            { id: 'review', label: 'Review', color: '#f59e0b', isDefault: false },
+            { id: 'done', label: 'Done', color: '#10b981', isDefault: true },
+          ];
+        } else {
+          // Mark existing default statuses as isDefault
+          data.statusOptions = data.statusOptions.map((opt: StatusOption) => ({
+            ...opt,
+            isDefault: opt.id === 'todo' || opt.id === 'done' ? true : (opt.isDefault || false),
+          }));
+        }
+        
+        // Ensure default priority options are present and marked
+        if (!data.priorityOptions || data.priorityOptions.length === 0) {
+          data.priorityOptions = [
+            { id: 'low', label: 'Low', color: '#94a3b8', isDefault: true },
+            { id: 'medium', label: 'Medium', color: '#f59e0b', isDefault: false },
+            { id: 'high', label: 'High', color: '#ef4444', isDefault: true },
+          ];
+        } else {
+          // Mark existing default priorities as isDefault
+          data.priorityOptions = data.priorityOptions.map((opt: PriorityOption) => ({
+            ...opt,
+            isDefault: opt.id === 'low' || opt.id === 'high' ? true : (opt.isDefault || false),
+          }));
+        }
+        
         setProjectSettings(data);
         setOriginalProjectSettings(data); // Store original for comparison
       } else {
@@ -844,6 +876,36 @@ function SettingsContent() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                    Timezone
+                  </label>
+                  <select
+                    value={userSettings.timezone || 'Europe/Berlin'}
+                    onChange={(e) => setUserSettings({ ...userSettings, timezone: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    style={{ borderColor: 'var(--color-border)' }}
+                  >
+                    <option value="Europe/Berlin">Europe/Berlin (Germany) - Default</option>
+                    <option value="Europe/London">Europe/London (UK)</option>
+                    <option value="Europe/Paris">Europe/Paris (France)</option>
+                    <option value="Europe/Amsterdam">Europe/Amsterdam (Netherlands)</option>
+                    <option value="Europe/Madrid">Europe/Madrid (Spain)</option>
+                    <option value="Europe/Rome">Europe/Rome (Italy)</option>
+                    <option value="America/New_York">America/New York (EST)</option>
+                    <option value="America/Chicago">America/Chicago (CST)</option>
+                    <option value="America/Denver">America/Denver (MST)</option>
+                    <option value="America/Los_Angeles">America/Los Angeles (PST)</option>
+                    <option value="Asia/Tokyo">Asia/Tokyo (Japan)</option>
+                    <option value="Asia/Shanghai">Asia/Shanghai (China)</option>
+                    <option value="Asia/Singapore">Asia/Singapore</option>
+                    <option value="Australia/Sydney">Australia/Sydney</option>
+                    <option value="UTC">UTC</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    All dates and times will be displayed in this timezone
+                  </p>
+                </div>
+                <div>
                   <label className="block text-sm font-medium mb-2 text-gray-500">
                     Email
                   </label>
@@ -1075,6 +1137,45 @@ function SettingsContent() {
           </div>
         );
 
+      case 'note-templates':
+        return (
+          <div className="space-y-6">
+            <div className="rounded-lg shadow-sm border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+                    Note Templates
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Create and manage templates for your meeting notes
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setAlertDialog({
+                      isOpen: true,
+                      title: 'Coming Soon',
+                      message: 'Template creation UI will be available soon. You can use the default template for now.',
+                      type: 'info',
+                    });
+                  }}
+                  className="px-4 py-2 text-sm rounded-md flex items-center gap-2 text-white font-medium"
+                  style={{ backgroundColor: 'var(--color-primary)' }}
+                >
+                  <Plus size={16} />
+                  New Template
+                </button>
+              </div>
+
+              <div className="text-sm text-gray-600 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="font-medium text-blue-900 mb-2">Default Template Available</p>
+                <p>The system includes a default "Meeting Notes" template with sections for Agenda, Discussion, Decisions, and Action Items.</p>
+                <p className="mt-2">Custom template management coming in a future update.</p>
+              </div>
+            </div>
+          </div>
+        );
+
       case 'project-details':
         return (
           <div className="space-y-6">
@@ -1131,7 +1232,7 @@ function SettingsContent() {
                 <div className="flex justify-end">
                   <button
                     onClick={async () => {
-                      if (!projectId || !projectName.trim()) return;
+                      if (!projectId || !(projectName?.trim())) return;
                       
                       setIsSaving(true);
                       setSaveSuccess(false);
@@ -1162,12 +1263,12 @@ function SettingsContent() {
                         setIsSaving(false);
                       }
                     }}
-                    disabled={isSaving || !projectName.trim()}
+                    disabled={isSaving || !(projectName?.trim())}
                     className="px-4 py-2 text-sm rounded-md transition-all flex items-center gap-2 font-medium disabled:cursor-not-allowed"
                     style={{
                       backgroundColor: saveSuccess ? '#10b981' : 'var(--color-primary)',
                       color: 'white',
-                      opacity: !projectName.trim() ? 0.6 : 1,
+                      opacity: !(projectName?.trim()) ? 0.6 : 1,
                     }}
                   >
                     {isSaving ? (

@@ -35,46 +35,60 @@ export const colorSchemes: ColorScheme[] = [
     border: '#e2e8f0',
   },
   {
-    id: 'ocean-blue',
+    id: 'ocean',
     name: 'Ocean Blue',
-    primary: '#0284c7',
+    primary: '#0ea5e9',
     secondary: '#0369a1',
-    success: '#0891b2',
-    warning: '#f59e0b',
-    error: '#dc2626',
-    background: '#f8fafc',
-    surface: '#ffffff',
-    text: '#0f172a',
-    textSecondary: '#64748b',
-    border: '#e2e8f0',
-  },
-  {
-    id: 'dark-mode',
-    name: 'Dark Mode',
-    primary: '#3b82f6',
-    secondary: '#1e40af',
     success: '#10b981',
     warning: '#f59e0b',
     error: '#ef4444',
-    background: '#0f172a',
-    surface: '#1e293b',
-    text: '#f1f5f9',
-    textSecondary: '#94a3b8',
-    border: '#334155',
-  },
-  {
-    id: 'minimal-grey',
-    name: 'Minimal Grey',
-    primary: '#475569',
-    secondary: '#334155',
-    success: '#64748b',
-    warning: '#94a3b8',
-    error: '#64748b',
-    background: '#f8fafc',
+    background: '#f0f9ff',
     surface: '#ffffff',
     text: '#0f172a',
     textSecondary: '#64748b',
-    border: '#e2e8f0',
+    border: '#e0f2fe',
+  },
+  {
+    id: 'sunset',
+    name: 'Sunset Orange',
+    primary: '#f97316',
+    secondary: '#c2410c',
+    success: '#22c55e',
+    warning: '#fbbf24',
+    error: '#dc2626',
+    background: '#fff7ed',
+    surface: '#ffffff',
+    text: '#0f172a',
+    textSecondary: '#78716c',
+    border: '#fed7aa',
+  },
+  {
+    id: 'forest',
+    name: 'Forest Green',
+    primary: '#059669',
+    secondary: '#065f46',
+    success: '#10b981',
+    warning: '#d97706',
+    error: '#dc2626',
+    background: '#f0fdf4',
+    surface: '#ffffff',
+    text: '#0f172a',
+    textSecondary: '#6b7280',
+    border: '#bbf7d0',
+  },
+  {
+    id: 'purple',
+    name: 'Royal Purple',
+    primary: '#9333ea',
+    secondary: '#6b21a8',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    error: '#ef4444',
+    background: '#faf5ff',
+    surface: '#ffffff',
+    text: '#0f172a',
+    textSecondary: '#6b7280',
+    border: '#e9d5ff',
   },
 ];
 
@@ -158,21 +172,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--color-warning', scheme.warning);
     root.style.setProperty('--color-error', scheme.error);
     root.style.setProperty('--color-bg', scheme.background);
-    root.style.setProperty('--color-background', scheme.background);
-    root.style.setProperty('--color-text', scheme.text);
-    root.style.setProperty('--color-foreground', scheme.text);
     root.style.setProperty('--color-surface', scheme.surface);
-    root.style.setProperty('--color-border', scheme.border);
-    
-    // Extract RGB values for gradients
-    const hexToRgb = (hex: string) => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result 
-        ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
-        : '0, 150, 70';
-    };
-    root.style.setProperty('--color-primary-rgb', hexToRgb(scheme.primary));
+    root.style.setProperty('--color-text', scheme.text);
     root.style.setProperty('--color-text-secondary', scheme.textSecondary);
+    root.style.setProperty('--color-border', scheme.border);
   };
 
   const setScheme = (schemeId: string) => {

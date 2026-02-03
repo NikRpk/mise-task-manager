@@ -164,3 +164,26 @@ export const DEFAULT_DATE_FORMAT = 'dd.MM.yyyy';
 
 /** Default datetime format */
 export const DEFAULT_DATETIME_FORMAT = 'dd.MM.yyyy HH:mm';
+
+// ============================================================================
+// NOTE TEMPLATES
+// ============================================================================
+
+/** Default note template for meetings */
+export const DEFAULT_NOTE_TEMPLATE = {
+  id: 'default',
+  name: 'Meeting Notes',
+  sections: [
+    { id: 'agenda', title: 'Agenda', placeholder: 'What topics will be discussed?', order: 1 },
+    { id: 'discussion', title: 'Discussion & Notes', placeholder: 'Key points discussed...', order: 2 },
+    { id: 'decisions', title: 'Decisions Made', placeholder: 'What was decided?', order: 3 },
+    { id: 'action-items', title: 'Action Items', placeholder: 'What needs to be done?', order: 4 },
+  ],
+  isDefault: true,
+} as const;
+
+/** Maximum number of notes to display per page */
+export const NOTES_PER_PAGE = 50;
+
+/** Number of days to fetch upcoming calendar events */
+export const CALENDAR_FETCH_DAYS = 30;

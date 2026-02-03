@@ -1,8 +1,6 @@
-'use client';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, User, Palette, Bell, Sliders, Users, Settings as SettingsIcon } from 'lucide-react';
+import { ArrowLeft, User, Palette, Bell, Sliders, Users, Settings as SettingsIcon, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { Project } from '@/types';
 import { authenticatedFetch } from '@/lib/api-client';
@@ -10,7 +8,7 @@ import { logger } from '@/lib/logger';
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
-  activeSection: 'profile' | 'appearance' | 'notifications' | 'project-details' | 'project-status' | 'project-priority' | 'project-custom-fields' | 'project-members';
+  activeSection: 'profile' | 'appearance' | 'notifications' | 'note-templates' | 'project-details' | 'project-status' | 'project-priority' | 'project-custom-fields' | 'project-members';
 }
 
 export default function SettingsLayout({ children, activeSection }: SettingsLayoutProps) {
@@ -56,6 +54,7 @@ export default function SettingsLayout({ children, activeSection }: SettingsLayo
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'note-templates', label: 'Note Templates', icon: FileText },
   ];
 
   const projectSections = [

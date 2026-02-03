@@ -1,0 +1,288 @@
+/**
+ * Calendar Event Selector Component
+ * Allows users to select a meeting or create a standalone note
+ */
+
+'use client';
+
+import { useEffect, useState, useMemo } from 'react';
+import { X, Calendar, Clock, Link as LinkIcon, Plus, AlertCircle } from 'lucide-react';
+import { CalendarEvent } from '@/types';
+import { useCalendarEvents } from '@/hooks/useCalendarEvents';
+import { useAuth } from '@/lib/auth-context';
+import { authenticatedFetch } from '@/lib/api-client';
+import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+import { DEFAULT_TIMEZONE } from '@/lib/constants';
+
+interface CalendarEventSelectorProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectEvent: (event: CalendarEvent | null) => void;
+}
+
+export default function CalendarEventSelector({
+  isOpen,
+  onClose,
+  onSelectEvent,
+}: CalendarEventSelectorProps) {
+  const { user } = useAuth();
+  const { events, loading, connected, fetchEvents, connectCalendar } = useCalendarEvents(user?.uid);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [userTimezone, setUserTimezone] = useState(DEFAULT_TIMEZONE);
+
+  // Fetch user's timezone setting
+  useEffect(() => {
+    if (user) {
+      const fetchUserTimezone = async () => {
+        try {
+          const res = await authenticatedFetch('/api/settings');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.timezone) {
+              setUserTimezone(data.timezone);
+            }
+          }
+        } catch (error) {
+          // Use default timezone
+        }
+      };
+      fetchUserTimezone();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (isOpen && user && connected) {
+      fetchEvents();
+    }
+  }, [isOpen, user, connected, fetchEvents]);
+
+  // Handle ESC key to close
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose]);
+
+  // Filter events by search query
+  const filteredEvents = useMemo(() => {
+    return events.filter(event =>
+      event.summary.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [events, searchQuery]);
+
+  // Group events by day
+  const eventsByDay = useMemo(() => {
+    const groups: Record<string, CalendarEvent[]> = {};
+    
+    filteredEvents.forEach(event => {
+      const startDate = toZonedTime(new Date(event.start), userTimezone);
+      const dayKey = format(startDate, 'yyyy-MM-dd');
+      
+      if (!groups[dayKey]) {
+        groups[dayKey] = [];
+      }
+      groups[dayKey].push(event);
+    });
+    
+    return groups;
+  }, [filteredEvents, userTimezone]);
+
+  const handleEventSelect = (event: CalendarEvent) => {
+    onSelectEvent(event);
+    onClose();
+  };
+
+  const handleNoMeeting = () => {
+    onSelectEvent(null);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <div
+        className="rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col"
+        style={{ backgroundColor: 'var(--color-surface)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-6 py-4 border-b"
+          style={{ borderColor: 'var(--color-border)' }}
+        >
+          <div>
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
+              Select Meeting
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Choose an upcoming meeting or create a standalone note
+            </p>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            title="Close"
+          >
+            <X size={20} style={{ color: 'var(--color-text)' }} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {!connected ? (
+            /* Not Connected State */
+            <div className="text-center py-12">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50 mb-4">
+                <Calendar size={32} className="text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--color-text)' }}>
+                Connect Google Calendar
+              </h3>
+              <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
+                Connect your Google Calendar to see upcoming meetings and link notes to events
+              </p>
+              <button
+                onClick={connectCalendar}
+                className="px-6 py-3 rounded-md text-white font-medium flex items-center gap-2 mx-auto"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                <Calendar size={18} />
+                Connect Google Calendar
+              </button>
+              <div className="mt-6">
+                <button
+                  onClick={handleNoMeeting}
+                  className="text-sm text-gray-600 hover:text-gray-900 underline"
+                >
+                  Skip and create note without meeting
+                </button>
+              </div>
+            </div>
+          ) : loading ? (
+            /* Loading State */
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: 'var(--color-primary)' }}></div>
+              <p className="text-sm text-gray-500">Loading meetings...</p>
+            </div>
+          ) : events.length === 0 ? (
+            /* No Events State */
+            <div className="text-center py-12">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+                <AlertCircle size={32} className="text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--color-text)' }}>
+                No Upcoming Meetings
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                You don't have any meetings scheduled in the next 30 days
+              </p>
+              <button
+                onClick={handleNoMeeting}
+                className="px-6 py-3 rounded-md text-white font-medium"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                Create Note Without Meeting
+              </button>
+            </div>
+          ) : (
+            /* Events List */
+            <div>
+              {/* Search Bar */}
+              <input
+                type="text"
+                placeholder="Search meetings..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg mb-4"
+                style={{ borderColor: 'var(--color-border)' }}
+              />
+
+              {/* Events Grouped by Day */}
+              <div className="space-y-4">
+                {Object.entries(eventsByDay)
+                  .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+                  .map(([dayKey, dayEvents]) => {
+                    const dayDate = toZonedTime(new Date(dayKey), userTimezone);
+                    
+                    return (
+                      <div key={dayKey}>
+                        {/* Day Header */}
+                        <div className="sticky top-0 bg-gray-50 px-3 py-2 rounded-md mb-2 border" style={{ borderColor: 'var(--color-border)' }}>
+                          <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                            {format(dayDate, 'EEEE, dd.MM.yyyy')}
+                          </h3>
+                        </div>
+                        
+                        {/* Events for this day */}
+                        <div className="space-y-2 ml-2">
+                          {dayEvents.map(event => {
+                            const startDate = toZonedTime(new Date(event.start), userTimezone);
+                            const endDate = toZonedTime(new Date(event.end), userTimezone);
+                            
+                            return (
+                              <button
+                                key={event.id}
+                                onClick={() => handleEventSelect(event)}
+                                className="w-full text-left p-4 border rounded-lg hover:border-green-500 hover:bg-green-50 transition-all"
+                                style={{ borderColor: 'var(--color-border)' }}
+                              >
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <h4 className="font-semibold mb-1" style={{ color: 'var(--color-text)' }}>
+                                      {event.summary}
+                                    </h4>
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                      <Clock size={14} />
+                                      {format(startDate, 'HH:mm')} - {format(endDate, 'HH:mm')}
+                                    </div>
+                                  </div>
+                                  {event.htmlLink && (
+                                    <LinkIcon size={16} className="text-gray-400 flex-shrink-0 ml-2" />
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* No Meeting Option */}
+              <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                <button
+                  onClick={handleNoMeeting}
+                  className="w-full p-4 border-2 border-dashed rounded-lg hover:border-green-500 hover:bg-green-50 transition-all flex items-center justify-center gap-2"
+                  style={{ borderColor: 'var(--color-border)' }}
+                >
+                  <Plus size={18} style={{ color: 'var(--color-primary)' }} />
+                  <span className="font-medium" style={{ color: 'var(--color-text)' }}>
+                    Create Note Without Meeting
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

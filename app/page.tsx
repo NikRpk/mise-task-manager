@@ -81,20 +81,62 @@ function HomePage() {
   const [projectIconDialog, setProjectIconDialog] = useState(false);
   const [pendingProjectName, setPendingProjectName] = useState('');
 
-  // Memoize sensor configuration to prevent re-creation
-  const sensorConfig = useMemo(() => ({
-    activationConstraint: {
-      distance: DRAG_ACTIVATION_DISTANCE,
-      delay: DRAG_ACTIVATION_DELAY,
-      tolerance: DRAG_ACTIVATION_TOLERANCE,
-    },
-  }), []);
-  
   const sensors = useSensors(
-    useSensor(PointerSensor, sensorConfig)
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: DRAG_ACTIVATION_DISTANCE,
+        delay: DRAG_ACTIVATION_DELAY,
+        tolerance: DRAG_ACTIVATION_TOLERANCE,
+      },
+    })
   );
 
-  const fetchProjectSettings = useCallback(async () => {
+  // Load tasks and project settings when project changes
+  useEffect(() => {
+    if (selectedProjectId) {
+      let cancelled = false;
+      
+      const loadData = async () => {
+        try {
+          setError(null);
+          await Promise.all([
+            fetchTasks(),
+            fetchProjectSettings()
+          ]);
+        } catch (err) {
+          if (!cancelled) {
+            logger.error('Failed to load project data', err as Error, {
+              projectId: selectedProjectId,
+              userId: user?.uid,
+            });
+            setError('Failed to load project data. Please try refreshing.');
+          }
+        }
+      };
+      
+      loadData();
+      
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [selectedProjectId, fetchTasks]);
+
+  // Handle shared task link
+  useEffect(() => {
+    const taskId = searchParams.get('taskId');
+    if (taskId && tasks.length > 0) {
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        setSelectedTask(task);
+        setIsModalOpen(true);
+        // Remove taskId from URL without reloading
+        window.history.replaceState({}, '', '/');
+      }
+    }
+  }, [searchParams, tasks]);
+
+  const fetchProjectSettings = async () => {
     if (!selectedProjectId) return;
 
     // Helper to convert constants to StatusOption format
@@ -128,52 +170,7 @@ function HomePage() {
       // Fallback to default columns from constants
       setStatusColumns(getDefaultStatusColumns());
     }
-  }, [selectedProjectId, user?.uid]);
-
-  // Load tasks and project settings when project changes
-  useEffect(() => {
-    if (selectedProjectId) {
-      let cancelled = false;
-      
-      const loadData = async () => {
-        try {
-          setError(null);
-          await Promise.all([
-            fetchTasks(),
-            fetchProjectSettings()
-          ]);
-        } catch (err) {
-          if (!cancelled) {
-            logger.error('Failed to load project data', err as Error, {
-              projectId: selectedProjectId,
-              userId: user?.uid,
-            });
-            setError('Failed to load project data. Please try refreshing.');
-          }
-        }
-      };
-      
-      loadData();
-      
-      return () => {
-        cancelled = true;
-      };
-    }
-  }, [selectedProjectId, fetchTasks, fetchProjectSettings, user?.uid]);
-
-  // Handle shared task link
-  useEffect(() => {
-    const taskId = searchParams.get('taskId');
-    if (taskId && tasks.length > 0) {
-      const task = tasks.find(t => t.id === taskId);
-      if (task) {
-        setSelectedTask(task);
-        setIsModalOpen(true);
-        // Remove taskId from URL without reloading
-        window.history.replaceState({}, '', '/');
-      }
-    }
-  }, [searchParams, tasks]);
+  };
 
   const handleCreateProject = useCallback(() => {
     setProjectNameDialog(true);
@@ -335,7 +332,18 @@ function HomePage() {
           {/* Top Bar */}
           <div className="flex justify-between items-center px-7 py-4" style={{ borderBottom: '3px solid var(--color-primary)' }}>
             <div className="flex items-center gap-4">
-              <h1 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>Task Manager</h1>
+              <div className="flex items-center gap-2">
+                <span className="px-4 py-2 text-sm rounded-md font-semibold" style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}>
+                  Tasks
+                </span>
+                <Link
+                  href="/notes"
+                  className="px-4 py-2 text-sm rounded-md transition-colors hover:bg-gray-100"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  Notes
+                </Link>
+              </div>
               <div className="border-l pl-4" style={{ borderColor: 'var(--color-border)' }}>
                 <ProjectSelector
                   projects={projects}
