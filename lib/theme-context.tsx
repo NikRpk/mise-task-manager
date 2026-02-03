@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { auth } from './firebase';
 import { logger } from './logger';
 
 export interface ColorScheme {
@@ -91,7 +92,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Load saved color scheme from settings
     const loadColorScheme = async () => {
       try {
-        const res = await fetch('/api/settings');
+        const user = auth.currentUser;
+        if (!user) {
+          // Wait for auth to initialize
+          logger.debug('Theme: waiting for authentication');
+          return;
+        }
+
+        const token = await user.getIdToken();
+        const res = await fetch('/api/settings', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
         if (res.ok) {
           const data = await res.json();
           if (data.colorScheme) {
@@ -110,7 +125,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         logger.debug('Theme: Failed to load color scheme (normal during initial load)');
       }
     };
-    loadColorScheme();
+    
+    // Listen for auth state changes
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        loadColorScheme();
+      }
+    });
+    
+    return () => unsubscribe();
   }, []);
 
   const applyScheme = (scheme: ColorScheme) => {

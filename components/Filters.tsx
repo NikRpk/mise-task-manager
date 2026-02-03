@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { FilterOptions, TaskStatus, Priority } from '@/types';
+import { authenticatedFetch } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
 
 interface FiltersProps {
   filters: FilterOptions;
@@ -24,16 +26,19 @@ const defaultStatusColors: Record<string, string> = {
 };
 
 export default function Filters({ filters, onChange, owners }: FiltersProps) {
+  const { user } = useAuth();
   const [statusOptions, setStatusOptions] = useState<StatusOption[]>([]);
   const [statusColors, setStatusColors] = useState<Record<string, string>>(defaultStatusColors);
 
   useEffect(() => {
+    // Only fetch if user is authenticated
+    if (!user) return;
+    
     // Fetch status options from settings
-    fetch('/api/settings')
+    authenticatedFetch('/api/settings')
       .then(res => {
-        if (!res.ok && res.status === 401) {
-          // User not authenticated yet, use defaults silently
-          throw new Error('Not authenticated');
+        if (!res.ok) {
+          throw new Error(`Failed to fetch settings: ${res.status}`);
         }
         return res.json();
       })
@@ -56,7 +61,7 @@ export default function Filters({ filters, onChange, owners }: FiltersProps) {
         }
       })
       .catch(() => {
-        // Use defaults if fetch fails (including 401)
+        // Use defaults if fetch fails
         setStatusOptions([
           { id: '1', label: 'To Do', value: 'todo', color: 'var(--color-text-secondary)' },
           { id: '2', label: 'In Progress', value: 'in-progress', color: '#f6c400' },
@@ -64,7 +69,7 @@ export default function Filters({ filters, onChange, owners }: FiltersProps) {
           { id: '4', label: 'Done', value: 'done', color: '#00a61c' },
         ]);
       });
-  }, []);
+  }, [user]);
 
   const updateFilter = <K extends keyof FilterOptions>(key: K, value: FilterOptions[K]) => {
     onChange({ ...filters, [key]: value });

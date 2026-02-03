@@ -220,6 +220,7 @@ function SettingsContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [projectName, setProjectName] = useState('');
+  const [projectIcon, setProjectIcon] = useState('📋');
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<ProjectRole>('EDIT');
@@ -279,6 +280,7 @@ function SettingsContent() {
       const res = await authenticatedFetch(`/api/projects/${projectId}`);
       const data = await res.json();
       setProjectName(data.name);
+      setProjectIcon(data.icon || '📋');
     } catch (error) {
       console.error('Failed to fetch project details:', error);
     }
@@ -1068,6 +1070,190 @@ function SettingsContent() {
                     </p>
                   </div>
                 </label>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'project-details':
+        return (
+          <div className="space-y-6">
+            <div className="rounded-lg shadow-sm border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+                  Project Details
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Manage project information and settings
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {/* Project Name & Icon */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                      Project Name
+                    </label>
+                    <input
+                      type="text"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md"
+                      style={{ borderColor: 'var(--color-border)' }}
+                      placeholder="Enter project name"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      This name will be displayed throughout the application
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                      Project Icon
+                    </label>
+                    <input
+                      type="text"
+                      value={projectIcon}
+                      onChange={(e) => setProjectIcon(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md text-2xl text-center"
+                      style={{ borderColor: 'var(--color-border)' }}
+                      placeholder="📋"
+                      maxLength={2}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter an emoji (e.g., 📋, 🚀, 💡)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={async () => {
+                      if (!projectId || !projectName.trim()) return;
+                      
+                      setIsSaving(true);
+                      setSaveSuccess(false);
+                      try {
+                        await authenticatedFetch(`/api/projects/${projectId}`, {
+                          method: 'PUT',
+                          body: JSON.stringify({ 
+                            name: projectName,
+                            icon: projectIcon || '📋'
+                          }),
+                        });
+                        setSaveSuccess(true);
+                        setTimeout(() => setSaveSuccess(false), 3000);
+                        
+                        // Refresh page to update project selector
+                        setTimeout(() => {
+                          window.location.reload();
+                        }, 1500);
+                      } catch (error) {
+                        console.error('Failed to update project:', error);
+                        setAlertDialog({
+                          isOpen: true,
+                          title: 'Error',
+                          message: 'Failed to update project. Please try again.',
+                          type: 'error',
+                        });
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}
+                    disabled={isSaving || !projectName.trim()}
+                    className="px-4 py-2 text-sm rounded-md transition-all flex items-center gap-2 font-medium disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: saveSuccess ? '#10b981' : 'var(--color-primary)',
+                      color: 'white',
+                      opacity: !projectName.trim() ? 0.6 : 1,
+                    }}
+                  >
+                    {isSaving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Saving...
+                      </>
+                    ) : saveSuccess ? (
+                      <>
+                        <Check size={16} />
+                        Saved!
+                      </>
+                    ) : (
+                      <>
+                        <Save size={16} />
+                        Save Changes
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Danger Zone */}
+                <div className="mt-8 pt-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                  <h3 className="text-sm font-semibold text-red-600 mb-2">
+                    Danger Zone
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Deleting this project will permanently remove all tasks, settings, and data associated with it. This action cannot be undone.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setConfirmDialog({
+                        isOpen: true,
+                        title: 'Delete Project',
+                        message: `Are you sure you want to delete "${projectName}"?\n\nThis will permanently delete:\n• All tasks in this project\n• All project settings\n• All member assignments\n\nThis action cannot be undone.`,
+                        type: 'danger',
+                        onConfirm: async () => {
+                          if (!projectId) return;
+                          
+                          try {
+                            await authenticatedFetch(`/api/projects/${projectId}`, {
+                              method: 'DELETE',
+                            });
+                            
+                            setAlertDialog({
+                              isOpen: true,
+                              title: 'Project Deleted',
+                              message: 'The project has been permanently deleted.',
+                              type: 'success',
+                            });
+                            
+                            // Redirect to home after 2 seconds
+                            setTimeout(() => {
+                              window.location.href = '/';
+                            }, 2000);
+                          } catch (error) {
+                            console.error('Failed to delete project:', error);
+                            setAlertDialog({
+                              isOpen: true,
+                              title: 'Error',
+                              message: 'Failed to delete project. Please try again.',
+                              type: 'error',
+                            });
+                          }
+                        },
+                      });
+                    }}
+                    className="px-4 py-2 text-sm border-2 rounded-md transition-colors flex items-center gap-2 font-medium"
+                    style={{
+                      borderColor: '#f30047',
+                      color: '#f30047',
+                      backgroundColor: 'white',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f30047';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'white';
+                      e.currentTarget.style.color = '#f30047';
+                    }}
+                  >
+                    <Trash2 size={16} />
+                    Delete Project
+                  </button>
+                </div>
               </div>
             </div>
           </div>

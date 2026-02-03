@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, User, Palette, Bell, Sliders, Users } from 'lucide-react';
+import { ArrowLeft, User, Palette, Bell, Sliders, Users, Settings as SettingsIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Project } from '@/types';
 import { authenticatedFetch } from '@/lib/api-client';
@@ -10,7 +10,7 @@ import { logger } from '@/lib/logger';
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
-  activeSection: 'profile' | 'appearance' | 'notifications' | 'project-status' | 'project-priority' | 'project-custom-fields' | 'project-members';
+  activeSection: 'profile' | 'appearance' | 'notifications' | 'project-details' | 'project-status' | 'project-priority' | 'project-custom-fields' | 'project-members';
 }
 
 export default function SettingsLayout({ children, activeSection }: SettingsLayoutProps) {
@@ -59,6 +59,7 @@ export default function SettingsLayout({ children, activeSection }: SettingsLayo
   ];
 
   const projectSections = [
+    { id: 'project-details', label: 'Project Details', icon: SettingsIcon },
     { id: 'project-status', label: 'Status Options', icon: Sliders },
     { id: 'project-priority', label: 'Priority Options', icon: Sliders },
     { id: 'project-custom-fields', label: 'Custom Fields', icon: Sliders },
