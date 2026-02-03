@@ -1,6 +1,6 @@
 /**
  * Note Modal Component
- * Editor for meeting notes with template sections and task extraction
+ * Editor for meeting notes with single rich text field and task extraction
  */
 
 'use client';
@@ -43,8 +43,8 @@ export default function NoteModal({
   const [templateId, setTemplateId] = useState('default');
   const [isSaving, setIsSaving] = useState(false);
   const [attachToCalendar, setAttachToCalendar] = useState(true);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [isEditMode, setIsEditMode] = useState(!readOnly);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'success' | 'warning' | 'info' }>({
@@ -70,14 +70,14 @@ export default function NoteModal({
       } else {
         // Creating new note - use template content
         setTitle(calendarEvent?.summary || '');
-        const template = templates.find(t => t.id === 'default') || templates[0];
+        const template = templates.find(t => t.id === templateId) || templates[0];
         setContent(template?.content || '');
         setTasks([]);
         setProjectId(defaultProjectId || null);
         setTemplateId('default');
       }
     }
-  }, [isOpen, note, calendarEvent, defaultProjectId, readOnly, templates]);
+  }, [isOpen, note, calendarEvent, defaultProjectId, readOnly, templates, templateId]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -117,7 +117,7 @@ export default function NoteModal({
             setAlertDialog({
               isOpen: true,
               title: 'Success',
-              message: 'Note saved and attached to calendar event as a file',
+              message: 'Note saved and attached to calendar event as a Google Doc',
               type: 'success',
             });
           } else {
@@ -129,7 +129,6 @@ export default function NoteModal({
             });
           }
         } catch (error) {
-          // Note is saved, just attachment failed
           console.warn('Failed to attach to calendar:', error);
           setAlertDialog({
             isOpen: true,
@@ -156,7 +155,6 @@ export default function NoteModal({
   };
 
   const handleTemplateChange = (newTemplateId: string) => {
-    // Warn if there's content
     const hasContent = content.trim() && content !== currentTemplate?.content;
     
     if (hasContent) {
@@ -215,7 +213,6 @@ export default function NoteModal({
             message: `${tasksToCreate.length} task(s) created successfully`,
             type: 'success',
           });
-          // Refresh to get updated task IDs
           setTimeout(() => window.location.reload(), 1500);
         }
       } catch (error) {
@@ -276,24 +273,6 @@ export default function NoteModal({
             style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
           >
             <div className="flex items-center gap-4 flex-wrap">
-              {/* Template Selector */}
-              <div className="flex items-center gap-2">
-                <FileText size={16} className="text-gray-500" />
-                <select
-                  value={templateId}
-                  onChange={(e) => handleTemplateChange(e.target.value)}
-                  disabled={!isEditMode}
-                  className="px-3 py-1.5 text-sm border rounded-md"
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  {templates.map(template => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* Project Selector */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Project:</span>
@@ -313,47 +292,65 @@ export default function NoteModal({
                 </select>
               </div>
 
-              {/* Calendar Event Badge */}
+              {/* Calendar Event Badge - Clickable to change */}
               {(note?.calendarEventId || calendarEvent) && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-sm">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => {
+                    if (isEditMode) {
+                      setAlertDialog({
+                        isOpen: true,
+                        title: 'Change Meeting',
+                        message: 'Meeting linking coming soon. For now, create a new note for a different meeting.',
+                        type: 'info',
+                      });
+                    }
+                  }}
+                  title="Click to change meeting (coming soon)"
+                >
                   <Calendar size={14} />
-                  <span>Linked to meeting</span>
+                  <span>Linked to: {calendarEvent?.summary || 'Meeting'}</span>
                 </div>
               )}
             </div>
           </div>
 
+          {/* Calendar Event Details */}
+          {calendarEvent && (
+            <div className="px-6 py-4 bg-blue-50 border-b" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex items-start gap-4">
+                <Calendar size={20} className="text-blue-600 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-blue-900">{calendarEvent.summary}</h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    {new Date(calendarEvent.start).toLocaleString('de-DE', { 
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: 'Europe/Berlin'
+                    })}
+                  </p>
+                  {/* Attendees would go here - need to fetch from API */}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-4xl mx-auto space-y-6">
-              {/* Template Sections */}
-              {currentTemplate?.sections
-                .sort((a, b) => a.order - b.order)
-                .map(section => (
-                  <div key={section.id}>
-                    <label className="block text-sm font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>
-                      {section.title}
-                    </label>
-                    <textarea
-                      value={content[section.id] || ''}
-                      onChange={(e) => setContent({ ...content, [section.id]: e.target.value })}
-                      placeholder={section.placeholder}
-                      disabled={isEditMode}
-                      className="w-full min-h-[120px] px-4 py-3 border rounded-md focus:outline-none focus:ring-2 transition-all"
-                      style={{ 
-                        borderColor: 'var(--color-border)',
-                        resize: 'vertical',
-                        backgroundColor: isEditMode ? '#ffffff' : '#f9fafb',
-                      }}
-                      onFocus={(e) => {
-                        if (isEditMode) e.target.style.boxShadow = '0 0 0 2px var(--color-primary)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.boxShadow = '';
-                      }}
-                    />
-                  </div>
-                ))}
+              {/* Single Rich Text Editor */}
+              <div>
+                <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+                  <RichTextEditor
+                    value={content}
+                    onChange={setContent}
+                    placeholder="Start taking notes..."
+                  />
+                </div>
+              </div>
 
               {/* Tasks Section */}
               <div className="mt-8">
@@ -361,14 +358,16 @@ export default function NoteModal({
                   <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>
                     Tasks
                   </h3>
-                  <button
-                    onClick={addTask}
-                    className="px-3 py-1.5 text-sm rounded-md flex items-center gap-2 text-white"
-                    style={{ backgroundColor: 'var(--color-primary)' }}
-                  >
-                    <Plus size={14} />
-                    Add Task
-                  </button>
+                  {isEditMode && (
+                    <button
+                      onClick={addTask}
+                      className="px-3 py-1.5 text-sm rounded-md flex items-center gap-2 text-white"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    >
+                      <Plus size={14} />
+                      Add Task
+                    </button>
+                  )}
                 </div>
 
                 {tasks.length === 0 ? (
@@ -390,9 +389,11 @@ export default function NoteModal({
                             <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                               Deadline
                             </th>
-                            <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Actions
-                            </th>
+                            {isEditMode && (
+                              <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Actions
+                              </th>
+                            )}
                           </tr>
                         </thead>
                         <tbody>
@@ -408,8 +409,12 @@ export default function NoteModal({
                                   value={task.title}
                                   onChange={(e) => updateTask(task.id, { title: e.target.value })}
                                   placeholder="Task title..."
+                                  disabled={!isEditMode}
                                   className="w-full px-2 py-1 border rounded text-sm"
-                                  style={{ borderColor: 'var(--color-border)' }}
+                                  style={{ 
+                                    borderColor: 'var(--color-border)',
+                                    backgroundColor: isEditMode ? '#ffffff' : '#f9fafb',
+                                  }}
                                 />
                               </td>
                               <td className="px-4 py-3">
@@ -418,8 +423,12 @@ export default function NoteModal({
                                   value={task.owner}
                                   onChange={(e) => updateTask(task.id, { owner: e.target.value })}
                                   placeholder="Owner..."
+                                  disabled={!isEditMode}
                                   className="w-full px-2 py-1 border rounded text-sm"
-                                  style={{ borderColor: 'var(--color-border)' }}
+                                  style={{ 
+                                    borderColor: 'var(--color-border)',
+                                    backgroundColor: isEditMode ? '#ffffff' : '#f9fafb',
+                                  }}
                                 />
                               </td>
                               <td className="px-4 py-3">
@@ -427,19 +436,25 @@ export default function NoteModal({
                                   type="date"
                                   value={task.deadline || ''}
                                   onChange={(e) => updateTask(task.id, { deadline: e.target.value || null })}
+                                  disabled={!isEditMode}
                                   className="w-full px-2 py-1 border rounded text-sm"
-                                  style={{ borderColor: 'var(--color-border)' }}
+                                  style={{ 
+                                    borderColor: 'var(--color-border)',
+                                    backgroundColor: isEditMode ? '#ffffff' : '#f9fafb',
+                                  }}
                                 />
                               </td>
-                              <td className="px-4 py-3 text-center">
-                                <button
-                                  onClick={() => removeTask(task.id)}
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                  title="Remove task"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </td>
+                              {isEditMode && (
+                                <td className="px-4 py-3 text-center">
+                                  <button
+                                    onClick={() => removeTask(task.id)}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                    title="Remove task"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </tbody>
@@ -447,7 +462,7 @@ export default function NoteModal({
                     </div>
                     
                     {/* Create Tasks Button */}
-                    {projectId && note?.id && tasks.some(t => !t.createdTaskId && t.title.trim()) && (
+                    {isEditMode && projectId && note?.id && tasks.some(t => !t.createdTaskId && t.title.trim()) && (
                       <div className="mt-3 flex justify-end">
                         <button
                           onClick={handleCreateTasks}
@@ -471,7 +486,7 @@ export default function NoteModal({
             style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
           >
             <div className="flex items-center gap-3">
-              {(note?.calendarEventId || calendarEvent) && !readOnly && (
+              {(note?.calendarEventId || calendarEvent) && isEditMode && (
                 <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
                   <input
                     type="checkbox"

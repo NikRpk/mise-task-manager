@@ -1230,33 +1230,58 @@ function SettingsContent() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
-                    Note Templates
+                    Default Note Template
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    Create and manage templates for your meeting notes
+                    Edit the default template used for meeting notes
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    setAlertDialog({
-                      isOpen: true,
-                      title: 'Coming Soon',
-                      message: 'Template creation UI will be available soon. You can use the default template for now.',
-                      type: 'info',
-                    });
+                  onClick={handleSave}
+                  disabled={isSaving || !hasChanges}
+                  className="px-4 py-2 text-sm rounded-md transition-all flex items-center gap-2 font-medium disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: saveSuccess ? '#10b981' : (hasChanges ? 'var(--color-primary)' : 'white'),
+                    color: saveSuccess ? 'white' : (hasChanges ? 'white' : '#94a3b8'),
+                    border: `1px solid ${saveSuccess ? '#10b981' : (hasChanges ? 'var(--color-primary)' : 'var(--color-border)')}`,
+                    opacity: (!hasChanges && !saveSuccess) ? 0.6 : 1,
                   }}
-                  className="px-4 py-2 text-sm rounded-md flex items-center gap-2 text-white font-medium"
-                  style={{ backgroundColor: 'var(--color-primary)' }}
                 >
-                  <Plus size={16} />
-                  New Template
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: hasChanges ? 'white' : 'var(--color-primary)' }}></div>
+                      Saving...
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check size={16} />
+                      Saved!
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      Save Template
+                    </>
+                  )}
                 </button>
               </div>
 
-              <div className="text-sm text-gray-600 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="font-medium text-blue-900 mb-2">Default Template Available</p>
-                <p>The system includes a default "Meeting Notes" template with sections for Agenda, Discussion, Decisions, and Action Items.</p>
-                <p className="mt-2">Custom template management coming in a future update.</p>
+              <div className="text-sm text-gray-600 p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                <p className="font-medium text-blue-900 mb-2">Template Instructions</p>
+                <p>Use the rich text editor to create your template. Include headers (H2) for sections and start bullet lists underneath.</p>
+                <p className="mt-2">Example structure: Agenda, Discussion, Decisions, Action Items</p>
+              </div>
+
+              {/* Template Editor */}
+              <div>
+                <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--color-text)' }}>
+                  Template Content
+                </label>
+                <RichTextEditor
+                  value={userSettings.noteTemplate || ''}
+                  onChange={(value) => setUserSettings({ ...userSettings, noteTemplate: value })}
+                  placeholder="Create your note template with headers and bullet points..."
+                />
               </div>
             </div>
           </div>

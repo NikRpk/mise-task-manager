@@ -67,29 +67,20 @@ export async function POST(
 }
 
 /**
- * Format note content for calendar event description (HTML format for Google Doc)
+ * Format note content for Google Doc
  */
 function formatNoteForCalendar(note: Note, userEmail: string): string {
   let html = `<h1>${note.title}</h1>\n`;
   html += `<p><em>Created: ${new Date(note.createdAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}</em></p>\n`;
   html += `<hr>\n\n`;
   
-  // Add each section
-  for (const [sectionId, content] of Object.entries(note.content)) {
-    if (content.trim()) {
-      // Find section title from template
-      const sectionTitle = sectionId
-        .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-      
-      html += `<h2>${sectionTitle}</h2>\n`;
-      html += `<div>${content}</div>\n\n`;
-    }
-  }
+  // Add note content (already formatted HTML from RichTextEditor)
+  html += note.content;
+  html += `\n\n`;
   
   // Add tasks section
   if (note.tasks.length > 0) {
+    html += `<hr>\n`;
     html += `<h2>Tasks</h2>\n`;
     html += `<ul>\n`;
     note.tasks.forEach((task) => {
