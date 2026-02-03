@@ -14,6 +14,7 @@ import AlertDialog from '@/components/AlertDialog';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { colorSchemes, useTheme } from '@/lib/theme-context';
+import TipTapEditor from '@/components/TipTapEditor';
 import { ProjectSettings, StatusOption, PriorityOption, CustomField, ProjectMember, ProjectRole } from '@/types';
 
 interface UserSettings {
@@ -1277,7 +1278,7 @@ function SettingsContent() {
                 <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--color-text)' }}>
                   Template Content
                 </label>
-                <RichTextEditor
+                <TipTapEditor
                   value={userSettings.noteTemplate || ''}
                   onChange={(value) => setUserSettings({ ...userSettings, noteTemplate: value })}
                   placeholder="Create your note template with headers and bullet points..."

@@ -308,44 +308,77 @@ export default function NoteModal({
                   </select>
                 </div>
 
-                {/* Event Info or Link Button */}
+              {/* Right side - Event Info */}
+              <div className="relative">
                 {selectedCalendarEvent || calendarEvent ? (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-md">
-                    <Calendar size={14} className="text-blue-600" />
-                    <div className="text-sm">
-                      <div className="font-medium text-blue-900">{(selectedCalendarEvent || calendarEvent)?.summary}</div>
-                      <div className="text-xs text-blue-600">
-                        {new Date((selectedCalendarEvent || calendarEvent)!.start).toLocaleString('de-DE', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'Europe/Berlin'
-                        })}
+                  <>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-md">
+                      <Calendar size={14} className="text-blue-600 flex-shrink-0" />
+                      <div className="text-sm">
+                        <span className="font-medium text-blue-900">{(selectedCalendarEvent || calendarEvent)?.summary}</span>
+                        <span className="text-xs text-blue-600 ml-2">
+                          {new Date((selectedCalendarEvent || calendarEvent)!.start).toLocaleString('de-DE', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Europe/Berlin'
+                          })}
+                        </span>
                       </div>
+                      {isEditMode && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowMeetingSelector(!showMeetingSelector);
+                          }}
+                          className="ml-2 p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                          title="Change meeting"
+                          type="button"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                      )}
                     </div>
+                    
+                    {/* Meeting Selector Dropdown */}
+                    {showMeetingSelector && (
+                      <MeetingSelectorDropdown
+                        isOpen={showMeetingSelector}
+                        onClose={() => setShowMeetingSelector(false)}
+                        onSelect={handleChangeMeeting}
+                        currentEventId={(selectedCalendarEvent || calendarEvent)?.id}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <>
                     {isEditMode && (
                       <button
-                        onClick={() => setShowMeetingSelector(true)}
-                        className="ml-2 p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                        title="Change meeting"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMeetingSelector(!showMeetingSelector);
+                        }}
+                        className="px-3 py-1.5 text-sm border-2 border-dashed rounded-md flex items-center gap-2 hover:bg-blue-50 transition-colors"
+                        style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
+                        type="button"
                       >
-                        <Edit size={14} />
+                        <Calendar size={14} />
+                        <span>Link to Meeting</span>
                       </button>
                     )}
-                  </div>
-                ) : (
-                  isEditMode && (
-                    <button
-                      onClick={() => setShowMeetingSelector(true)}
-                      className="px-3 py-1.5 text-sm border-2 border-dashed rounded-md flex items-center gap-2 hover:bg-blue-50 transition-colors"
-                      style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
-                    >
-                      <Calendar size={14} />
-                      <span>Link to Meeting</span>
-                    </button>
-                  )
+                    
+                    {/* Meeting Selector Dropdown */}
+                    {showMeetingSelector && (
+                      <MeetingSelectorDropdown
+                        isOpen={showMeetingSelector}
+                        onClose={() => setShowMeetingSelector(false)}
+                        onSelect={handleChangeMeeting}
+                        currentEventId={null}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             </div>
