@@ -8,18 +8,16 @@
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Search, Calendar, FileText, Trash2, Edit, Link as LinkIcon, Filter } from 'lucide-react';
-import { Note, CalendarEvent, Project } from '@/types';
+import { Note, CalendarEvent } from '@/types';
 import { useAuth } from '@/lib/auth-context';
 import { useNoteData } from '@/hooks/useNoteData';
 import { useNoteTemplates } from '@/hooks/useNoteTemplates';
-import { useProjectData } from '@/hooks/useProjectData';
 import { authenticatedFetch } from '@/lib/api-client';
 import NoteModal from '@/components/NoteModal';
 import CalendarEventSelector from '@/components/CalendarEventSelector';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import AuthGuard from '@/components/AuthGuard';
 import UserProfile from '@/components/UserProfile';
-import ProjectSelector from '@/components/ProjectSelector';
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { DEFAULT_TIMEZONE } from '@/lib/constants';
@@ -32,14 +30,13 @@ function NotesPage() {
   
   const { notes, loading, fetchNotes, createNote, updateNote, deleteNote } = useNoteData(user?.uid);
   const { templates } = useNoteTemplates(user?.uid);
-  const { projects, selectedProjectId, setSelectedProjectId } = useProjectData(user?.uid);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterProject, setFilterProject] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isCalendarSelectorOpen, setIsCalendarSelectorOpen] = useState(false);
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [userTimezone, setUserTimezone] = useState(DEFAULT_TIMEZONE);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; message: string; onConfirm: () => void }>({
     isOpen: false,
@@ -67,12 +64,12 @@ function NotesPage() {
     }
   }, [user]);
 
-  // Fetch notes on mount or when filter changes
+  // Fetch notes on mount
   useEffect(() => {
     if (user) {
-      fetchNotes(filterProject);
+      fetchNotes();
     }
-  }, [user, filterProject, fetchNotes]);
+  }, [user, fetchNotes]);
 
   // Filtered and searched notes
   const filteredNotes = useMemo(() => {
@@ -90,11 +87,19 @@ function NotesPage() {
 
   const handleCalendarEventSelected = (event: CalendarEvent | null) => {
     setSelectedCalendarEvent(event);
+    setIsReadOnly(false);
+    setIsNoteModalOpen(true);
+  };
+
+  const handleViewNote = (note: Note) => {
+    setSelectedNote(note);
+    setIsReadOnly(true);
     setIsNoteModalOpen(true);
   };
 
   const handleEditNote = (note: Note) => {
     setSelectedNote(note);
+    setIsReadOnly(false);
     setIsNoteModalOpen(true);
   };
 
@@ -119,12 +124,6 @@ function NotesPage() {
       const newNote = await createNote(noteData);
       return newNote.id;
     }
-  };
-
-  const getProjectName = (projectId: string | null) => {
-    if (!projectId) return null;
-    const project = projects.find(p => p.id === projectId);
-    return project ? `${project.icon} ${project.name}` : null;
   };
 
   if (loading && notes.length === 0) {
@@ -157,14 +156,6 @@ function NotesPage() {
                 <span className="px-4 py-2 text-sm rounded-md font-semibold" style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}>
                   Notes
                 </span>
-              </div>
-              <div className="border-l pl-4" style={{ borderColor: 'var(--color-border)' }}>
-                <ProjectSelector
-                  projects={projects}
-                  selectedProjectId={filterProject}
-                  onChange={setFilterProject}
-                  onCreateProject={() => {}}
-                />
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -231,9 +222,6 @@ function NotesPage() {
                       Title
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Project
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Meeting
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -249,7 +237,6 @@ function NotesPage() {
                 </thead>
                 <tbody>
                   {filteredNotes.map(note => {
-                    const projectName = getProjectName(note.projectId);
                     const createdDate = toZonedTime(new Date(note.createdAt), userTimezone);
                     
                     return (
@@ -259,21 +246,15 @@ function NotesPage() {
                         style={{ borderColor: 'var(--color-border)' }}
                       >
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleViewNote(note)}
+                            className="flex items-center gap-2 hover:underline text-left"
+                          >
                             <FileText size={16} className="text-gray-400" />
                             <span className="font-medium" style={{ color: 'var(--color-text)' }}>
                               {note.title}
                             </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          {projectName ? (
-                            <span className="px-2 py-1 text-xs rounded-full bg-gray-100" style={{ color: 'var(--color-text)' }}>
-                              {projectName}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">No project</span>
-                          )}
+                          </button>
                         </td>
                         <td className="px-6 py-4">
                           {note.calendarEventLink ? (
@@ -346,9 +327,7 @@ function NotesPage() {
         }}
         onSave={handleSaveNote}
         templates={templates}
-        projects={projects}
         calendarEvent={selectedCalendarEvent}
-        defaultProjectId={filterProject || undefined}
       />
 
       {/* Confirm Dialog */}

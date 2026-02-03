@@ -38,3 +38,45 @@ export interface FilterOptions {
   priority?: Priority[];
   tags?: string[];
 }
+
+// ========== NOTES & TEMPLATES ==========
+
+export interface NoteTask {
+  id: string;
+  title: string;
+  owner: string;
+  deadline: string | null;
+  createdTaskId?: string; // Links to actual Task if created
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string; // Single rich text content field
+  tasks: NoteTask[];
+  calendarEventId: string | null; // Google Calendar event ID
+  calendarEventLink: string | null;
+  templateId: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NoteTemplate {
+  id: string;
+  name: string;
+  content: string; // HTML template content
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  isDefault?: boolean;
+}
+
+export interface CalendarEvent {
+  id: string;
+  summary: string;
+  start: string;
+  end: string;
+  htmlLink: string;
+  description?: string | null;
+}

@@ -11,26 +11,17 @@ import { Note } from '@/types';
 export async function GET(request: NextRequest) {
   return withAuth(request, async (req, user) => {
     try {
-      const searchParams = request.nextUrl.searchParams;
-      const projectId = searchParams.get('projectId');
-      
       const notesRef = adminDb.collection('notes');
-      let query: FirebaseFirestore.Query = notesRef;
       
       // Only fetch notes created by this user
-      query = query.where('createdBy', '==', user.uid);
-      
-      // Filter by project if specified
-      if (projectId) {
-        query = query.where('projectId', '==', projectId);
-      }
+      const query = notesRef.where('createdBy', '==', user.uid);
       
       const snapshot = await query.get();
       
       const notes: Note[] = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
-      })) as Note[];
+        ...doc.data() as Omit<Note, 'id'>
+      }));
       
       // Sort in memory (client-side) to avoid needing a Firestore index
       notes.sort((a, b) => {
@@ -57,7 +48,6 @@ export async function POST(request: NextRequest) {
         title: body.title || 'Untitled Note',
         content: body.content || {},
         tasks: body.tasks || [],
-        projectId: body.projectId || null,
         calendarEventId: body.calendarEventId || null,
         calendarEventLink: body.calendarEventLink || null,
         templateId: body.templateId || 'default',

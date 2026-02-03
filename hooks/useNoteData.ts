@@ -10,7 +10,7 @@ import { logger } from '@/lib/logger';
 interface UseNoteDataResult {
   notes: Note[];
   loading: boolean;
-  fetchNotes: (projectId?: string | null) => Promise<void>;
+  fetchNotes: () => Promise<void>;
   createNote: (noteData: Partial<Note>) => Promise<Note>;
   updateNote: (noteId: string, noteData: Partial<Note>) => Promise<void>;
   deleteNote: (noteId: string) => Promise<void>;
@@ -25,16 +25,12 @@ export function useNoteData(userId: string | undefined): UseNoteDataResult {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchNotes = useCallback(async (projectId?: string | null) => {
+  const fetchNotes = useCallback(async () => {
     if (!userId) return;
 
     try {
       setLoading(true);
-      const url = projectId
-        ? `/api/notes?projectId=${projectId}`
-        : '/api/notes';
-      
-      const res = await authenticatedFetch(url);
+      const res = await authenticatedFetch('/api/notes');
       const data = await res.json();
       
       setNotes(Array.isArray(data) ? data : []);

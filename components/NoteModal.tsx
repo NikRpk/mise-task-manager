@@ -7,11 +7,10 @@
 
 import { useState, useEffect } from 'react';
 import { X, Save, Calendar, Link as LinkIcon, FileText, Plus, Trash2, Edit, ChevronDown } from 'lucide-react';
-import { Note, NoteTemplate, NoteTask, CalendarEvent, Project } from '@/types';
+import { Note, NoteTemplate, NoteTask, CalendarEvent } from '@/types';
 import TipTapEditor from './TipTapEditor';
 import ConfirmDialog from './ConfirmDialog';
 import AlertDialog from './AlertDialog';
-import MeetingSelectorDropdown from './MeetingSelectorDropdown';
 import { authenticatedFetch } from '@/lib/api-client';
 
 interface NoteModalProps {
@@ -20,9 +19,7 @@ interface NoteModalProps {
   onClose: () => void;
   onSave: (noteData: Partial<Note>) => Promise<string>; // Returns note ID
   templates: NoteTemplate[];
-  projects: Project[];
   calendarEvent?: CalendarEvent | null;
-  defaultProjectId?: string;
   readOnly?: boolean;
 }
 
@@ -32,15 +29,12 @@ export default function NoteModal({
   onClose,
   onSave,
   templates,
-  projects,
   calendarEvent,
-  defaultProjectId,
   readOnly = false,
 }: NoteModalProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tasks, setTasks] = useState<NoteTask[]>([]);
-  const [projectId, setProjectId] = useState<string | null>(null);
   const [templateId, setTemplateId] = useState('default');
   const [isSaving, setIsSaving] = useState(false);
   const [attachToCalendar, setAttachToCalendar] = useState(true);
@@ -66,13 +60,11 @@ export default function NoteModal({
         setTitle(note.title);
         setContent(note.content);
         setTasks(note.tasks);
-        setProjectId(note.projectId);
         setTemplateId(note.templateId);
       } else {
         // Creating new note - load user's saved template
         setTitle(calendarEvent?.summary || '');
         setTasks([]);
-        setProjectId(defaultProjectId || null);
         setTemplateId('default');
         
         // Load template asynchronously
@@ -121,7 +113,7 @@ ACTION ITEMS
         })();
       }
     }
-  }, [isOpen, note, calendarEvent, defaultProjectId, readOnly, templates]);
+  }, [isOpen, note, calendarEvent, readOnly, templates]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -141,7 +133,6 @@ ACTION ITEMS
         title: title.trim(),
         content,
         tasks,
-        projectId,
         templateId,
         calendarEventId: note?.calendarEventId || calendarEvent?.id || null,
         calendarEventLink: note?.calendarEventLink || calendarEvent?.htmlLink || null,
@@ -241,41 +232,6 @@ ACTION ITEMS
     setTasks(tasks.filter(task => task.id !== taskId));
   };
 
-  const handleCreateTasks = async () => {
-    if (!note?.id || !projectId) return;
-    
-    const tasksToCreate = tasks.filter(t => !t.createdTaskId && t.title.trim());
-    
-    setConfirmMessage(`Create ${tasksToCreate.length} task(s) in the selected project? This will add them to your task board.`);
-    setConfirmAction(() => async () => {
-      try {
-        const res = await authenticatedFetch(`/api/notes/${note.id}/create-tasks`, {
-          method: 'POST',
-          body: JSON.stringify({ projectId }),
-        });
-        
-        if (res.ok) {
-          setAlertDialog({
-            isOpen: true,
-            title: 'Success',
-            message: `${tasksToCreate.length} task(s) created successfully`,
-            type: 'success',
-          });
-          // Refresh to get updated task IDs
-          setTimeout(() => window.location.reload(), 1500);
-        }
-      } catch (error) {
-        setAlertDialog({
-          isOpen: true,
-          title: 'Error',
-          message: 'Failed to create tasks',
-          type: 'error',
-        });
-      }
-      setShowConfirm(false);
-    });
-    setShowConfirm(true);
-  };
 
   if (!isOpen) return null;
 
@@ -315,41 +271,17 @@ ACTION ITEMS
           </div>
 
           {/* Consolidated Toolbar */}
-          <div
-            className="px-6 py-3 border-b"
-            style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
-          >
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              {/* Left side - Project */}
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Project:</span>
-                  <select
-                    value={projectId || ''}
-                    onChange={(e) => setProjectId(e.target.value || null)}
-                    disabled={!isEditMode}
-                    className="px-3 py-1.5 text-sm border rounded-md"
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    <option value="">No Project</option>
-                    {projects.map(project => (
-                      <option key={project.id} value={project.id}>
-                        {project.icon} {project.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          {(note?.calendarEventId || calendarEvent) && (
+            <div
+              className="px-6 py-3 border-b"
+              style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
+            >
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-sm w-fit">
+                <Calendar size={14} />
+                <span>Linked to meeting</span>
               </div>
-
-              {/* Calendar Event Badge */}
-              {(note?.calendarEventId || calendarEvent) && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-sm">
-                  <Calendar size={14} />
-                  <span>Linked to meeting</span>
-                </div>
-              )}
             </div>
-          </div>
+          )}
 
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-6">
@@ -371,76 +303,83 @@ ACTION ITEMS
                   <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>
                     Tasks
                   </h3>
-                  <button
-                    onClick={addTask}
-                    className="px-3 py-1.5 text-sm rounded-md flex items-center gap-2 text-white"
-                    style={{ backgroundColor: 'var(--color-primary)' }}
-                  >
-                    <Plus size={14} />
-                    Add Task
-                  </button>
+                  {isEditMode && (
+                    <button
+                      onClick={addTask}
+                      className="px-3 py-1.5 text-sm rounded-md flex items-center gap-2 text-white"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    >
+                      <Plus size={14} />
+                      Add Task
+                    </button>
+                  )}
                 </div>
 
                 {tasks.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-8 border-2 border-dashed rounded-lg" style={{ borderColor: 'var(--color-border)' }}>
-                    No tasks yet. Click "Add Task" to create action items from this note.
+                    No tasks yet. {isEditMode && 'Click "Add Task" to create action items from this note.'}
                   </p>
                 ) : (
-                  <>
-                    <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-gray-50 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                            <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Task Title
-                            </th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Owner
-                            </th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Deadline
-                            </th>
+                  <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                          <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            Task Title
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            Owner
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            Deadline
+                          </th>
+                          {isEditMode && (
                             <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                               Actions
                             </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {tasks.map((task) => (
-                            <tr
-                              key={task.id}
-                              className="border-b"
-                              style={{ borderColor: 'var(--color-border)' }}
-                            >
-                              <td className="px-4 py-3">
-                                <input
-                                  type="text"
-                                  value={task.title}
-                                  onChange={(e) => updateTask(task.id, { title: e.target.value })}
-                                  placeholder="Task title..."
-                                  className="w-full px-2 py-1 border rounded text-sm"
-                                  style={{ borderColor: 'var(--color-border)' }}
-                                />
-                              </td>
-                              <td className="px-4 py-3">
-                                <input
-                                  type="text"
-                                  value={task.owner}
-                                  onChange={(e) => updateTask(task.id, { owner: e.target.value })}
-                                  placeholder="Owner..."
-                                  className="w-full px-2 py-1 border rounded text-sm"
-                                  style={{ borderColor: 'var(--color-border)' }}
-                                />
-                              </td>
-                              <td className="px-4 py-3">
-                                <input
-                                  type="date"
-                                  value={task.deadline || ''}
-                                  onChange={(e) => updateTask(task.id, { deadline: e.target.value || null })}
-                                  className="w-full px-2 py-1 border rounded text-sm"
-                                  style={{ borderColor: 'var(--color-border)' }}
-                                />
-                              </td>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tasks.map((task) => (
+                          <tr
+                            key={task.id}
+                            className="border-b"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          >
+                            <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                value={task.title}
+                                onChange={(e) => updateTask(task.id, { title: e.target.value })}
+                                placeholder="Task title..."
+                                disabled={!isEditMode}
+                                className="w-full px-2 py-1 border rounded text-sm"
+                                style={{ borderColor: 'var(--color-border)' }}
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                value={task.owner}
+                                onChange={(e) => updateTask(task.id, { owner: e.target.value })}
+                                placeholder="Owner..."
+                                disabled={!isEditMode}
+                                className="w-full px-2 py-1 border rounded text-sm"
+                                style={{ borderColor: 'var(--color-border)' }}
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="date"
+                                value={task.deadline || ''}
+                                onChange={(e) => updateTask(task.id, { deadline: e.target.value || null })}
+                                disabled={!isEditMode}
+                                className="w-full px-2 py-1 border rounded text-sm"
+                                style={{ borderColor: 'var(--color-border)' }}
+                              />
+                            </td>
+                            {isEditMode && (
                               <td className="px-4 py-3 text-center">
                                 <button
                                   onClick={() => removeTask(task.id)}
@@ -450,26 +389,12 @@ ACTION ITEMS
                                   <Trash2 size={16} />
                                 </button>
                               </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    
-                    {/* Create Tasks Button */}
-                    {projectId && note?.id && tasks.some(t => !t.createdTaskId && t.title.trim()) && (
-                      <div className="mt-3 flex justify-end">
-                        <button
-                          onClick={handleCreateTasks}
-                          className="px-4 py-2 text-sm rounded-md flex items-center gap-2 font-medium border-2 hover:bg-green-50 transition-colors"
-                          style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
-                        >
-                          <Plus size={16} />
-                          Create {tasks.filter(t => !t.createdTaskId && t.title.trim()).length} Task(s) in Project
-                        </button>
-                      </div>
-                    )}
-                  </>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
