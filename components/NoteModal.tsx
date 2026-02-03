@@ -6,11 +6,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Save, Calendar, Link as LinkIcon, FileText, Plus, Trash2, Edit } from 'lucide-react';
+import { X, Save, Calendar, Link as LinkIcon, FileText, Plus, Trash2, Edit, ChevronDown } from 'lucide-react';
 import { Note, NoteTemplate, NoteTask, CalendarEvent, Project } from '@/types';
-import RichTextEditor from './RichTextEditor';
+import TipTapEditor from './TipTapEditor';
 import ConfirmDialog from './ConfirmDialog';
 import AlertDialog from './AlertDialog';
+import MeetingSelectorDropdown from './MeetingSelectorDropdown';
 import { authenticatedFetch } from '@/lib/api-client';
 
 interface NoteModalProps {
@@ -45,6 +46,8 @@ export default function NoteModal({
   const [attachToCalendar, setAttachToCalendar] = useState(true);
   const [isEditMode, setIsEditMode] = useState(!readOnly);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showMeetingSelector, setShowMeetingSelector] = useState(false);
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(calendarEvent || null);
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'success' | 'warning' | 'info' }>({
@@ -56,10 +59,21 @@ export default function NoteModal({
 
   const currentTemplate = templates.find(t => t.id === templateId) || templates[0];
 
+  const handleChangeMeeting = (newEvent: CalendarEvent | null) => {
+    setSelectedCalendarEvent(newEvent);
+    if (newEvent) {
+      setTitle(newEvent.summary);
+    }
+    setShowMeetingSelector(false);
+  };
+
   // Initialize or reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
       setIsEditMode(!readOnly);
+      // Reset alert dialog
+      setAlertDialog({ isOpen: false, title: '', message: '', type: 'info' });
+      
       if (note) {
         // Editing existing note
         setTitle(note.title);
@@ -99,15 +113,15 @@ export default function NoteModal({
         tasks,
         projectId,
         templateId,
-        calendarEventId: note?.calendarEventId || calendarEvent?.id || null,
-        calendarEventLink: note?.calendarEventLink || calendarEvent?.htmlLink || null,
+        calendarEventId: note?.calendarEventId || selectedCalendarEvent?.id || calendarEvent?.id || null,
+        calendarEventLink: note?.calendarEventLink || selectedCalendarEvent?.htmlLink || calendarEvent?.htmlLink || null,
       };
 
       // Save the note first and get the ID back
       const savedNoteId = await onSave(noteData);
       
       // If checkbox is enabled and note is linked to calendar, attach it
-      if (attachToCalendar && (note?.calendarEventId || calendarEvent?.id)) {
+      if (attachToCalendar && (note?.calendarEventId || selectedCalendarEvent?.id || calendarEvent?.id)) {
         try {
           const attachRes = await authenticatedFetch(`/api/notes/${savedNoteId}/attach-to-calendar`, {
             method: 'POST',
@@ -141,7 +155,7 @@ export default function NoteModal({
       
       setTimeout(() => {
         onClose();
-      }, attachToCalendar && (note?.calendarEventId || calendarEvent?.id) ? 1500 : 0);
+      }, attachToCalendar && (note?.calendarEventId || selectedCalendarEvent?.id || calendarEvent?.id) ? 1500 : 0);
     } catch (error) {
       setAlertDialog({
         isOpen: true,
@@ -267,89 +281,88 @@ export default function NoteModal({
             </button>
           </div>
 
-          {/* Toolbar */}
+          {/* Consolidated Toolbar */}
           <div
-            className="flex items-center justify-between px-6 py-3 border-b"
+            className="px-6 py-3 border-b"
             style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
           >
-            <div className="flex items-center gap-4 flex-wrap">
-              {/* Project Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Project:</span>
-                <select
-                  value={projectId || ''}
-                  onChange={(e) => setProjectId(e.target.value || null)}
-                  disabled={!isEditMode}
-                  className="px-3 py-1.5 text-sm border rounded-md"
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  <option value="">No Project</option>
-                  {projects.map(project => (
-                    <option key={project.id} value={project.id}>
-                      {project.icon} {project.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Calendar Event Badge - Clickable to change */}
-              {(note?.calendarEventId || calendarEvent) && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                  onClick={() => {
-                    if (isEditMode) {
-                      setAlertDialog({
-                        isOpen: true,
-                        title: 'Change Meeting',
-                        message: 'Meeting linking coming soon. For now, create a new note for a different meeting.',
-                        type: 'info',
-                      });
-                    }
-                  }}
-                  title="Click to change meeting (coming soon)"
-                >
-                  <Calendar size={14} />
-                  <span>Linked to: {calendarEvent?.summary || 'Meeting'}</span>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              {/* Left side - Project and Event */}
+              <div className="flex items-center gap-4">
+                {/* Project Selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Project:</span>
+                  <select
+                    value={projectId || ''}
+                    onChange={(e) => setProjectId(e.target.value || null)}
+                    disabled={!isEditMode}
+                    className="px-3 py-1.5 text-sm border rounded-md"
+                    style={{ borderColor: 'var(--color-border)' }}
+                  >
+                    <option value="">No Project</option>
+                    {projects.map(project => (
+                      <option key={project.id} value={project.id}>
+                        {project.icon} {project.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
+
+                {/* Event Info or Link Button */}
+                {selectedCalendarEvent || calendarEvent ? (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-md">
+                    <Calendar size={14} className="text-blue-600" />
+                    <div className="text-sm">
+                      <div className="font-medium text-blue-900">{(selectedCalendarEvent || calendarEvent)?.summary}</div>
+                      <div className="text-xs text-blue-600">
+                        {new Date((selectedCalendarEvent || calendarEvent)!.start).toLocaleString('de-DE', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          timeZone: 'Europe/Berlin'
+                        })}
+                      </div>
+                    </div>
+                    {isEditMode && (
+                      <button
+                        onClick={() => setShowMeetingSelector(true)}
+                        className="ml-2 p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                        title="Change meeting"
+                      >
+                        <Edit size={14} />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  isEditMode && (
+                    <button
+                      onClick={() => setShowMeetingSelector(true)}
+                      className="px-3 py-1.5 text-sm border-2 border-dashed rounded-md flex items-center gap-2 hover:bg-blue-50 transition-colors"
+                      style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
+                    >
+                      <Calendar size={14} />
+                      <span>Link to Meeting</span>
+                    </button>
+                  )
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Calendar Event Details */}
-          {calendarEvent && (
-            <div className="px-6 py-4 bg-blue-50 border-b" style={{ borderColor: 'var(--color-border)' }}>
-              <div className="flex items-start gap-4">
-                <Calendar size={20} className="text-blue-600 flex-shrink-0 mt-1" />
-                <div className="flex-1">
-                  <h3 className="font-semibold text-blue-900">{calendarEvent.summary}</h3>
-                  <p className="text-sm text-blue-700 mt-1">
-                    {new Date(calendarEvent.start).toLocaleString('de-DE', { 
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      timeZone: 'Europe/Berlin'
-                    })}
-                  </p>
-                  {/* Attendees would go here - need to fetch from API */}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-4xl mx-auto space-y-6">
-              {/* Single Rich Text Editor */}
+              {/* Stable Rich Text Editor */}
               <div>
-                <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
-                  <RichTextEditor
-                    value={content}
-                    onChange={setContent}
-                    placeholder="Start taking notes..."
-                  />
-                </div>
+                <TipTapEditor
+                  value={content}
+                  onChange={setContent}
+                  placeholder="Start taking notes..."
+                  disabled={!isEditMode}
+                  attendees={[]} // TODO: Extract from calendar event
+                />
               </div>
 
               {/* Tasks Section */}
@@ -463,7 +476,10 @@ export default function NoteModal({
                     
                     {/* Create Tasks Button */}
                     {isEditMode && projectId && note?.id && tasks.some(t => !t.createdTaskId && t.title.trim()) && (
-                      <div className="mt-3 flex justify-end">
+                      <div className="mt-3 flex items-center justify-between">
+                        <p className="text-xs text-gray-500">
+                          💡 Tasks will be created in your project's task board and linked back to this note
+                        </p>
                         <button
                           onClick={handleCreateTasks}
                           className="px-4 py-2 text-sm rounded-md flex items-center gap-2 font-medium border-2 hover:bg-green-50 transition-colors"
@@ -486,7 +502,7 @@ export default function NoteModal({
             style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
           >
             <div className="flex items-center gap-3">
-              {(note?.calendarEventId || calendarEvent) && isEditMode && (
+              {(note?.calendarEventId || selectedCalendarEvent || calendarEvent) && isEditMode && (
                 <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
                   <input
                     type="checkbox"

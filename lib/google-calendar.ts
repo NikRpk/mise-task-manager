@@ -307,7 +307,7 @@ export async function attachNoteToCalendarEvent(
     
     // Add file link to event description (simple format)
     const existingDescription = event.data.description || '';
-    const noteLink = `📝 <a href="${fileLink}">${noteTitle}</a>`;
+    const noteLink = `Notes: <a href="${fileLink}">${noteTitle}</a>`;
     const separator = existingDescription ? '<br><br>' : '';
     const updatedDescription = `${existingDescription}${separator}${noteLink}`;
     
