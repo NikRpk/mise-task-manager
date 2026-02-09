@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { Task, TaskStatus } from '@/types';
+import { Task, TaskStatus, StatusHistoryEntry } from '@/types';
 import { authenticatedFetch } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
 
@@ -14,6 +14,7 @@ interface UseTaskDataResult {
   fetchTasks: () => Promise<void>;
   updateTaskStatus: (taskId: string, newStatus: TaskStatus) => Promise<void>;
   saveTask: (taskData: Partial<Task>) => Promise<void>;
+  deleteTask: (taskId: string) => void;
   loading: boolean;
 }
 
@@ -57,10 +58,26 @@ export function useTaskData(
 
     const originalStatus = task.status;
 
+    // Create status history entry
+    const historyEntry: StatusHistoryEntry = {
+      id: Date.now().toString(),
+      fromStatus: originalStatus,
+      toStatus: newStatus,
+      changedBy: userId || 'Unknown',
+      changedAt: new Date().toISOString(),
+    };
+
     // Optimistic update - immediately update UI
     setTasks(prevTasks =>
       prevTasks.map(t =>
-        t.id === taskId ? { ...t, status: newStatus, updatedAt: new Date().toISOString() } : t
+        t.id === taskId 
+          ? { 
+              ...t, 
+              status: newStatus, 
+              updatedAt: new Date().toISOString(),
+              statusHistory: [...(t.statusHistory || []), historyEntry]
+            } 
+          : t
       )
     );
 
@@ -68,7 +85,11 @@ export function useTaskData(
     try {
       await authenticatedFetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...task, status: newStatus }),
+        body: JSON.stringify({ 
+          ...task, 
+          status: newStatus,
+          statusHistory: [...(task.statusHistory || []), historyEntry]
+        }),
       });
     } catch (error) {
       logger.error('Failed to update task status', error as Error, {
@@ -119,12 +140,20 @@ export function useTaskData(
     }
   }, [projectId, userId, fetchTasks]);
 
+  const deleteTask = useCallback((taskId: string) => {
+    // Optimistically remove the task from the UI
+    setTasks(prevTasks => prevTasks.filter(t => t.id !== taskId));
+    
+    logger.info('Task removed from UI', { taskId });
+  }, []);
+
   return {
     tasks,
     setTasks,
     fetchTasks,
     updateTaskStatus,
     saveTask,
+    deleteTask,
     loading,
   };
 }

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Layout Options</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #fffdfa;
+      color: #0f172a;
+      padding: 40px 20px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #0f172a;
+    }
+
+    .subtitle {
+      color: #64748b;
+      margin-bottom: 40px;
+      font-size: 16px;
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 48px;
+    }
+
+    .option {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .option-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .option-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .option-tag {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: 12px;
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .option-description {
+      color: #64748b;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding: 16px;
+      background: #f8fafc;
+      border-radius: 6px;
+    }
+
+    .pros-cons h4 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #0f172a;
+    }
+
+    .pros-cons ul {
+      list-style: none;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .pros-cons li {
+      padding-left: 16px;
+      position: relative;
+      margin-bottom: 4px;
+    }
+
+    .pros-cons li:before {
+      content: "•";
+      position: absolute;
+      left: 0;
+    }
+
+    .view-link {
+      display: inline-block;
+      background: #009646;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .view-link:hover {
+      background: #125034;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Task Layout Options</h1>
+    <p class="subtitle">Choose the most space-efficient design for your task list</p>
+
+    <div class="options-grid">
+      <!-- Option 1: Compact Inline -->
+      <div class="option">
+        <div class="option-header">
+          <h2 class="option-title">Option 1: Compact Inline</h2>
+          <span class="option-tag">Most Compact</span>
+        </div>
+        <p class="option-description">
+          All fields in a single row with tighter spacing. Minimalist design that maximizes vertical space efficiency.
+        </p>
+        <div class="pros-cons">
+          <div>
+            <h4>Pros</h4>
+            <ul>
+              <li>Maximum space efficiency</li>
+              <li>Clean, minimal look</li>
+              <li>More tasks visible at once</li>
+              <li>Fast scanning</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Cons</h4>
+            <ul>
+              <li>Less whitespace</li>
+              <li>Tighter on mobile</li>
+              <li>Fields are smaller</li>
+            </ul>
+          </div>
+        </div>
+        <a href="option-1-compact-inline.html" class="view-link">View Demo →</a>
+      </div>
+
+      <!-- Option 2: Condensed Grid -->
+      <div class="option">
+        <div class="option-header">
+          <h2 class="option-title">Option 2: Condensed Grid</h2>
+          <span class="option-tag">Balanced</span>
+        </div>
+        <p class="option-description">
+          Task title spans full width, owner/deadline in second row. Better readability while maintaining compactness.
+        </p>
+        <div class="pros-cons">
+          <div>
+            <h4>Pros</h4>
+            <ul>
+              <li>Full-width task title</li>
+              <li>Good balance of space/readability</li>
+              <li>Works well on mobile</li>
+              <li>Clear visual hierarchy</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Cons</h4>
+            <ul>
+              <li>Takes more vertical space</li>
+              <li>Two rows per task</li>
+            </ul>
+          </div>
+        </div>
+        <a href="option-2-condensed-grid.html" class="view-link">View Demo →</a>
+      </div>
+
+      <!-- Option 3: Dense Table -->
+      <div class="option">
+        <div class="option-header">
+          <h2 class="option-title">Option 3: Dense Table</h2>
+          <span class="option-tag">Data-Focused</span>
+        </div>
+        <p class="option-description">
+          Table-style layout with minimal padding. Best for users who need to manage many tasks at once.
+        </p>
+        <div class="pros-cons">
+          <div>
+            <h4>Pros</h4>
+            <ul>
+              <li>Ultra-compact</li>
+              <li>Easy column scanning</li>
+              <li>Professional data feel</li>
+              <li>Fits most tasks on screen</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Cons</h4>
+            <ul>
+              <li>Less modern aesthetic</li>
+              <li>Requires horizontal scroll on mobile</li>
+              <li>Less breathing room</li>
+            </ul>
+          </div>
+        </div>
+        <a href="option-3-dense-table.html" class="view-link">View Demo →</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -16,9 +16,7 @@ interface SubTasksListProps {
 }
 
 export function SubTasksList({ subTasks, onAdd, onUpdate, onRemove }: SubTasksListProps) {
-  const completedCount = subTasks.filter(st => st.completed).length;
   const totalCount = subTasks.length;
-  const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   return (
     <div>
@@ -27,25 +25,6 @@ export function SubTasksList({ subTasks, onAdd, onUpdate, onRemove }: SubTasksLi
           <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text)', letterSpacing: '0.5px' }}>
             Sub-tasks ({totalCount})
           </label>
-          
-          {/* Progress Bar - Inline */}
-          {totalCount > 0 && (
-            <div className="flex items-center gap-2 flex-1">
-              <div style={{ flex: 1, height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden', maxWidth: '200px' }}>
-                <div 
-                  style={{ 
-                    height: '100%', 
-                    background: 'linear-gradient(90deg, var(--color-primary) 0%, var(--color-success) 100%)',
-                    width: `${progressPercentage}%`,
-                    transition: 'width 0.3s ease'
-                  }}
-                />
-              </div>
-              <span className="text-xs font-medium" style={{ color: 'var(--color-primary)', minWidth: '50px' }}>
-                {completedCount}/{totalCount}
-              </span>
-            </div>
-          )}
         </div>
         <button
           type="button"

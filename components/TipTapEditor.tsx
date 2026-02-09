@@ -21,13 +21,14 @@ import TaskItem from '@tiptap/extension-task-item';
 import Mention from '@tiptap/extension-mention';
 import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Link2, Undo, Redo, Image as ImageIcon, Heading1, Heading2, Type, Code, Minus, CheckSquare, Palette } from 'lucide-react';
 import { useState, useCallback } from 'react';
+import { Person } from '@/types';
 
 interface TipTapEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
-  attendees?: string[];
+  people?: Person[]; // Changed from attendees: string[]
 }
 
 const COLORS = [
@@ -41,15 +42,22 @@ const COLORS = [
   { name: 'Gray', value: '#64748b' },
 ];
 
-export default function TipTapEditor({ value, onChange, placeholder = 'Start typing...', disabled = false, attendees = [] }: TipTapEditorProps) {
+export default function TipTapEditor({ value, onChange, placeholder = 'Start typing...', disabled = false, people = [] }: TipTapEditorProps) {
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   // Mention suggestion configuration
   const mentionSuggestion = useCallback(() => ({
     items: ({ query }: { query: string }) => {
-      return attendees
-        .filter(person => person.toLowerCase().includes(query.toLowerCase()))
-        .slice(0, 5);
+      return people
+        .filter(person => 
+          person.displayName.toLowerCase().includes(query.toLowerCase()) ||
+          person.email.toLowerCase().includes(query.toLowerCase())
+        )
+        .slice(0, 10)
+        .map(p => ({ 
+          id: p.email, 
+          label: p.displayName 
+        }));
     },
     render: () => {
       let popup: HTMLDivElement;
@@ -58,23 +66,23 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         onStart: (props: any) => {
           popup = document.createElement('div');
           popup.className = 'mention-suggestions';
-          popup.style.cssText = 'position: absolute; background: white; border: 1px solid #e2e8f0; border-radius: 0.375rem; padding: 0.25rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000;';
+          popup.style.cssText = 'position: absolute; background: white; border: 1px solid #e2e8f0; border-radius: 0.375rem; padding: 0.25rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 9999;';
           
-          props.items.forEach((item: string, index: number) => {
+          props.items.forEach((item: { id: string; label: string }) => {
             const button = document.createElement('button');
-            button.textContent = item;
+            button.textContent = item.label;
             button.className = 'mention-item';
             button.style.cssText = 'display: block; width: 100%; text-align: left; padding: 0.5rem; border-radius: 0.25rem; background: transparent; border: none; cursor: pointer;';
             button.onmouseover = () => button.style.background = '#f3f4f6';
             button.onmouseout = () => button.style.background = 'transparent';
-            button.onclick = () => props.command({ id: item });
+            button.onclick = () => props.command(item);
             popup.appendChild(button);
           });
           
           document.body.appendChild(popup);
         },
         onUpdate: (props: any) => {
-          // Update position and content
+          // Update position
         },
         onKeyDown: (props: any) => {
           if (props.event.key === 'Escape') {
@@ -88,16 +96,22 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         },
       };
     },
-  }), [attendees]);
+  }), [people]);
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         codeBlock: false, // Using custom CodeBlock
         horizontalRule: false, // Using custom HorizontalRule
+        bold: false, // Imported separately below
+        italic: false, // Imported separately below
       }),
       Link.configure({
-        openOnClick: false,
+        openOnClick: true,
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer',
+        },
       }),
       Placeholder.configure({
         placeholder,
@@ -331,7 +345,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
             
             {showColorPicker && (
               <div 
-                className="absolute top-full left-0 mt-1 bg-white border rounded-md shadow-lg p-3 z-50"
+                className="absolute top-full left-0 mt-1 bg-white border rounded-md shadow-lg p-3 z-[9999]"
                 style={{ borderColor: 'var(--color-border)', minWidth: '180px' }}
               >
                 <div className="text-xs font-medium mb-2 text-gray-600">Text Color</div>
@@ -414,6 +428,8 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         .ProseMirror {
           outline: none;
           min-height: 200px;
+          font-size: 0.875rem;
+          line-height: 1.5;
         }
         .ProseMirror p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);

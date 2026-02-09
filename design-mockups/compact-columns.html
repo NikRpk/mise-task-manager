@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Column Layout - Note Editor Mockup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: #fffdfa;
+            color: #0f172a;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Note page layout */
+        .note-page {
+            background: #ffffff;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .note-header {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0.75rem 1.75rem;
+        }
+
+        .header-top {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .back-btn {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.5rem;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .back-btn:hover {
+            background: #f1f5f9;
+        }
+
+        .title-input {
+            flex: 1;
+            font-size: 1.5rem;
+            font-weight: 600;
+            border: none;
+            outline: none;
+            padding: 0.25rem 0;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+        }
+
+        .btn-primary {
+            background: #009646;
+            color: #ffffff;
+            border: none;
+        }
+
+        .calendar-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.813rem;
+            color: #475569;
+            padding-left: 3rem;
+        }
+
+        .calendar-icon {
+            color: #3b82f6;
+        }
+
+        /* REDUCED: Content area padding */
+        .note-content {
+            padding: 1rem 1.75rem;
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        /* Column layout */
+        .left-column {
+            flex: 0 0 70%;
+        }
+
+        .right-column {
+            flex: 0 0 calc(30% - 1.5rem);
+        }
+
+        /* Sections */
+        .section {
+            margin-bottom: 1.25rem;
+        }
+
+        .section:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Card styling */
+        .card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 1rem;
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        /* Editor */
+        .editor {
+            min-height: 400px;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            color: #374151;
+            padding: 0.5rem;
+        }
+
+        .editor p {
+            margin: 0.5rem 0;
+        }
+
+        /* REDUCED: H1/H2 spacing */
+        .editor h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0.5rem 0 0.5rem 0; /* Reduced from 1rem 0 0.5rem 0 */
+            color: #111827;
+        }
+
+        .editor h1:first-child {
+            margin-top: 0; /* No top margin if it's the first element */
+        }
+
+        .editor h2 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin: 0.5rem 0 0.5rem 0; /* Reduced from 1rem 0 0.5rem 0 */
+            color: #111827;
+        }
+
+        .editor h2:first-child {
+            margin-top: 0;
+        }
+
+        .editor h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0.5rem 0 0.5rem 0;
+            color: #111827;
+        }
+
+        .editor ul, .editor ol {
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+
+        .editor li {
+            margin: 0.25rem 0;
+        }
+
+        .editor strong {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        /* Tasks in right column - compact */
+        .tasks-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .task-item {
+            padding: 0.75rem;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            font-size: 0.813rem;
+        }
+
+        .task-item:hover {
+            border-color: #cbd5e1;
+            background: #fafafa;
+        }
+
+        .task-title {
+            font-weight: 500;
+            color: #0f172a;
+            margin-bottom: 0.5rem;
+        }
+
+        .task-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .task-owner {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .task-deadline {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .add-task-btn {
+            width: 100%;
+            padding: 0.625rem;
+            border: 1px dashed #cbd5e1;
+            border-radius: 0.5rem;
+            background: transparent;
+            color: #64748b;
+            font-size: 0.813rem;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .add-task-btn:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+            color: #475569;
+        }
+
+        /* Previous meeting section */
+        .previous-meeting {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            background: #f8fafc;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .section-header:hover {
+            background: #f1f5f9;
+        }
+
+        .section-header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .chevron {
+            color: #64748b;
+            transition: transform 0.2s;
+        }
+
+        .chevron.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .section-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .section-meta {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .section-content {
+            border-top: 1px solid #e2e8f0;
+            padding: 1rem;
+        }
+
+        .collapsed-content {
+            display: none;
+        }
+
+        .previous-note-content {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .previous-note-content h2 {
+            font-size: 1rem;
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+        }
+
+        .subsection-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+        }
+
+        .previous-tasks {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .previous-task-item {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            padding: 0.625rem;
+            font-size: 0.813rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .previous-task-title {
+            font-weight: 500;
+            color: #0f172a;
+        }
+
+        .previous-task-meta {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-align: right;
+        }
+
+        /* Google Doc section - compact */
+        .google-doc-section {
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
+            padding: 0.875rem;
+        }
+
+        .checkbox {
+            margin-top: 0.125rem;
+        }
+
+        .google-doc-text {
+            font-size: 0.875rem;
+            color: #475569;
+        }
+
+        /* Sticky task header */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background: #ffffff;
+            z-index: 10;
+            padding-bottom: 0.5rem;
+        }
+
+        /* Page title */
+        .page-title {
+            text-align: center;
+            padding: 2rem;
+            background: #ffffff;
+            border-bottom: 2px solid #009646;
+        }
+
+        .page-title h1 {
+            font-size: 1.75rem;
+            color: #009646;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-title p {
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .note-content {
+                flex-direction: column;
+            }
+            
+            .left-column,
+            .right-column {
+                flex: 1 1 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-title">
+        <h1>Column Layout Design</h1>
+        <p>Notes (70%) on the left, Tasks (30%) on the right with reduced spacing</p>
+    </div>
+
+    <div class="container">
+        <div class="note-page">
+            <!-- Header -->
+            <div class="note-header">
+                <div class="header-top">
+                    <button class="back-btn">←</button>
+                    <input type="text" class="title-input" value="Test 3 - Recurring" placeholder="Note title...">
+                    <div class="header-actions">
+                        <button class="btn">Cancel</button>
+                        <button class="btn btn-primary">Save Note</button>
+                    </div>
+                </div>
+                <div class="calendar-info">
+                    <span class="calendar-icon">📅</span>
+                    <a href="#" style="color: #475569; text-decoration: none;">06.02.2026, 21:00</a>
+                    <span>•</span>
+                    <span>2 attendees</span>
+                    <span>•</span>
+                    <a href="#" style="color: #3b82f6; text-decoration: none;">Join Meeting</a>
+                    <span class="badge" style="display: inline-block; padding: 0.125rem 0.5rem; font-size: 0.75rem; background: #dbeafe; color: #1e40af; border-radius: 0.25rem; margin-left: 0.5rem;">Google Doc</span>
+                </div>
+            </div>
+
+            <!-- REDUCED PADDING: Content area (was 1.25rem, now 1rem top) -->
+            <div class="note-content">
+                <!-- LEFT COLUMN: Notes (70%) -->
+                <div class="left-column">
+                    <!-- Editor Section -->
+                    <div class="section">
+                        <div class="card">
+                            <div class="editor">
+                                <!-- REDUCED SPACING: H1 at top has no top margin -->
+                                <h1>Agenda</h1>
+                                <ol>
+                                    <li><strong>Opening Remarks</strong> - Vision casting and policy reminders</li>
+                                    <li><strong>Infrastructure & Logistics</strong> - Lair maintenance and supply chain</li>
+                                    <li><strong>Strategy & Conquest</strong> - Coffee supply control</li>
+                                    <li><strong>Branding & PR</strong> - Logo selection and social media</li>
+                                    <li><strong>AOB</strong> - Dental plan discussion</li>
+                                </ol>
+
+                                <!-- REDUCED SPACING: H2 margins reduced from 1rem to 0.5rem -->
+                                <h2>Discussion Points</h2>
+                                <ul>
+                                    <li>The Caffeine Coup: Board approved acquisition of major coffee bean regions</li>
+                                    <li>Logo Debat: Skull-with-monocle rejected, pivoting to minimalist design</li>
+                                    <li>Budget Reallocation: Moon Laser funds diverted to Server Stability</li>
+                                </ul>
+
+                                <h2>Decisions</h2>
+                                <p><strong>The Imperial March Initiative:</strong> Finance pushed back on Disney royalty fees. Will investigate public domain ominous chants instead.</p>
+
+                                <h2>Action Items</h2>
+                                <ul>
+                                    <li>Deploy Barista Battalions by Q3 - General Malice</li>
+                                    <li>Design new minimalist logo - Creative Team</li>
+                                    <li>Research public domain chants - Legal Dept</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Previous Meeting Section -->
+                    <div class="section">
+                        <div class="previous-meeting">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <div class="section-header-left">
+                                    <span class="chevron">▼</span>
+                                    <span class="calendar-icon">📅</span>
+                                    <div>
+                                        <div class="section-title">Previous Meeting</div>
+                                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.125rem;">
+                                            30.01.2026, 21:00
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="section-meta">4 tasks</span>
+                            </div>
+                            <div class="section-content">
+                                <div class="subsection-title">Notes</div>
+                                <div class="previous-note-content">
+                                    <h2>Key Updates</h2>
+                                    <ul>
+                                        <li>Coffee bean acquisition completed in South America</li>
+                                        <li>Logo finalists narrowed down to 3 options</li>
+                                        <li>Server infrastructure upgrade 80% complete</li>
+                                    </ul>
+                                    <p><strong>Action:</strong> Follow up on dental insurance quotes.</p>
+                                </div>
+
+                                <div class="subsection-title">Tasks from Previous Meeting</div>
+                                <div class="previous-tasks">
+                                    <div class="previous-task-item">
+                                        <div>
+                                            <div class="previous-task-title">✓ Complete coffee bean acquisition</div>
+                                            <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.125rem;">Operations</div>
+                                        </div>
+                                        <div class="previous-task-meta">10.02.2026</div>
+                                    </div>
+                                    <div class="previous-task-item">
+                                        <div>
+                                            <div class="previous-task-title">Finalize logo designs</div>
+                                            <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.125rem;">Creative Team</div>
+                                        </div>
+                                        <div class="previous-task-meta">15.02.2026</div>
+                                    </div>
+                                    <div class="previous-task-item">
+                                        <div>
+                                            <div class="previous-task-title">✓ Server upgrade phase 1</div>
+                                            <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.125rem;">IT Dept</div>
+                                        </div>
+                                        <div class="previous-task-meta">08.02.2026</div>
+                                    </div>
+                                    <div class="previous-task-item">
+                                        <div>
+                                            <div class="previous-task-title">Get dental insurance quotes</div>
+                                            <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.125rem;">HR Team</div>
+                                        </div>
+                                        <div class="previous-task-meta">20.02.2026</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Google Doc -->
+                    <div class="section">
+                        <div class="card google-doc-section">
+                            <input type="checkbox" class="checkbox" checked>
+                            <div class="google-doc-text">
+                                <strong>Update Google Doc with latest changes</strong>
+                                <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">
+                                    Changes will be synced to all attendees
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: Tasks (30%) -->
+                <div class="right-column">
+                    <div class="sticky-header">
+                        <div class="card-title">Tasks (6)</div>
+                    </div>
+
+                    <div class="tasks-list">
+                        <div class="task-item">
+                            <div class="task-title">Deploy Barista Battalions by Q3</div>
+                            <div class="task-meta">
+                                <div class="task-owner">👤 General Malice</div>
+                                <div class="task-deadline">📅 30.09.2026</div>
+                            </div>
+                        </div>
+
+                        <div class="task-item">
+                            <div class="task-title">Design new minimalist logo (sans-serif "A")</div>
+                            <div class="task-meta">
+                                <div class="task-owner">👤 Creative Team</div>
+                                <div class="task-deadline">📅 15.03.2026</div>
+                            </div>
+                        </div>
+
+                        <div class="task-item">
+                            <div class="task-title">Research public domain ominous chants</div>
+                            <div class="task-meta">
+                                <div class="task-owner">👤 Legal Dept</div>
+                                <div class="task-deadline">📅 28.02.2026</div>
+                            </div>
+                        </div>
+
+                        <div class="task-item">
+                            <div class="task-title">Add premium PPO plan to benefits package</div>
+                            <div class="task-meta">
+                                <div class="task-owner">👤 HR Team</div>
+                                <div class="task-deadline">📅 31.03.2026</div>
+                            </div>
+                        </div>
+
+                        <div class="task-item">
+                            <div class="task-title">Address humidity issues in shark tank</div>
+                            <div class="task-meta">
+                                <div class="task-owner">👤 Facilities</div>
+                                <div class="task-deadline">📅 20.02.2026</div>
+                            </div>
+                        </div>
+
+                        <div class="task-item">
+                            <div class="task-title">Source matte-black spandex for tactical units</div>
+                            <div class="task-meta">
+                                <div class="task-owner">👤 Supply Chain</div>
+                                <div class="task-deadline">📅 15.02.2026</div>
+                            </div>
+                        </div>
+
+                        <button class="add-task-btn">+ Add task</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSection(headerElement) {
+            const chevron = headerElement.querySelector('.chevron');
+            const content = headerElement.nextElementSibling;
+            
+            if (content.classList.contains('collapsed-content')) {
+                content.classList.remove('collapsed-content');
+                chevron.classList.remove('collapsed');
+            } else {
+                content.classList.add('collapsed-content');
+                chevron.classList.add('collapsed');
+            }
+        }
+    </script>
+
+    <!-- Design notes -->
+    <div style="background: #ffffff; border-top: 2px solid #e2e8f0; padding: 2rem; margin-top: 2rem;">
+        <div style="max-width: 1400px; margin: 0 auto;">
+            <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #009646;">Design Changes Applied</h2>
+            <ul style="font-size: 0.875rem; color: #475569; padding-left: 1.5rem; line-height: 1.8;">
+                <li><strong>✓ Reduced H1/H2 spacing:</strong> Top margin reduced from 1rem (16px) to 0.5rem (8px), first heading has 0 top margin</li>
+                <li><strong>✓ Reduced header-to-content spacing:</strong> Content area top padding reduced from 1.25rem (20px) to 1rem (16px)</li>
+                <li><strong>✓ Column layout:</strong> 70% notes / 30% tasks side-by-side on desktop, stacks on mobile (< 1024px)</li>
+                <li><strong>Sticky task header:</strong> Task section header stays visible while scrolling</li>
+                <li><strong>Compact task cards:</strong> More space-efficient than table format in narrow column</li>
+                <li><strong>Previous meeting:</strong> Still collapsible, stays in left column under notes</li>
+            </ul>
+            
+            <div style="margin-top: 1.5rem; padding: 1rem; background: #f8fafc; border-radius: 0.5rem; border-left: 4px solid #009646;">
+                <strong style="color: #125034;">💡 Benefits of Column Layout:</strong>
+                <ul style="margin-top: 0.5rem; padding-left: 1.5rem; font-size: 0.875rem; color: #475569; line-height: 1.8;">
+                    <li>See tasks while writing notes without scrolling</li>
+                    <li>Better use of horizontal screen space on larger displays</li>
+                    <li>Natural workflow: content on left, action items on right</li>
+                    <li>Tasks remain visible and accessible at all times</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

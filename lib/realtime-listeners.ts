@@ -1,0 +1,205 @@
+/**
+ * Real-time Firestore Listeners with Smart Cache Invalidation
+ * Automatically invalidates caches when Firestore detects changes
+ * Pauses listeners when tab is hidden to save resources
+ * 
+ * NOTE: Project listener disabled - projects cached for 30min (acceptable since rarely change)
+ */
+
+'use client';
+
+import { useEffect } from 'react';
+import { db } from './firebase';
+import { collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { useCache } from './cache-context';
+import { logger } from './logger';
+
+interface RealtimeListenersOptions {
+  userId: string | undefined;
+  selectedProjectId: string | null;
+  enabled?: boolean;
+}
+
+/**
+ * Hook to set up real-time listeners for user data
+ * Automatically invalidates caches when data changes in Firestore
+ */
+export function useRealtimeListeners({
+  userId,
+  selectedProjectId,
+  enabled = true,
+}: RealtimeListenersOptions) {
+  const cache = useCache();
+
+  // Listen to notes changes
+  useEffect(() => {
+    if (!enabled || !userId) return;
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+
+    let unsubscribe: Unsubscribe | null = null;
+
+    const setupListener = () => {
+      if (unsubscribe) return;
+
+      try {
+        const notesRef = collection(db, 'notes');
+        const q = query(notesRef, where('createdBy', '==', userId));
+
+        unsubscribe = onSnapshot(
+          q,
+          (snapshot) => {
+            if (!snapshot.metadata.hasPendingWrites) {
+              cache.invalidate('user-notes');
+            }
+          },
+          (error) => {
+            logger.error('Notes listener error', error, { userId });
+          }
+        );
+      } catch (error) {
+        logger.error('Failed to setup notes listener', error as Error, { userId });
+      }
+    };
+
+    const teardownListener = () => {
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        teardownListener();
+      } else {
+        setupListener();
+      }
+    };
+
+    if (!document.hidden) {
+      setupListener();
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      teardownListener();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [userId, cache, enabled]);
+
+  // Listen to tasks changes
+  useEffect(() => {
+    if (!enabled || !userId || !selectedProjectId) return;
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+
+    let unsubscribe: Unsubscribe | null = null;
+
+    const setupListener = () => {
+      if (unsubscribe) return;
+
+      try {
+        const tasksRef = collection(db, 'tasks');
+        const q = query(tasksRef, where('projectId', '==', selectedProjectId));
+
+        unsubscribe = onSnapshot(
+          q,
+          (snapshot) => {
+            if (!snapshot.metadata.hasPendingWrites) {
+              cache.invalidatePattern(new RegExp(`^project-${selectedProjectId}-`));
+            }
+          },
+          (error) => {
+            logger.error('Tasks listener error', error, { projectId: selectedProjectId });
+          }
+        );
+      } catch (error) {
+        logger.error('Failed to setup tasks listener', error as Error, {
+          projectId: selectedProjectId,
+        });
+      }
+    };
+
+    const teardownListener = () => {
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        teardownListener();
+      } else {
+        setupListener();
+      }
+    };
+
+    if (!document.hidden) {
+      setupListener();
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      teardownListener();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [userId, selectedProjectId, cache, enabled]);
+
+  // Listen to people directory changes
+  useEffect(() => {
+    if (!enabled || !userId) return;
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+
+    let unsubscribe: Unsubscribe | null = null;
+
+    const setupListener = () => {
+      if (unsubscribe) return;
+
+      try {
+        const peopleRef = collection(db, 'people');
+
+        unsubscribe = onSnapshot(
+          peopleRef,
+          (snapshot) => {
+            if (!snapshot.metadata.hasPendingWrites) {
+              cache.invalidate('people-directory');
+            }
+          },
+          (error) => {
+            logger.error('People listener error', error, { userId });
+          }
+        );
+      } catch (error) {
+        logger.error('Failed to setup people listener', error as Error, { userId });
+      }
+    };
+
+    const teardownListener = () => {
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        teardownListener();
+      } else {
+        setupListener();
+      }
+    };
+
+    if (!document.hidden) {
+      setupListener();
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      teardownListener();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [userId, cache, enabled]);
+}

@@ -288,7 +288,6 @@ export default function TaskModalRefactored({
           title={formData.title || ''}
           projectId={formData.projectId || ''}
           projects={projects}
-          subTasks={formData.subTasks || []}
           deadline={formData.deadline}
           isSaving={isSaving}
           saveError={saveError}

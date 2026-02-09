@@ -151,6 +151,15 @@ export async function POST(request: NextRequest) {
       const tasksRef = adminDb.collection('tasks');
       const newTaskRef = tasksRef.doc();
 
+      // Create initial status history entry
+      const initialStatusHistory = [{
+        id: Date.now().toString(),
+        fromStatus: null,
+        toStatus: body.status || 'todo',
+        changedBy: user.displayName || user.uid,
+        changedAt: new Date().toISOString(),
+      }];
+
       const newTask: Task = {
         id: newTaskRef.id,
         title: body.title || '',
@@ -165,6 +174,7 @@ export async function POST(request: NextRequest) {
         tags: body.tags || [],
         images: body.images || [],
         comments: body.comments || [],
+        statusHistory: body.statusHistory || initialStatusHistory,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

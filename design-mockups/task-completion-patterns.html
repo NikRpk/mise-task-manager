@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Completion UI Patterns - 10 Mockups</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .mockup {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .mockup-header {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .mockup-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #6366f1;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .mockup-description {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        /* Task Card Styles */
+        .task-card {
+            background: #fafbfc;
+            border-left: 4px solid #6366f1;
+            border-right: 1px solid #e2e8f0;
+            border-top: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .task-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .task-card.completed {
+            opacity: 0.6;
+            border-left-color: #10b981;
+        }
+        
+        .task-card.completed .task-title {
+            text-decoration: line-through;
+        }
+        
+        .task-title {
+            font-size: 14px;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+        
+        .task-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: #64748b;
+        }
+        
+        .priority-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: #fef2f2;
+            color: #f30047;
+            border: 1px solid #fecaca;
+        }
+        
+        /* Pattern 1: Circular Checkbox Left */
+        .pattern-1 .task-card {
+            display: flex;
+            align-items: start;
+            gap: 12px;
+        }
+        
+        .pattern-1 .circle-check {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #d1d5db;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .pattern-1 .circle-check:hover {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+        
+        .pattern-1 .task-card.completed .circle-check {
+            background: #10b981;
+            border-color: #10b981;
+        }
+        
+        .pattern-1 .checkmark {
+            color: white;
+            font-size: 12px;
+            display: none;
+        }
+        
+        .pattern-1 .task-card.completed .checkmark {
+            display: block;
+        }
+        
+        /* Pattern 2: Square Checkbox Left */
+        .pattern-2 .task-card {
+            display: flex;
+            align-items: start;
+            gap: 12px;
+        }
+        
+        .pattern-2 .square-check {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #d1d5db;
+            border-radius: 4px;
+            flex-shrink: 0;
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .pattern-2 .square-check:hover {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+        
+        .pattern-2 .task-card.completed .square-check {
+            background: #10b981;
+            border-color: #10b981;
+        }
+        
+        .pattern-2 .checkmark {
+            color: white;
+            font-size: 11px;
+            display: none;
+        }
+        
+        .pattern-2 .task-card.completed .checkmark {
+            display: block;
+        }
+        
+        /* Pattern 3: Hover Check Icon Right */
+        .pattern-3 .check-hover {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            background: #10b981;
+            border-radius: 6px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .pattern-3 .task-card:hover .check-hover {
+            display: flex;
+        }
+        
+        .pattern-3 .check-hover:hover {
+            background: #059669;
+            transform: scale(1.1);
+        }
+        
+        .pattern-3 .checkmark {
+            color: white;
+            font-size: 14px;
+        }
+        
+        /* Pattern 4: Status Pill */
+        .pattern-4 .status-pill {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #fbbf24;
+            color: #78350f;
+        }
+        
+        .pattern-4 .status-pill:hover {
+            background: #f59e0b;
+            transform: scale(1.05);
+        }
+        
+        .pattern-4 .task-card.completed .status-pill {
+            background: #10b981;
+            color: white;
+        }
+        
+        /* Pattern 5: Large Circle Left */
+        .pattern-5 .task-card {
+            display: flex;
+            align-items: start;
+            gap: 14px;
+        }
+        
+        .pattern-5 .large-circle {
+            width: 28px;
+            height: 28px;
+            border: 3px solid #e5e7eb;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .pattern-5 .large-circle:hover {
+            border-color: #10b981;
+            transform: scale(1.1);
+        }
+        
+        .pattern-5 .task-card.completed .large-circle {
+            background: #10b981;
+            border-color: #10b981;
+        }
+        
+        .pattern-5 .checkmark {
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            display: none;
+        }
+        
+        .pattern-5 .task-card.completed .checkmark {
+            display: block;
+        }
+        
+        /* Pattern 6: Icon Button Right */
+        .pattern-6 .icon-button {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            border: 2px solid #10b981;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .pattern-6 .icon-button:hover {
+            background: #10b981;
+        }
+        
+        .pattern-6 .icon-button:hover .checkmark {
+            color: white;
+        }
+        
+        .pattern-6 .checkmark {
+            color: #10b981;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        /* Pattern 7: Floating Action Button */
+        .pattern-7 .fab {
+            position: absolute;
+            bottom: -12px;
+            right: 12px;
+            width: 36px;
+            height: 36px;
+            background: #6366f1;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+            transition: all 0.2s;
+        }
+        
+        .pattern-7 .fab:hover {
+            background: #4f46e5;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.5);
+        }
+        
+        .pattern-7 .checkmark {
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .pattern-7 .task-card {
+            margin-bottom: 16px;
+        }
+        
+        /* Pattern 8: Inline Complete Button */
+        .pattern-8 .complete-button {
+            margin-top: 12px;
+            padding: 6px 14px;
+            background: white;
+            border: 2px solid #10b981;
+            border-radius: 6px;
+            color: #10b981;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .pattern-8 .complete-button:hover {
+            background: #10b981;
+            color: white;
+        }
+        
+        /* Pattern 9: Progress Circle */
+        .pattern-9 .progress-circle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 32px;
+            height: 32px;
+        }
+        
+        .pattern-9 .progress-circle svg {
+            transform: rotate(-90deg);
+        }
+        
+        .pattern-9 .progress-circle circle {
+            fill: none;
+            stroke: #e5e7eb;
+            stroke-width: 3;
+        }
+        
+        .pattern-9 .progress-circle .progress {
+            stroke: #10b981;
+            stroke-dasharray: 88;
+            stroke-dashoffset: 88;
+            transition: stroke-dashoffset 0.3s;
+            cursor: pointer;
+        }
+        
+        .pattern-9 .task-card:hover .progress {
+            stroke-dashoffset: 44;
+        }
+        
+        .pattern-9 .task-card.completed .progress {
+            stroke-dashoffset: 0;
+        }
+        
+        /* Pattern 10: Minimal Checkbox Top Right */
+        .pattern-10 .minimal-check {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #cbd5e1;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .pattern-10 .minimal-check:hover {
+            border-color: #10b981;
+            border-width: 3px;
+        }
+        
+        .pattern-10 .task-card.completed .minimal-check {
+            background: #10b981;
+            border-color: #10b981;
+        }
+        
+        .pattern-10 .checkmark {
+            color: white;
+            font-size: 10px;
+            display: none;
+        }
+        
+        .pattern-10 .task-card.completed .checkmark {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Task Completion UI Patterns</h1>
+        
+        <div class="grid">
+            <!-- Pattern 1: Circular Checkbox Left (Trello/Asana Style) -->
+            <div class="mockup pattern-1">
+                <div class="mockup-header">
+                    <div class="mockup-title">Pattern 1: Circular Checkbox Left</div>
+                    <div class="mockup-description">Classic Trello/Asana pattern - Most familiar</div>
+                </div>
+                <div class="task-card" onclick="this.classList.toggle('completed')">
+                    <div class="circle-check">
+                        <span class="checkmark">✓</span>
+                    </div>
+                    <div>
+                        <div class="task-title">Check in on multi-lingual</div>
+                        <div class="task-meta">
+                            <span class="priority-badge">MEDIUM</span>
+                            <span>📅 09.02</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pattern 2: Square Checkbox Left (Microsoft Style) -->
+            <div class="mockup pattern-2">
+                <div class="mockup-header">
+                    <div class="mockup-title">Pattern 2: Square Checkbox Left</div>
+                    <div class="mockup-description">Microsoft To-Do style - Traditional</div>
+                </div>
+                <div class="task-card" onclick="this.classList.toggle('completed')">
+                    <div class="square-check">
+                        <span class="checkmark">✓</span>
+                    </div>
+                    <div>
+                        <div class="task-title">Check in on multi-lingual</div>
+                        <div class="task-meta">
+                            <span class="priority-badge">MEDIUM</span>
+                            <span>📅 09.02</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pattern 3: Hover Check Icon Right (Linear Style) -->
+            <div class="mockup pattern-3">
+                <div class="mockup-header">
+                    <div class="mockup-title">Pattern 3: Hover Check Icon</div>
+                    <div class="mockup-description">Appears on hover - Clean when not in use</div>
+                </div>
+                <div class="task-card" onclick="this.classList.toggle('completed')">
+                    <div class="check-hover">
+                        <span class="checkmark">✓</span>
+                    </div>
+                    <div class="task-title">Check in on multi-lingual</div>
+                    <div class="task-meta">
+                        <span class="priority-badge">MEDIUM</span>
+                        <span>📅 09.02</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pattern 4: Status Pill (Notion Style) -->
+            <div class="mockup pattern-4">
+                <div class="mockup-header">
+                    <div class="mockup-title">Pattern 4: Status Pill</div>
+                    <div class="mockup-description">Shows current status - Very explicit</div>
+                </div>
+                <div class="task-card" onclick="this.classList.toggle('completed')">
+                    <div class="status-pill">In Progress</div>
+                    <div class="task-title">Check in on multi-lingual</div>
+                    <div class="task-meta">
+                        <span class="priority-badge">MEDIUM</span>
+                        <span>📅 09.02</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pattern 5: Large Circle Left (Bold Style) -->
+            <div class="mockup pattern-5">
+                <div class="mockup-header">
+                    <div class="mockup-title">Pattern 5: Large Circle</div>
+                    <div class="mockup-description">Bigger target - Very clear action</div>
+                </div>
+                <div class="task-card" onclick="this.classList.toggle('completed')">
+                    <div class="large-circle">
+                        <span class="checkmark">✓</span>
+                    </div>
+                    <div>
+                        <div class="task-title">Check in on multi-lingual</div>
+                        <div class="task-meta">
+                            <span class="priority-badge">MEDIUM</span>
+                            <span>📅 09.02</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pattern 6: Icon Button Right (Monday.com Style) -->
+            <div class="mockup pattern-6">
+                <div class="mockup-header">
+                    <div class="mockup-title">Pattern 6: Icon Button Right</div>
+                    <div class="mockup-description">Always visible button - Clear affordance</div>
+                </div>
+                <div class="task-card" onclick="this.classList.toggle('completed')">
+                    <div class="icon-button">
+                        <span class="checkmark">✓</span>
+                    </div>
+                    <div class="task-title">Check in on multi-lingual</div>
+                    <div class="task-meta">
+                        <span class="priority-badge">MEDIUM</span>
+                        <span>📅 09.02</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pattern 7: Floating Action Button (Material Design) -->
+            <div class="mockup pattern-7">
+                <div class="mockup-header">
+                    <div class="mockup-title">Pattern 7: Floating Action Button</div>
+                    <div class="mockup-description">Prominent & modern - Stands out</div>
+                </div>
+                <div class="task-card" onclick="this.classList.toggle('completed')">
+                    <div class="fab">
+                        <span class="checkmark">✓</span>
+                    </div>
+                    <div class="task-title">Check in on multi-lingual</div>
+                    <div class="task-meta">
+                        <span class="priority-badge">MEDIUM</span>
+                        <span>📅 09.02</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pattern 8: Inline Complete Button (Explicit) -->
+            <div class="mockup pattern-8">
+                <div class="mockup-header">
+                    <div class="mockup-title">Pattern 8: Complete Button</div>
+                    <div class="mockup-description">Text button - Most explicit action</div>
+                </div>
+                <div class="task-card">
+                    <div class="task-title">Check in on multi-lingual</div>
+                    <div class="task-meta">
+                        <span class="priority-badge">MEDIUM</span>
+                        <span>📅 09.02</span>
+                    </div>
+                    <button class="complete-button" onclick="this.closest('.task-card').classList.toggle('completed')">
+                        <span>✓</span> Mark Complete
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Pattern 9: Progress Circle (Visual Progress) -->
+            <div class="mockup pattern-9">
+                <div class="mockup-header">
+                    <div class="mockup-title">Pattern 9: Progress Circle</div>
+                    <div class="mockup-description">Animated progress - Satisfying feedback</div>
+                </div>
+                <div class="task-card" onclick="this.classList.toggle('completed')">
+                    <div class="progress-circle">
+                        <svg width="32" height="32">
+                            <circle cx="16" cy="16" r="14"/>
+                            <circle cx="16" cy="16" r="14" class="progress"/>
+                        </svg>
+                    </div>
+                    <div class="task-title">Check in on multi-lingual</div>
+                    <div class="task-meta">
+                        <span class="priority-badge">MEDIUM</span>
+                        <span>📅 09.02</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pattern 10: Minimal Checkbox Top Right (Your Current) -->
+            <div class="mockup pattern-10">
+                <div class="mockup-header">
+                    <div class="mockup-title">Pattern 10: Minimal Top Right</div>
+                    <div class="mockup-description">Your current design - Subtle & clean</div>
+                </div>
+                <div class="task-card" onclick="this.classList.toggle('completed')">
+                    <div class="minimal-check">
+                        <span class="checkmark">✓</span>
+                    </div>
+                    <div class="task-title">Check in on multi-lingual</div>
+                    <div class="task-meta">
+                        <span class="priority-badge">MEDIUM</span>
+                        <span>📅 09.02</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; color: white; margin-top: 40px; padding: 20px;">
+            <p style="font-size: 14px; margin-bottom: 10px;">Click any task card to see the completed state!</p>
+            <p style="font-size: 12px; opacity: 0.8;">Hover over cards to see interactive effects</p>
+        </div>
+    </div>
+</body>
+</html>

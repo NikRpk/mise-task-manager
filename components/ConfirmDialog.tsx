@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { AlertTriangle, Info, CheckCircle2, X } from 'lucide-react';
 
 interface ConfirmDialogProps {
@@ -25,6 +26,25 @@ export default function ConfirmDialog({
   type = 'warning',
   children,
 }: ConfirmDialogProps) {
+  // Handle Enter key to confirm
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        onConfirm();
+        onClose();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onConfirm, onClose]);
+
   if (!isOpen) return null;
 
   const iconColors = {

@@ -12,101 +12,68 @@ service cloud.firestore {
       return request.auth.uid;
     }
     
-    // Helper function to check if user is a member of a project
-    function isMemberOfProject(projectId) {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/projects/$(projectId)) &&
-             getUserId() in get(/databases/$(database)/documents/projects/$(projectId)).data.members[].userId;
-    }
-    
-    // Helper function to get user's role in a project
-    function getUserRoleInProject(projectId) {
-      let project = get(/databases/$(database)/documents/projects/$(projectId)).data;
-      let member = project.members.filter(m => m.userId == getUserId())[0];
-      return member.role;
-    }
-    
-    // Helper function to check if user has at least the required role
-    // Role hierarchy: VIEW < EDIT < ADMIN
-    function hasRole(projectId, requiredRole) {
-      let userRole = getUserRoleInProject(projectId);
-      let roleValue = {
-        'VIEW': 1,
-        'EDIT': 2,
-        'ADMIN': 3
-      };
-      return roleValue[userRole] >= roleValue[requiredRole];
-    }
-    
     // ========== PROJECTS ==========
     match /projects/{projectId} {
       // Anyone authenticated can create a project
       allow create: if isAuthenticated();
       
-      // Only members can read the project
-      allow read: if isMemberOfProject(projectId);
-      
-      // Only ADMIN members can update or delete
-      allow update: if isMemberOfProject(projectId) && hasRole(projectId, 'ADMIN');
-      allow delete: if isMemberOfProject(projectId) && hasRole(projectId, 'ADMIN');
+      // Read/update/delete - complex member checks happen in backend
+      // Allow if user is authenticated (backend will enforce member checks)
+      allow read, update, delete: if isAuthenticated();
     }
     
     // ========== TASKS ==========
     match /tasks/{taskId} {
-      // Members with EDIT permission can create tasks
-      allow create: if isAuthenticated() && 
-                      isMemberOfProject(request.resource.data.projectId) &&
-                      hasRole(request.resource.data.projectId, 'EDIT');
-      
-      // Members with VIEW permission can read tasks
-      allow read: if isAuthenticated() && 
-                    isMemberOfProject(resource.data.projectId);
-      
-      // Members with EDIT permission can update tasks
-      allow update: if isAuthenticated() && 
-                      isMemberOfProject(resource.data.projectId) &&
-                      hasRole(resource.data.projectId, 'EDIT');
-      
-      // Members with EDIT permission can delete tasks
-      allow delete: if isAuthenticated() && 
-                      isMemberOfProject(resource.data.projectId) &&
-                      hasRole(resource.data.projectId, 'EDIT');
+      // All operations allowed if authenticated (backend enforces project membership)
+      allow create, read, update, delete: if isAuthenticated();
     }
     
     // ========== USER SETTINGS ==========
     match /userSettings/{userId} {
       // Users can only read/write their own settings
-      allow read, write: if isAuthenticated() && getUserId() == userId;
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
     
     // ========== NOTES ==========
+    // Notes can include: title, content, tasks, calendarEventId, calendarEventLink,
+    // calendarEventData, googleDocId, googleDocUrl, recurringEventId, recurringInstanceDate,
+    // templateId, createdBy, createdAt, updatedAt
     match /notes/{noteId} {
       // Users can only create their own notes
-      allow create: if isAuthenticated() && request.resource.data.createdBy == getUserId();
+      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
       
       // Users can only read their own notes
-      allow read: if isAuthenticated() && resource.data.createdBy == getUserId();
+      allow read: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
       
       // Users can only update their own notes
-      allow update: if isAuthenticated() && resource.data.createdBy == getUserId();
+      allow update: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
       
       // Users can only delete their own notes
-      allow delete: if isAuthenticated() && resource.data.createdBy == getUserId();
+      allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
     }
     
     // ========== NOTE TEMPLATES ==========
     match /noteTemplates/{templateId} {
       // Users can only create their own templates
-      allow create: if isAuthenticated() && request.resource.data.createdBy == getUserId();
+      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
       
       // Users can only read their own templates
-      allow read: if isAuthenticated() && resource.data.createdBy == getUserId();
+      allow read: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
       
       // Users can only update their own templates
-      allow update: if isAuthenticated() && resource.data.createdBy == getUserId();
+      allow update: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
       
       // Users can only delete their own templates
-      allow delete: if isAuthenticated() && resource.data.createdBy == getUserId();
+      allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+    }
+    
+    // ========== PEOPLE/CONTACTS ==========
+    match /people/{personId} {
+      // All authenticated users can read the people database
+      allow read: if isAuthenticated();
+      
+      // Only backend can write (through admin SDK)
+      allow write: if false;
     }
     
     // Deny all other access

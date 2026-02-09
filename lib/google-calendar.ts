@@ -19,6 +19,7 @@ console.log('[MODULE] types imported');
 
 import { logger } from './logger';
 import { CALENDAR_FETCH_DAYS } from './constants';
+import { addPeopleFromAttendees } from './google-directory';
 
 console.log('[MODULE] google-calendar.ts fully loaded');
 
@@ -57,6 +58,8 @@ export function getAuthorizationUrl(): string {
       'https://www.googleapis.com/auth/calendar.readonly',
       'https://www.googleapis.com/auth/calendar.events',
       'https://www.googleapis.com/auth/drive.file', // Create and access own files in Drive
+      'https://www.googleapis.com/auth/admin.directory.user.readonly', // Read public directory info (viewType: domain_public)
+      'https://www.googleapis.com/auth/contacts.readonly', // Fallback to People API for personal contacts
     ],
     prompt: 'consent', // Force consent screen to get refresh token
   });
@@ -168,6 +171,112 @@ export async function removeUserRefreshToken(userId: string): Promise<void> {
 }
 
 /**
+ * Fetch display name for an email using Admin Directory API with fallback to People API
+ * Same pattern as the working Apps Script: try Directory first, then People API
+ * Falls back to email if both fail
+ */
+async function fetchDisplayName(email: string, oauth2Client: any, isFirstLookup: boolean = false): Promise<string> {
+  // Try Admin Directory API first (for workspace users)
+  try {
+    const admin = google.admin({ version: 'directory_v1', auth: oauth2Client });
+    
+    if (isFirstLookup) {
+      console.log(`\n🔍 SAMPLE LOOKUP FOR: ${email}`);
+      console.log(`   Step 1: Trying Admin Directory API (projection=basic, viewType=domain_public)`);
+    }
+    
+    const response = await admin.users.get({
+      userKey: email,
+      projection: 'basic',
+      viewType: 'domain_public',
+    });
+    
+    if (response.data && response.data.name && response.data.name.fullName) {
+      if (isFirstLookup) {
+        console.log(`   ✅ Admin Directory SUCCESS: ${response.data.name.fullName}`);
+      }
+      return response.data.name.fullName;
+    }
+    
+    if (isFirstLookup) {
+      console.log(`   ⚠️ Admin Directory returned data but no name.fullName`);
+    }
+  } catch (adminError) {
+    if (isFirstLookup) {
+      console.log(`   ⚠️ Admin Directory failed: ${(adminError as Error).message}`);
+      console.log(`   Step 2: Falling back to People API...`);
+    }
+    
+    // Fall back to People API (for personal contacts)
+    try {
+      const people = google.people({ version: 'v1', auth: oauth2Client });
+      
+      const peopleResponse = await people.people.searchContacts({
+        query: email,
+        readMask: 'names,emailAddresses',
+      });
+      
+      if (isFirstLookup) {
+        console.log(`   📦 People API response:`, JSON.stringify(peopleResponse.data, null, 2));
+      }
+      
+      if (peopleResponse.data.results && peopleResponse.data.results.length > 0) {
+        const person = peopleResponse.data.results[0].person;
+        if (person?.names && person.names.length > 0) {
+          if (isFirstLookup) {
+            console.log(`   ✅ People API SUCCESS: ${person.names[0].displayName}`);
+          }
+          return person.names[0].displayName || email;
+        }
+      }
+      
+      if (isFirstLookup) {
+        console.log(`   ⚠️ People API returned no results`);
+      }
+    } catch (peopleError) {
+      if (isFirstLookup) {
+        console.log(`   ❌ People API also failed: ${(peopleError as Error).message}`);
+      }
+    }
+  }
+  
+  if (isFirstLookup) {
+    console.log(`   ❌ Both APIs failed - using email as fallback`);
+  }
+  
+  return email; // Fallback to email if both APIs fail
+}
+
+/**
+ * Enrich attendees with display names from Admin Directory API
+ * Fetches names in parallel for performance
+ */
+async function enrichAttendeesWithNames(
+  attendees: Array<{ email: string; displayName?: string }>,
+  oauth2Client: any
+): Promise<Array<{ email: string; displayName: string }>> {
+  if (!attendees || attendees.length === 0) {
+    return [];
+  }
+  
+  // Fetch all names in parallel
+  const enrichedAttendees = await Promise.all(
+    attendees.map(async (attendee) => {
+      // If displayName already exists, keep it
+      if (attendee.displayName) {
+        return { email: attendee.email, displayName: attendee.displayName };
+      }
+      
+      // Otherwise, fetch from Directory API
+      const displayName = await fetchDisplayName(attendee.email, oauth2Client);
+      return { email: attendee.email, displayName };
+    })
+  );
+  
+  return enrichedAttendees;
+}
+
+/**
  * Fetch upcoming calendar events for user
  */
 export async function fetchUpcomingEvents(userId: string): Promise<CalendarEvent[]> {
@@ -202,8 +311,77 @@ export async function fetchUpcomingEvents(userId: string): Promise<CalendarEvent
     
     const events = response.data.items || [];
     
+    // #region Debug logging - COMPLETE RAW API RESPONSE
+    console.log('\n'.repeat(3));
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔍 COMPLETE GOOGLE CALENDAR API RAW RESPONSE');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log(`Total events fetched: ${events.length}`);
+    
+    // Sample first event with attendees for debugging
+    const sampleEventWithAttendees = events.find(e => e.attendees && e.attendees.length > 0);
+    if (sampleEventWithAttendees) {
+      console.log('\n📅 SAMPLE EVENT TITLE:', sampleEventWithAttendees.summary);
+      console.log('\n🔴 COMPLETE RAW EVENT OBJECT (EXACTLY AS GOOGLE RETURNS IT):');
+      console.log('─────────────────────────────────────────────────────────');
+      console.log(JSON.stringify(sampleEventWithAttendees, null, 2));
+      console.log('─────────────────────────────────────────────────────────');
+      
+      // Also show just attendees for clarity
+      console.log('\n👥 JUST THE ATTENDEES ARRAY:');
+      console.log(JSON.stringify(sampleEventWithAttendees.attendees, null, 2));
+      
+      // Count attendees with/without displayName
+      const attendeesWithName = sampleEventWithAttendees.attendees?.filter(a => a.displayName) || [];
+      const attendeesWithoutName = sampleEventWithAttendees.attendees?.filter(a => !a.displayName) || [];
+      const resources = sampleEventWithAttendees.attendees?.filter(a => a.resource) || [];
+      
+      console.log(`\n📊 STATISTICS:`);
+      console.log(`  - Total attendees: ${sampleEventWithAttendees.attendees?.length || 0}`);
+      console.log(`  - With displayName: ${attendeesWithName.length}`);
+      console.log(`  - Without displayName: ${attendeesWithoutName.length}`);
+      console.log(`  - Resources (meeting rooms): ${resources.length}`);
+    } else {
+      console.log('\n⚠️ No events with attendees found in this batch');
+    }
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('\n'.repeat(2));
+    // #endregion
+    
+    // #region Enrich attendees with names from Admin Directory API
+    console.log('🔍 ENRICHING ATTENDEES WITH DIRECTORY API...');
+    const startTime = Date.now();
+    
+    // Collect all unique emails from all events
+    const allEmails = new Set<string>();
+    events.forEach(event => {
+      event.attendees?.forEach(attendee => {
+        if (attendee.email && !attendee.resource) {
+          allEmails.add(attendee.email);
+        }
+      });
+    });
+    
+    console.log(`   Found ${allEmails.size} unique attendee emails`);
+    
+    // Fetch all names in parallel (log details for first one only)
+    const emailToNameMap = new Map<string, string>();
+    const emailArray = Array.from(allEmails);
+    const namePromises = emailArray.map(async (email, index) => {
+      const displayName = await fetchDisplayName(email, oauth2Client, index === 0);
+      emailToNameMap.set(email, displayName);
+      return { email, displayName };
+    });
+    
+    const enrichedNames = await Promise.all(namePromises);
+    
+    const namesFound = enrichedNames.filter(e => e.displayName !== e.email).length;
+    console.log(`   ✅ Fetched ${namesFound} names from Directory API in ${Date.now() - startTime}ms`);
+    console.log(`   📧 ${allEmails.size - namesFound} emails have no Directory entry (using email as fallback)`);
+    // #endregion
+    
     // Filter out all-day events and map to our format
-    return events
+    const mappedEvents = events
       .filter(event => {
         // Exclude all-day events (they have 'date' instead of 'dateTime')
         return event.start?.dateTime && event.end?.dateTime;
@@ -215,12 +393,14 @@ export async function fetchUpcomingEvents(userId: string): Promise<CalendarEvent
         end: event.end?.dateTime || '',
         htmlLink: event.htmlLink || '',
         description: event.description || null,
+        recurringEventId: event.recurringEventId || undefined, // Include recurring event series ID
         attendees: event.attendees?.map(attendee => ({
           email: attendee.email || '',
-          displayName: attendee.displayName,
+          displayName: attendee.email ? (emailToNameMap.get(attendee.email) || attendee.email) : undefined,
           responseStatus: attendee.responseStatus as 'accepted' | 'declined' | 'tentative' | 'needsAction' | undefined,
           organizer: attendee.organizer || false,
           self: attendee.self || false,
+          resource: attendee.resource || false, // Meeting rooms have resource: true
         })) || [],
         hangoutLink: event.hangoutLink,
         conferenceData: event.conferenceData ? {
@@ -230,6 +410,31 @@ export async function fetchUpcomingEvents(userId: string): Promise<CalendarEvent
           })),
         } : undefined,
       }));
+    
+    // Auto-sync people from all event attendees (fire-and-forget)
+    // Filter out meeting rooms (resources) - only include actual people
+    const allAttendees = mappedEvents
+      .flatMap(event => event.attendees || [])
+      .filter(a => a.email && !a.resource); // Exclude meeting rooms/resources
+    
+    // #region Debug logging - People sync
+    console.log('=== PEOPLE SYNC DEBUG ===');
+    console.log(`Total attendees to sync (excluding resources): ${allAttendees.length}`);
+    const syncWithNames = allAttendees.filter(a => a.displayName);
+    const syncWithoutNames = allAttendees.filter(a => !a.displayName);
+    console.log(`  - Attendees WITH displayName: ${syncWithNames.length}`);
+    console.log(`  - Attendees WITHOUT displayName: ${syncWithoutNames.length}`);
+    console.log('=== END DEBUG ===\n');
+    // #endregion
+    
+    if (allAttendees.length > 0) {
+      // Don't wait for this - run in background
+      addPeopleFromAttendees(allAttendees).catch(err => 
+        logger.warn('Failed to sync people from calendar events', { error: err.message })
+      );
+    }
+    
+    return mappedEvents;
   } catch (error) {
     console.error('Failed to fetch calendar events', error as Error, { userId });
     throw new Error('Failed to fetch calendar events. Please try reconnecting your Google Calendar.');
@@ -238,6 +443,7 @@ export async function fetchUpcomingEvents(userId: string): Promise<CalendarEvent
 
 /**
  * Attach note content to calendar event
+ * Returns the created document ID and URL
  */
 export async function attachNoteToCalendarEvent(
   userId: string,
@@ -246,7 +452,7 @@ export async function attachNoteToCalendarEvent(
   noteContent: string,
   userEmail: string,
   driveFolderId?: string
-): Promise<void> {
+): Promise<{ docId: string; docUrl: string }> {
   console.log('[ATTACH] Starting note attachment', { userId, eventId, noteTitle, hasFolderId: !!driveFolderId });
   
   try {
@@ -268,10 +474,11 @@ export async function attachNoteToCalendarEvent(
     console.log('[ATTACH] Initializing Google APIs');
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+    const docs = google.docs({ version: 'v1', auth: oauth2Client });
     
     // Create Google Doc in Drive
-    const timestamp = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }).replace(/[/:]/g, '-');
-    const fileName = `Meeting Notes - ${noteTitle} - ${timestamp}`;
+    const dateString = new Date().toLocaleDateString('de-DE'); // dd.MM.yyyy
+    const fileName = `Meeting Notes | ${noteTitle} (${dateString})`;
     
     const fileMetadata: any = {
       name: fileName,
@@ -324,6 +531,39 @@ export async function attachNoteToCalendarEvent(
       throw new Error('Failed to create Google Doc');
     }
     
+    // Set A4 paper size with 1cm margins
+    console.log('[ATTACH] Setting document page setup (A4, 1cm margins)');
+    try {
+      await docs.documents.batchUpdate({
+        documentId: fileId,
+        requestBody: {
+          requests: [
+            {
+              updateDocumentStyle: {
+                documentStyle: {
+                  // 1cm = 28.35 points
+                  marginTop: { magnitude: 28.35, unit: 'PT' },
+                  marginBottom: { magnitude: 28.35, unit: 'PT' },
+                  marginLeft: { magnitude: 28.35, unit: 'PT' },
+                  marginRight: { magnitude: 28.35, unit: 'PT' },
+                  // A4 size: 210mm x 297mm = 595.28 x 841.89 points
+                  pageSize: {
+                    width: { magnitude: 595.28, unit: 'PT' },
+                    height: { magnitude: 841.89, unit: 'PT' }
+                  }
+                },
+                fields: 'marginTop,marginBottom,marginLeft,marginRight,pageSize'
+              }
+            }
+          ]
+        }
+      });
+      console.log('[ATTACH] Document page setup updated successfully');
+    } catch (docsError) {
+      console.warn('[ATTACH] Failed to set document page setup (non-critical):', docsError);
+      // Don't throw - this is a nice-to-have enhancement
+    }
+    
     // Get event attendees
     console.log('Fetching event attendees');
     const event = await calendar.events.get({
@@ -334,29 +574,31 @@ export async function attachNoteToCalendarEvent(
     const attendees = event.data.attendees || [];
     console.log('Found attendees', { count: attendees.length });
     
-    // Add commenter permissions for each attendee
-    for (const attendee of attendees) {
-      if (attendee.email) {
-        try {
-          await drive.permissions.create({
-            fileId: fileId,
-            requestBody: {
-              role: 'commenter',
-              type: 'user',
-              emailAddress: attendee.email,
-            },
-            sendNotificationEmail: false,
-          });
+    // Add commenter permissions for all attendees in parallel
+    const attendeePermissionPromises = attendees
+      .filter(attendee => attendee.email)
+      .map(attendee =>
+        drive.permissions.create({
+          fileId: fileId,
+          requestBody: {
+            role: 'commenter',
+            type: 'user',
+            emailAddress: attendee.email,
+          },
+          sendNotificationEmail: false,
+        })
+        .then(() => {
           console.log('Added permission for attendee', { email: attendee.email });
-        } catch (error) {
+          return { success: true, email: attendee.email };
+        })
+        .catch(error => {
           console.warn('Failed to add permission for attendee:', attendee.email, error);
-        }
-      }
-    }
+          return { success: false, email: attendee.email, error };
+        })
+      );
     
-    // Give creator edit access
-    console.log('Adding creator permissions', { email: userEmail });
-    await drive.permissions.create({
+    // Give creator edit access (add to parallel operations)
+    const creatorPermissionPromise = drive.permissions.create({
       fileId: fileId,
       requestBody: {
         role: 'writer',
@@ -364,22 +606,54 @@ export async function attachNoteToCalendarEvent(
         emailAddress: userEmail,
       },
       sendNotificationEmail: false,
+    })
+    .then(() => {
+      console.log('Added creator permissions', { email: userEmail });
+      return { success: true, email: userEmail };
+    })
+    .catch(error => {
+      console.error('Failed to add creator permission:', userEmail, error);
+      throw error; // Creator permission is critical, so throw
     });
     
-    // Add link to calendar event description
-    console.log('Updating calendar event description');
-    const existingDescription = event.data.description || '';
-    const noteLink = `Notes: <a href="${fileLink}">${noteTitle}</a>`;
-    const separator = existingDescription ? '<br><br>' : '';
-    const updatedDescription = `${existingDescription}${separator}${noteLink}`;
+    // Execute all permissions in parallel
+    const allPermissionPromises = [...attendeePermissionPromises, creatorPermissionPromise];
+    const permissionResults = await Promise.allSettled(allPermissionPromises);
     
-    await calendar.events.patch({
-      calendarId: 'primary',
-      eventId: eventId,
-      requestBody: {
-        description: updatedDescription,
-      },
-    });
+    // Check if creator permission succeeded (it's the last one)
+    const creatorResult = permissionResults[permissionResults.length - 1];
+    if (creatorResult.status === 'rejected') {
+      throw new Error(`Failed to add creator permissions: ${creatorResult.reason}`);
+    }
+    
+    // Log summary of attendee permissions (non-critical)
+    const successfulAttendees = permissionResults
+      .slice(0, -1) // Exclude creator
+      .filter(r => r.status === 'fulfilled')
+      .length;
+    console.log(`Successfully added permissions for ${successfulAttendees}/${attendees.length} attendees`);
+    
+    // Try to add link to calendar event description (may fail if not organizer)
+    console.log('Attempting to update calendar event description');
+    try {
+      const existingDescription = event.data.description || '';
+      const noteLink = `Notes: <a href="${fileLink}">${noteTitle}</a>`;
+      const separator = existingDescription ? '<br><br>' : '';
+      const updatedDescription = `${existingDescription}${separator}${noteLink}`;
+      
+      await calendar.events.patch({
+        calendarId: 'primary',
+        eventId: eventId,
+        requestBody: {
+          description: updatedDescription,
+        },
+      });
+      console.log('Calendar event description updated successfully');
+    } catch (calendarError) {
+      console.warn('Could not update calendar event (user may not be organizer):', (calendarError as Error).message);
+      // Don't throw - the Google Doc was created successfully and shared with attendees
+      // This just means the link won't appear in the calendar event description
+    }
     
     console.log('Successfully attached note as Google Doc', {
       userId,
@@ -387,6 +661,11 @@ export async function attachNoteToCalendarEvent(
       fileId,
       folder: driveFolderId || 'root',
     });
+    
+    return {
+      docId: fileId,
+      docUrl: fileLink,
+    };
   } catch (error) {
     const errorDetails = {
       message: (error as any).message,
@@ -404,9 +683,83 @@ export async function attachNoteToCalendarEvent(
 }
 
 /**
+ * Update an existing Google Doc with new note content
+ * Uses Drive API to replace the entire document with HTML content
+ */
+export async function updateGoogleDoc(
+  userId: string,
+  docId: string,
+  noteTitle: string,
+  noteContent: string,
+  userEmail: string
+): Promise<void> {
+  console.log('[UPDATE] Starting doc update', { userId, docId, noteTitle });
+  
+  try {
+    const refreshToken = await getUserRefreshToken(userId);
+    
+    if (!refreshToken) {
+      console.error('[UPDATE] No refresh token found');
+      throw new Error('Google Calendar not connected');
+    }
+    
+    console.log('[UPDATE] Got refresh token, getting access token');
+    const accessToken = await getAccessTokenFromRefresh(refreshToken);
+    const oauth2Client = createOAuth2Client();
+    oauth2Client.setCredentials({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    
+    console.log('[UPDATE] Initializing Google Drive API');
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    
+    // Update the document content using Drive API with HTML
+    console.log('[UPDATE] Updating document content with HTML');
+    const media = {
+      mimeType: 'text/html',
+      body: noteContent,
+    };
+    
+    await drive.files.update({
+      fileId: docId,
+      media: media,
+    });
+    
+    console.log('[UPDATE] Document updated successfully');
+  } catch (error) {
+    const errorDetails = {
+      message: (error as any).message,
+      code: (error as any).code,
+      status: (error as any).status,
+    };
+    console.error('[UPDATE] Failed to update Google Doc', error as Error, {
+      userId,
+      docId,
+      errorDetails,
+    });
+    throw error;
+  }
+}
+
+/**
  * Check if user has Google Calendar connected
  */
 export async function isCalendarConnected(userId: string): Promise<boolean> {
   const refreshToken = await getUserRefreshToken(userId);
   return !!refreshToken;
+}
+
+/**
+ * Extract recurring event information from a calendar event
+ * Used to link notes from the same recurring meeting series
+ */
+export function extractRecurringInfo(calendarEvent: any): {
+  recurringEventId: string | null;
+  instanceDate: string | null;
+} {
+  return {
+    recurringEventId: calendarEvent.recurringEventId || null,
+    instanceDate: calendarEvent.start?.dateTime || calendarEvent.start?.date || null
+  };
 }

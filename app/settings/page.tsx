@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Save, Info, Check, Plus, Trash2, GripVertical, Mail, Shield, X, Lock, Calendar } from 'lucide-react';
+import { Save, Info, Check, Plus, Trash2, GripVertical, Mail, Shield, X, Lock, Calendar, Palette } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
@@ -19,10 +19,12 @@ import { ProjectSettings, StatusOption, PriorityOption, CustomField, ProjectMemb
 
 interface UserSettings {
   colorScheme: string;
+  customColorScheme?: ColorScheme;
   displayName?: string;
   timezone?: string;
   noteTemplate?: string;
   driveFolderId?: string;
+  defaultProjectId?: string;
   notifications?: {
     email: boolean;
     desktop: boolean;
@@ -186,7 +188,7 @@ SortablePriorityItem.displayName = 'SortablePriorityItem';
 function SettingsContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { currentScheme, setScheme } = useTheme();
+  const { currentScheme, setScheme, setCustomScheme } = useTheme();
   
   const section = searchParams.get('section') || 'profile';
   const projectId = searchParams.get('projectId');
@@ -209,6 +211,8 @@ function SettingsContent() {
     },
   });
 
+  const [userProjects, setUserProjects] = useState<Array<{id: string; name: string}>>([]);
+
   const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
     statusOptions: [],
     priorityOptions: [],
@@ -229,6 +233,24 @@ function SettingsContent() {
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<ProjectRole>('EDIT');
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+  
+  // Custom color scheme state
+  const [showCustomColorEditor, setShowCustomColorEditor] = useState(false);
+  const [customColors, setCustomColors] = useState<Partial<ColorScheme>>({
+    id: 'custom',
+    name: 'Custom',
+    primary: '#009646',
+    secondary: '#125034',
+    success: '#00a61c',
+    warning: '#f6c400',
+    error: '#f30047',
+    background: '#fffdfa',
+    surface: '#ffffff',
+    surfaceMuted: '#f8fafc',
+    text: '#0f172a',
+    textSecondary: '#64748b',
+    border: '#e2e8f0',
+  });
   
   // Dialog state
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'warning' | 'info' | 'success' }>({ isOpen: false, title: '', message: '', type: 'info' });
@@ -251,6 +273,7 @@ function SettingsContent() {
   useEffect(() => {
     if (user) {
       fetchUserSettings();
+      fetchUserProjects();
       checkCalendarConnection();
     }
   }, [user]);
@@ -281,11 +304,33 @@ function SettingsContent() {
         const data = await res.json();
         setUserSettings(data);
         setOriginalUserSettings(data); // Store original for comparison
+        
+        // Load custom color scheme if present
+        if (data.colorScheme === 'custom' && data.customColorScheme) {
+          setCustomColors(data.customColorScheme);
+        }
       } else {
         console.error('Failed to fetch settings:', res.status, await res.text());
       }
     } catch (error) {
       console.error('Failed to fetch settings:', error);
+    }
+  };
+
+  const fetchUserProjects = async () => {
+    try {
+      const res = await authenticatedFetch('/api/projects');
+      if (res.ok) {
+        const projects = await res.json();
+        setUserProjects(projects.map((p: any) => ({ id: p.id, name: p.name })));
+        
+        // If no default project is set, set it to the first project
+        if (!userSettings.defaultProjectId && projects.length > 0) {
+          setUserSettings(prev => ({ ...prev, defaultProjectId: projects[0].id }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
     }
   };
 
@@ -922,6 +967,27 @@ function SettingsContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                    Default Project for Note Tasks
+                  </label>
+                  <select
+                    value={userSettings.defaultProjectId || ''}
+                    onChange={(e) => setUserSettings({ ...userSettings, defaultProjectId: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    style={{ borderColor: 'var(--color-border)' }}
+                  >
+                    <option value="">Select a project...</option>
+                    {userProjects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    When you create tasks in notes and check "Create in project", they will be added to this project
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                     Google Drive Folder ID
                   </label>
                   <input
@@ -1015,6 +1081,59 @@ function SettingsContent() {
                   </button>
                 )}
               </div>
+              
+              {isCalendarConnected && (
+                <div className="mt-4 space-y-3">
+                  <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: 'var(--color-surface-muted)', color: 'var(--color-text)' }}>
+                    <p className="font-medium mb-1">📇 People Database</p>
+                    <p className="text-xs opacity-80">
+                      Your contacts database automatically populates as you use the app. Every time you view calendar events, 
+                      meeting attendees are added to your people database. Use @ mentions in notes and assign tasks to anyone 
+                      who has appeared in your calendar events.
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={async () => {
+                      setConfirmDialog({
+                        isOpen: true,
+                        title: 'Clear People from Calendar',
+                        message: 'This will delete all people that were synced from calendar events (meeting attendees). The next time you view calendar events, only actual people (not meeting rooms) will be re-added.\n\nThis action cannot be undone.',
+                        type: 'warning',
+                        onConfirm: async () => {
+                          try {
+                            const res = await authenticatedFetch('/api/people/clear?source=calendar', {
+                              method: 'DELETE',
+                            });
+                            
+                            if (res.ok) {
+                              const data = await res.json();
+                              setAlertDialog({
+                                isOpen: true,
+                                title: 'People Cleared',
+                                message: `Successfully deleted ${data.deletedCount} people from calendar source. The database will repopulate with only actual people (excluding meeting rooms) the next time you view calendar events.`,
+                                type: 'success',
+                              });
+                            }
+                          } catch (error) {
+                            setAlertDialog({
+                              isOpen: true,
+                              title: 'Error',
+                              message: 'Failed to clear people database',
+                              type: 'error',
+                            });
+                          }
+                        },
+                      });
+                    }}
+                    className="w-full px-4 py-2 text-sm border rounded-md flex items-center justify-center gap-2 font-medium transition-colors hover:bg-orange-50"
+                    style={{ borderColor: '#f59e0b', color: '#f59e0b' }}
+                  >
+                    <Trash2 size={16} />
+                    Clear Calendar People & Re-sync
+                  </button>
+                </div>
+              )}
 
               {!isCalendarConnected && (
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
@@ -1151,6 +1270,426 @@ function SettingsContent() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Custom Color Scheme Editor */}
+              <div className="mt-8 pt-8 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                <div className="mb-4">
+                  <button
+                    onClick={() => setShowCustomColorEditor(!showCustomColorEditor)}
+                    className="flex items-center gap-2 text-sm font-semibold transition-colors"
+                    style={{ color: 'var(--color-primary)' }}
+                  >
+                    {showCustomColorEditor ? '▼' : '▶'} Create Custom Color Scheme
+                  </button>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Define your own colors using hexadecimal codes
+                  </p>
+                </div>
+
+                {showCustomColorEditor && (
+                  <div className="space-y-6 p-6 rounded-lg" style={{ backgroundColor: 'var(--color-surface-muted)' }}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Primary Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Primary Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.primary || '#009646'}
+                            onChange={(e) => setCustomColors({ ...customColors, primary: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.primary || '#009646'}
+                            onChange={(e) => setCustomColors({ ...customColors, primary: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#009646"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Secondary Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Secondary Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.secondary || '#125034'}
+                            onChange={(e) => setCustomColors({ ...customColors, secondary: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.secondary || '#125034'}
+                            onChange={(e) => setCustomColors({ ...customColors, secondary: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#125034"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Success Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Success Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.success || '#00a61c'}
+                            onChange={(e) => setCustomColors({ ...customColors, success: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.success || '#00a61c'}
+                            onChange={(e) => setCustomColors({ ...customColors, success: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#00a61c"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Warning Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Warning Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.warning || '#f6c400'}
+                            onChange={(e) => setCustomColors({ ...customColors, warning: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.warning || '#f6c400'}
+                            onChange={(e) => setCustomColors({ ...customColors, warning: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#f6c400"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Error Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Error Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.error || '#f30047'}
+                            onChange={(e) => setCustomColors({ ...customColors, error: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.error || '#f30047'}
+                            onChange={(e) => setCustomColors({ ...customColors, error: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#f30047"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Background Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Background Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.background || '#fffdfa'}
+                            onChange={(e) => setCustomColors({ ...customColors, background: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.background || '#fffdfa'}
+                            onChange={(e) => setCustomColors({ ...customColors, background: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#fffdfa"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Surface Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Surface Color (Cards)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.surface || '#ffffff'}
+                            onChange={(e) => setCustomColors({ ...customColors, surface: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.surface || '#ffffff'}
+                            onChange={(e) => setCustomColors({ ...customColors, surface: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#ffffff"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Surface Muted Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Surface Muted (Subtle backgrounds)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.surfaceMuted || '#f8fafc'}
+                            onChange={(e) => setCustomColors({ ...customColors, surfaceMuted: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.surfaceMuted || '#f8fafc'}
+                            onChange={(e) => setCustomColors({ ...customColors, surfaceMuted: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#f8fafc"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Text Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Text Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.text || '#0f172a'}
+                            onChange={(e) => setCustomColors({ ...customColors, text: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.text || '#0f172a'}
+                            onChange={(e) => setCustomColors({ ...customColors, text: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#0f172a"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Text Secondary Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Secondary Text Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.textSecondary || '#64748b'}
+                            onChange={(e) => setCustomColors({ ...customColors, textSecondary: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.textSecondary || '#64748b'}
+                            onChange={(e) => setCustomColors({ ...customColors, textSecondary: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#64748b"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Border Color */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                          Border Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColors.border || '#e2e8f0'}
+                            onChange={(e) => setCustomColors({ ...customColors, border: e.target.value })}
+                            className="w-12 h-10 border rounded-md cursor-pointer"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          />
+                          <input
+                            type="text"
+                            value={customColors.border || '#e2e8f0'}
+                            onChange={(e) => setCustomColors({ ...customColors, border: e.target.value })}
+                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
+                            style={{ borderColor: 'var(--color-border)' }}
+                            placeholder="#e2e8f0"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Preview Card */}
+                    <div className="mt-6">
+                      <label className="block text-sm font-medium mb-3" style={{ color: 'var(--color-text)' }}>
+                        Preview
+                      </label>
+                      <div 
+                        className="p-6 rounded-lg border-2"
+                        style={{ 
+                          backgroundColor: customColors.background,
+                          borderColor: customColors.border,
+                        }}
+                      >
+                        <div 
+                          className="p-6 rounded-lg border"
+                          style={{ 
+                            backgroundColor: customColors.surface,
+                            borderColor: customColors.border,
+                          }}
+                        >
+                          <h3 
+                            className="text-lg font-semibold mb-3"
+                            style={{ color: customColors.text }}
+                          >
+                            Sample Card
+                          </h3>
+                          <p 
+                            className="text-sm mb-4"
+                            style={{ color: customColors.textSecondary }}
+                          >
+                            This is how your custom theme will look in the application.
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <span 
+                              className="px-3 py-1 rounded-md text-xs font-medium text-white"
+                              style={{ backgroundColor: customColors.primary }}
+                            >
+                              Primary
+                            </span>
+                            <span 
+                              className="px-3 py-1 rounded-md text-xs font-medium text-white"
+                              style={{ backgroundColor: customColors.secondary }}
+                            >
+                              Secondary
+                            </span>
+                            <span 
+                              className="px-3 py-1 rounded-md text-xs font-medium text-white"
+                              style={{ backgroundColor: customColors.success }}
+                            >
+                              Success
+                            </span>
+                            <span 
+                              className="px-3 py-1 rounded-md text-xs font-medium text-white"
+                              style={{ backgroundColor: customColors.warning }}
+                            >
+                              Warning
+                            </span>
+                            <span 
+                              className="px-3 py-1 rounded-md text-xs font-medium text-white"
+                              style={{ backgroundColor: customColors.error }}
+                            >
+                              Error
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => {
+                          setCustomColors({
+                            id: 'custom',
+                            name: 'Custom',
+                            primary: '#009646',
+                            secondary: '#125034',
+                            success: '#00a61c',
+                            warning: '#f6c400',
+                            error: '#f30047',
+                            background: '#fffdfa',
+                            surface: '#ffffff',
+                            surfaceMuted: '#f8fafc',
+                            text: '#0f172a',
+                            textSecondary: '#64748b',
+                            border: '#e2e8f0',
+                          });
+                        }}
+                        className="px-4 py-2 text-sm border rounded-md transition-colors"
+                        style={{ 
+                          borderColor: 'var(--color-border)',
+                          color: 'var(--color-text)',
+                        }}
+                      >
+                        Reset to Defaults
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Apply custom theme immediately
+                          setCustomScheme(customColors as ColorScheme);
+                          
+                          // Save to user settings
+                          setUserSettings({ 
+                            ...userSettings, 
+                            colorScheme: 'custom',
+                            customColorScheme: customColors as ColorScheme,
+                          });
+                          
+                          // Show save reminder
+                          setAlertDialog({
+                            isOpen: true,
+                            title: 'Custom Theme Applied',
+                            message: 'Your custom theme has been applied! Don\'t forget to click the "Save" button at the top to persist your changes.',
+                            type: 'success',
+                          });
+                        }}
+                        className="px-4 py-2 text-sm rounded-md text-white font-medium transition-colors flex items-center gap-2"
+                        style={{ backgroundColor: 'var(--color-primary)' }}
+                      >
+                        <Palette size={16} />
+                        Apply Custom Theme
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1440,27 +1979,36 @@ function SettingsContent() {
                           if (!projectId) return;
                           
                           try {
-                            await authenticatedFetch(`/api/projects/${projectId}`, {
+                            const res = await authenticatedFetch(`/api/projects/${projectId}`, {
                               method: 'DELETE',
                             });
                             
+                            if (!res.ok) {
+                              const errorData = await res.json();
+                              throw new Error(errorData.error || 'Failed to delete project');
+                            }
+                            
+                            // Set a flag in localStorage to invalidate cache on next page load
+                            localStorage.setItem('invalidate-projects-cache', 'true');
+                            
+                            // Show success message before redirect
                             setAlertDialog({
                               isOpen: true,
                               title: 'Project Deleted',
-                              message: 'The project has been permanently deleted.',
+                              message: 'Project deleted successfully. Redirecting...',
                               type: 'success',
                             });
                             
-                            // Redirect to home after 2 seconds
+                            // Redirect after a brief delay to show the success message
                             setTimeout(() => {
                               window.location.href = '/';
-                            }, 2000);
+                            }, 1500);
                           } catch (error) {
                             console.error('Failed to delete project:', error);
                             setAlertDialog({
                               isOpen: true,
                               title: 'Error',
-                              message: 'Failed to delete project. Please try again.',
+                              message: error instanceof Error ? error.message : 'Failed to delete project. Please try again.',
                               type: 'error',
                             });
                           }

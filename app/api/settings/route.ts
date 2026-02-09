@@ -11,6 +11,7 @@ interface UserSettings {
   timezone?: string;
   noteTemplate?: string;
   driveFolderId?: string;
+  defaultProjectId?: string; // Default project for creating tasks from notes
   googleCalendarRefreshToken?: string;
   googleCalendarConnectedAt?: string;
   notifications?: {
@@ -77,6 +78,7 @@ export async function PUT(request: NextRequest) {
         timezone: body.timezone || 'Europe/Berlin',
         noteTemplate: body.noteTemplate,
         driveFolderId: body.driveFolderId,
+        defaultProjectId: body.defaultProjectId,
         notifications: body.notifications || {
           email: true,
           desktop: true,

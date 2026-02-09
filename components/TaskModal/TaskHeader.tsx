@@ -14,7 +14,6 @@ interface TaskHeaderProps {
   title: string;
   projectId: string;
   projects: { id: string; name: string }[];
-  subTasks: any[];
   deadline: string | null;
   isSaving: boolean;
   saveError: string | null;
@@ -29,7 +28,6 @@ export function TaskHeader({
   title,
   projectId,
   projects,
-  subTasks,
   deadline,
   isSaving,
   saveError,
@@ -47,12 +45,6 @@ export function TaskHeader({
     }
     setIsEditingTitle(false);
   };
-
-  const completedSubtasks = subTasks?.filter(st => st.completed).length || 0;
-  const totalSubtasks = subTasks?.length || 0;
-  const progressPercentage = totalSubtasks > 0 
-    ? Math.round((completedSubtasks / totalSubtasks) * 100) 
-    : 0;
 
   const daysLeft = deadline 
     ? Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -159,15 +151,6 @@ export function TaskHeader({
               <span className="text-sm font-medium">Share</span>
             </button>
             <div className="flex gap-4">
-              {/* Complete % - Only show if there are sub-tasks */}
-              {totalSubtasks > 0 && (
-                <div className="text-center px-4 py-2 bg-surface border rounded-lg" style={{ borderColor: 'var(--color-border)' }}>
-                  <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                    {progressPercentage}%
-                  </div>
-                  <div className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>Complete</div>
-                </div>
-              )}
               {/* Days Left - Only show if there's a deadline */}
               {daysLeft !== null && (
                 <div className="text-center px-4 py-2 bg-surface border rounded-lg" style={{ borderColor: 'var(--color-border)' }}>

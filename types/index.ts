@@ -8,8 +8,24 @@ export interface SubTask {
   completed: boolean;
 }
 
+export interface StatusHistoryEntry {
+  id: string;
+  fromStatus: TaskStatus | null; // null for initial status
+  toStatus: TaskStatus;
+  changedBy: string;
+  changedAt: string; // ISO date string
+}
+
+export interface Comment {
+  id: string;
+  text: string;
+  author: string;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
+  title?: string; // Optional title field
   description: string; // Rich text/markdown support
   subTasks: SubTask[];
   deadline: string | null; // ISO date string
@@ -21,6 +37,9 @@ export interface Task {
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  images?: string[];
+  comments?: Comment[];
+  statusHistory?: StatusHistoryEntry[]; // Track status changes
 }
 
 export interface Project {
@@ -47,6 +66,7 @@ export interface NoteTask {
   owner: string;
   deadline: string | null;
   createdTaskId?: string; // Links to actual Task if created
+  createInProject?: boolean; // Whether to create this task in the default project
 }
 
 export interface Note {
@@ -57,6 +77,10 @@ export interface Note {
   calendarEventId: string | null; // Google Calendar event ID
   calendarEventLink: string | null;
   calendarEventData?: CalendarEvent | null; // Full calendar event data including attendees
+  googleDocId: string | null; // Google Doc ID if attached
+  googleDocUrl: string | null; // Google Doc URL for easy access
+  recurringEventId: string | null; // Google Calendar recurring event series ID
+  recurringInstanceDate: string | null; // ISO date of this specific instance
   templateId: string;
   createdBy: string;
   createdAt: string;
@@ -80,12 +104,14 @@ export interface CalendarEvent {
   end: string;
   htmlLink: string;
   description?: string | null;
+  recurringEventId?: string; // ID of the recurring event series (if part of recurring series)
   attendees?: Array<{
     email: string;
     displayName?: string;
     responseStatus?: 'accepted' | 'declined' | 'tentative' | 'needsAction';
     organizer?: boolean;
     self?: boolean;
+    resource?: boolean; // Meeting rooms/resources have this set to true
   }>;
   hangoutLink?: string;
   conferenceData?: {
@@ -94,4 +120,20 @@ export interface CalendarEvent {
       entryPointType: string;
     }>;
   };
+}
+
+// ========== PEOPLE & CONTACTS ==========
+
+export interface Person {
+  id: string; // email as ID
+  email: string;
+  displayName: string;
+  firstName?: string;
+  lastName?: string;
+  photoUrl?: string;
+  source: 'workspace' | 'calendar' | 'manual';
+  organizationId?: string;
+  lastSeen: string;
+  createdAt: string;
+  updatedAt: string;
 }

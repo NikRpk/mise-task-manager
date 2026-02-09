@@ -51,6 +51,10 @@ export async function POST(request: NextRequest) {
         calendarEventId: body.calendarEventId || null,
         calendarEventLink: body.calendarEventLink || null,
         calendarEventData: body.calendarEventData || null,
+        googleDocId: null, // Will be set when doc is created
+        googleDocUrl: null, // Will be set when doc is created
+        recurringEventId: body.recurringEventId || null, // Recurring event series ID
+        recurringInstanceDate: body.recurringInstanceDate || null, // Instance date
         templateId: body.templateId || 'default',
         createdBy: user.uid,
         createdAt: new Date().toISOString(),

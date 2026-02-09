@@ -1,14 +1,16 @@
 'use client';
 
 import { useAuth } from '@/lib/auth-context';
-import { LogOut, Settings, User } from 'lucide-react';
+import { LogOut, Settings, User, MessageSquare } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { logger } from '@/lib/logger';
+import FeedbackModal from './FeedbackModal';
 
 export default function UserProfile() {
   const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -80,6 +82,18 @@ export default function UserProfile() {
             </button>
 
             <button
+              onClick={() => {
+                setIsOpen(false);
+                setShowFeedbackModal(true);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors"
+              style={{ color: 'var(--color-text)' }}
+            >
+              <MessageSquare size={18} />
+              <span>Share Feedback</span>
+            </button>
+
+            <button
               onClick={handleSignOut}
               className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-red-600"
             >
@@ -89,6 +103,12 @@ export default function UserProfile() {
           </div>
         </div>
       )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        isOpen={showFeedbackModal} 
+        onClose={() => setShowFeedbackModal(false)} 
+      />
     </div>
   );
 }

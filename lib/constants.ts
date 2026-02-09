@@ -18,10 +18,10 @@ export const SEARCH_DEBOUNCE_MS = 300;
 // ============================================================================
 
 /** Minimum distance in pixels to activate drag */
-export const DRAG_ACTIVATION_DISTANCE = 3;
+export const DRAG_ACTIVATION_DISTANCE = 8;
 
 /** Delay in milliseconds before drag activates */
-export const DRAG_ACTIVATION_DELAY = 100;
+export const DRAG_ACTIVATION_DELAY = 150;
 
 /** Tolerance in pixels for drag detection */
 export const DRAG_ACTIVATION_TOLERANCE = 5;

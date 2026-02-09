@@ -1,6 +1,7 @@
 /**
  * Custom hook for managing project data and operations
  * Extracted from app/page.tsx to improve maintainability
+ * Now with caching for better performance
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -8,6 +9,7 @@ import { Project } from '@/types';
 import { authenticatedFetch } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
 import { DEFAULT_PROJECT_ICON } from '@/lib/constants';
+import { useCachedFetch, useCache } from '@/lib/cache-context';
 
 interface UseProjectDataResult {
   projects: Project[];
@@ -24,31 +26,42 @@ interface UseProjectDataResult {
  * @returns Project data and operations
  */
 export function useProjectData(userId: string | undefined): UseProjectDataResult {
-  const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cache = useCache();
 
-  const fetchProjects = useCallback(async () => {
-    if (!userId) return;
-
-    try {
-      setLoading(true);
-      const res = await authenticatedFetch('/api/projects');
-      const data = await res.json();
-      setProjects(data);
-      
-      // Auto-select first project if none selected
-      if (data.length > 0 && !selectedProjectId) {
-        setSelectedProjectId(data[0].id);
+  // Check for cache invalidation flag from localStorage (e.g., after project deletion)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const shouldInvalidate = localStorage.getItem('invalidate-projects-cache');
+      if (shouldInvalidate === 'true') {
+        cache.invalidate('user-projects');
+        localStorage.removeItem('invalidate-projects-cache');
       }
-    } catch (error) {
-      logger.error('Failed to fetch projects', error as Error, {
-        userId,
-      });
-    } finally {
-      setLoading(false);
     }
-  }, [userId, selectedProjectId]);
+  }, [cache]);
+
+  // Use cached fetch with 30-minute TTL
+  const { data: projects, isLoading, refetch } = useCachedFetch<Project[]>(
+    'user-projects',
+    async () => {
+      const res = await authenticatedFetch('/api/projects');
+      return res.json();
+    },
+    {
+      ttl: 30 * 60 * 1000, // 30 minutes
+      enabled: !!userId,
+      onError: (error) => {
+        logger.error('Failed to fetch projects', error, { userId });
+      },
+    }
+  );
+
+  // Auto-select first project if none selected
+  useEffect(() => {
+    if (projects && projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [projects, selectedProjectId]);
 
   const createProject = useCallback(async (name: string, icon?: string) => {
     try {
@@ -62,7 +75,9 @@ export function useProjectData(userId: string | undefined): UseProjectDataResult
       });
       const newProject = await res.json();
       
-      setProjects(prev => [...prev, newProject]);
+      // Invalidate cache and refetch to get fresh data
+      cache.invalidate('user-projects');
+      await refetch();
       setSelectedProjectId(newProject.id);
     } catch (error) {
       logger.error('Failed to create project', error as Error, {
@@ -71,21 +86,14 @@ export function useProjectData(userId: string | undefined): UseProjectDataResult
       });
       throw error; // Re-throw so caller can handle
     }
-  }, [userId]);
-
-  // Fetch projects on mount
-  useEffect(() => {
-    if (userId) {
-      fetchProjects();
-    }
-  }, [userId, fetchProjects]);
+  }, [userId, cache, refetch]);
 
   return {
-    projects,
+    projects: projects || [],
     selectedProjectId,
     setSelectedProjectId,
-    loading,
+    loading: isLoading,
     createProject,
-    refetchProjects: fetchProjects,
+    refetchProjects: refetch,
   };
 }

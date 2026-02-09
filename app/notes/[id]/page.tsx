@@ -11,35 +11,43 @@ import { Save, Calendar, Plus, Trash2, ArrowLeft, Edit, X } from 'lucide-react';
 import { Note, NoteTemplate, NoteTask, CalendarEvent } from '@/types';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/api-client';
+import { useUserSettings } from '@/hooks/useUserSettings';
 import TipTapEditor from '@/components/TipTapEditor';
 import AuthGuard from '@/components/AuthGuard';
 import UserProfile from '@/components/UserProfile';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import AlertDialog from '@/components/AlertDialog';
-import { ToastContainer, useToast } from '@/components/Toast';
+import { useToast } from '@/lib/toast-context';
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { DEFAULT_TIMEZONE } from '@/lib/constants';
 import Link from 'next/link';
+import { usePeopleData } from '@/hooks/usePeopleData';
+import OwnerSelector from '@/components/OwnerSelector';
+import PreviousMeetingSection from '@/components/PreviousMeetingSection';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 function NoteEditPage() {
   const router = useRouter();
   const params = useParams();
   const { user } = useAuth();
+  const { settings } = useUserSettings();
   const noteId = params.id as string;
   
   const [note, setNote] = useState<Note | null>(null);
+  const [previousNote, setPreviousNote] = useState<Note | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tasks, setTasks] = useState<NoteTask[]>([]);
   const [templateId, setTemplateId] = useState('default');
   const [isSaving, setIsSaving] = useState(false);
+  const [isAttaching, setIsAttaching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [userTimezone, setUserTimezone] = useState(DEFAULT_TIMEZONE);
-  const [attachToCalendar, setAttachToCalendar] = useState(false);
   const [calendarEvent, setCalendarEvent] = useState<CalendarEvent | null>(null);
-  const { toasts, showToast, dismissToast, updateToast } = useToast();
+  const [updateGoogleDoc, setUpdateGoogleDoc] = useState(false);
+  const { showToast, updateToast } = useToast();
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'success' | 'warning' | 'info' }>({
     isOpen: false,
     title: '',
@@ -52,38 +60,55 @@ function NoteEditPage() {
     onConfirm: () => {},
   });
   const taskInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const { people } = usePeopleData();
+
+  // Get timezone from cached settings
+  const userTimezone = settings?.timezone || DEFAULT_TIMEZONE;
+
+  // Check if user is organizer of the calendar event
+  const isOrganizer = note?.calendarEventData?.attendees?.some(
+    a => a.self && a.organizer
+  ) ?? false;
+
+  // Check if Google Doc has been attached
+  const hasGoogleDocAttached = !!note?.googleDocId;
 
   // Fetch note data
   useEffect(() => {
     if (user && noteId) {
       fetchNote();
-      fetchUserTimezone();
     }
   }, [user, noteId]);
 
   const fetchNote = async () => {
     try {
       setIsLoading(true);
-      const res = await authenticatedFetch(`/api/notes/${noteId}`);
+      const res = await authenticatedFetch(`/api/notes/${noteId}?includePrevious=true`);
       if (res.ok) {
         const data = await res.json();
-        setNote(data);
-        setTitle(data.title);
-        setContent(data.content);
-        setTasks(data.tasks || []);
-        setTemplateId(data.templateId);
+        
+        // Handle new response format with currentNote and previousNote
+        const currentNote = data.currentNote || data;
+        const prevNote = data.previousNote || null;
+        
+        setNote(currentNote);
+        setPreviousNote(prevNote);
+        setTitle(currentNote.title);
+        setContent(currentNote.content);
+        setTasks(currentNote.tasks || []);
+        setTemplateId(currentNote.templateId);
         
         // Fetch calendar event if linked
-        if (data.calendarEventId) {
+        if (currentNote.calendarEventId) {
           // For now, we'll just store the event data from the note
           // In a full implementation, you might want to fetch fresh event data
-          if (data.calendarEventLink) {
+          if (currentNote.calendarEventLink) {
             setCalendarEvent({
-              id: data.calendarEventId,
-              summary: data.title, // Fallback
+              id: currentNote.calendarEventId,
+              summary: currentNote.title, // Fallback
               start: new Date().toISOString(),
               end: new Date().toISOString(),
-              htmlLink: data.calendarEventLink,
+              htmlLink: currentNote.calendarEventLink,
             });
           }
         }
@@ -109,20 +134,6 @@ function NoteEditPage() {
     }
   };
 
-  const fetchUserTimezone = async () => {
-    try {
-      const res = await authenticatedFetch('/api/settings');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.timezone) {
-          setUserTimezone(data.timezone);
-        }
-      }
-    } catch (error) {
-      // Use default timezone
-    }
-  };
-
   const handleSave = async () => {
     if (!title.trim()) {
       setAlertDialog({
@@ -136,10 +147,13 @@ function NoteEditPage() {
 
     setIsSaving(true);
     try {
+      // Filter out tasks with empty titles
+      const validTasks = tasks.filter(task => task.title.trim() !== '');
+      
       const noteData: Partial<Note> = {
         title: title.trim(),
         content,
-        tasks,
+        tasks: validTasks,
         templateId,
         calendarEventId: note?.calendarEventId || null,
         calendarEventLink: note?.calendarEventLink || null,
@@ -161,48 +175,105 @@ function NoteEditPage() {
         duration: 3000,
       });
 
-      // If checkbox is enabled and note is linked to calendar, attach it in background
-      if (attachToCalendar && note?.calendarEventId) {
+      // If user checked "Update Google Doc", trigger the attachment/update
+      if (updateGoogleDoc && note?.calendarEventData) {
+        setIsAttaching(true);
         const toastId = showToast({
           type: 'loading',
-          title: 'Attaching to calendar',
-          message: 'Creating Google Doc...',
+          title: hasGoogleDocAttached ? 'Updating Google Doc' : 'Creating Google Doc',
+          message: 'Please wait...',
           duration: 0,
         });
 
-        // Fire and forget
-        authenticatedFetch(`/api/notes/${noteId}/attach-to-calendar`, {
-          method: 'POST',
-        }).then(attachRes => {
+        try {
+          const attachRes = await authenticatedFetch(`/api/notes/${noteId}/attach-to-calendar`, {
+            method: 'POST',
+          });
+
           if (attachRes.ok) {
             updateToast(toastId, {
               type: 'success',
-              title: 'Attached to calendar',
-              message: 'Google Doc created and linked to event',
+              title: hasGoogleDocAttached ? 'Google Doc updated' : 'Google Doc created',
+              message: hasGoogleDocAttached
+                ? 'The document has been updated with your latest changes'
+                : isOrganizer 
+                  ? 'Document created and linked to event' 
+                  : 'Document created and shared with attendees',
               duration: 5000,
             });
           } else {
-            updateToast(toastId, {
-              type: 'error',
-              title: 'Attachment failed',
-              message: 'Note saved but could not attach to calendar',
-              duration: 5000,
-            });
+            throw new Error('Attachment failed');
           }
-        }).catch(() => {
+        } catch (error) {
           updateToast(toastId, {
             type: 'error',
-            title: 'Attachment failed',
-            message: 'Note saved but could not attach to calendar',
+            title: hasGoogleDocAttached ? 'Update failed' : 'Creation failed',
+            message: 'Note saved but could not update the Google Doc',
             duration: 5000,
           });
-        });
-        
-        setAttachToCalendar(false);
+        } finally {
+          setIsAttaching(false);
+        }
       }
       
       setIsEditMode(false);
+      setUpdateGoogleDoc(false); // Reset checkbox
       await fetchNote(); // Refresh data
+      
+      // Create actual tasks in the default project for checked tasks
+      const tasksToCreate = validTasks.filter(task => 
+        task.createInProject === true && 
+        task.owner === user?.email &&
+        !task.createdTaskId // Don't recreate if already created
+      );
+      
+      if (tasksToCreate.length > 0 && settings?.defaultProjectId) {
+        const createPromises = tasksToCreate.map(async (noteTask) => {
+          try {
+            const noteUrl = `${window.location.origin}/notes/${noteId}`;
+            const taskData = {
+              title: noteTask.title,
+              description: `<p>Created from note: <a href="${noteUrl}" target="_blank" rel="noopener noreferrer">${title}</a></p>`,
+              status: 'todo',
+              priority: 'medium',
+              owner: noteTask.owner,
+              deadline: noteTask.deadline,
+              projectId: settings.defaultProjectId,
+              links: [],
+            };
+            
+            const taskRes = await authenticatedFetch('/api/tasks', {
+              method: 'POST',
+              body: JSON.stringify(taskData),
+            });
+            
+            if (taskRes.ok) {
+              const createdTask = await taskRes.json();
+              // Update the note task with the created task ID
+              noteTask.createdTaskId = createdTask.id;
+            }
+          } catch (error) {
+            console.error('Failed to create task:', error);
+          }
+        });
+        
+        await Promise.all(createPromises);
+        
+        if (tasksToCreate.length > 0) {
+          // Update the note with the task IDs
+          await authenticatedFetch(`/api/notes/${noteId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ tasks: validTasks }),
+          });
+          
+          showToast({
+            type: 'success',
+            title: 'Tasks created',
+            message: `${tasksToCreate.length} task${tasksToCreate.length === 1 ? '' : 's'} created in your default project`,
+            duration: 4000,
+          });
+        }
+      }
     } catch (error) {
       showToast({
         type: 'error',
@@ -267,9 +338,21 @@ function NoteEditPage() {
   };
 
   const updateTask = (taskId: string, updates: Partial<NoteTask>) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, ...updates } : task
-    ));
+    setTasks(tasks.map(task => {
+      if (task.id === taskId) {
+        const updatedTask = { ...task, ...updates };
+        // Auto-check createInProject when owner is set to current user
+        if (updates.owner === user?.email && task.owner !== user?.email) {
+          updatedTask.createInProject = true;
+        }
+        // Uncheck if owner is changed away from current user
+        if (updates.owner && updates.owner !== user?.email) {
+          updatedTask.createInProject = false;
+        }
+        return updatedTask;
+      }
+      return task;
+    }));
   };
 
   const removeTask = (taskId: string) => {
@@ -312,37 +395,95 @@ function NoteEditPage() {
                   style={{ color: 'var(--color-text)' }}
                 />
                 {note?.calendarEventData && (
-                  <div className="flex items-center gap-3 text-sm flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={14} className="text-blue-600 flex-shrink-0" />
+                  <div className="flex items-center gap-3 text-sm">
+                    <Calendar size={14} className="text-blue-600 flex-shrink-0" />
+                    
+                    {/* 2x2 Grid Layout */}
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+                      {/* Row 1, Col 1: Date/Time */}
                       <a
                         href={note.calendarEventData.htmlLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
+                        className="text-gray-700 hover:text-blue-600 hover:underline transition-colors"
                       >
                         {format(toZonedTime(new Date(note.calendarEventData.start), userTimezone), 'dd.MM.yyyy, HH:mm')}
                       </a>
-                    </div>
-                    {note.calendarEventData.attendees && note.calendarEventData.attendees.length > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-gray-500">•</span>
-                        <span className="text-gray-600">{note.calendarEventData.attendees.length} attendees</span>
+                      
+                      {/* Row 1, Col 2: Google Doc Badge */}
+                      <div>
+                        {note.googleDocId && note.googleDocUrl && (
+                          <a
+                            href={note.googleDocUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium hover:opacity-80 transition-opacity"
+                            style={{ color: '#166534' }}
+                            title="Open Google Doc"
+                          >
+                            📄 Google Doc
+                          </a>
+                        )}
                       </div>
-                    )}
-                    {(note.calendarEventData.hangoutLink || note.calendarEventData.conferenceData?.entryPoints?.[0]?.uri) && (
-                      <>
-                        <span className="text-gray-500">•</span>
-                        <a
-                          href={note.calendarEventData.hangoutLink || note.calendarEventData.conferenceData?.entryPoints?.[0]?.uri}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          Join Meeting
-                        </a>
-                      </>
-                    )}
+                      
+                      {/* Row 2, Col 1: Attendees */}
+                      <div className="relative group">
+                        {note.calendarEventData.attendees && note.calendarEventData.attendees.length > 0 && (
+                          <>
+                            <span className="text-gray-600 cursor-help">{note.calendarEventData.attendees.length} attendees</span>
+                            
+                            {/* Hover Tooltip */}
+                            <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50 w-64">
+                              <div className="bg-white rounded-lg shadow-lg border p-3" style={{ borderColor: 'var(--color-border)' }}>
+                                <div className="text-xs font-semibold mb-2 text-gray-700">Attendees</div>
+                                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                  {note.calendarEventData.attendees.map((attendee, index) => (
+                                    <div key={index} className="flex items-center justify-between text-xs">
+                                      <span className="text-gray-900">{attendee.displayName || attendee.email}</span>
+                                      <span 
+                                        className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                                        style={{
+                                          backgroundColor:
+                                            attendee.responseStatus === 'accepted' ? '#dcfce7' :
+                                            attendee.responseStatus === 'declined' ? '#fee2e2' :
+                                            attendee.responseStatus === 'tentative' ? '#fef9c3' :
+                                            '#f3f4f6',
+                                          color:
+                                            attendee.responseStatus === 'accepted' ? '#166534' :
+                                            attendee.responseStatus === 'declined' ? '#991b1b' :
+                                            attendee.responseStatus === 'tentative' ? '#854d0e' :
+                                            '#374151',
+                                        }}
+                                      >
+                                        {attendee.responseStatus === 'accepted' ? '✓ Yes' :
+                                         attendee.responseStatus === 'declined' ? '✗ No' :
+                                         attendee.responseStatus === 'tentative' ? '? Maybe' :
+                                         '⋯ No response'}
+                                        {attendee.organizer && ' (Organizer)'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      
+                      {/* Row 2, Col 2: Join Meeting */}
+                      <div>
+                        {(note.calendarEventData.hangoutLink || note.calendarEventData.conferenceData?.entryPoints?.[0]?.uri) && (
+                          <a
+                            href={note.calendarEventData.hangoutLink || note.calendarEventData.conferenceData?.entryPoints?.[0]?.uri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            Join Meeting
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -402,44 +543,6 @@ function NoteEditPage() {
               <UserProfile />
             </div>
           </div>
-          
-          {/* Expandable Attendees Details */}
-          {note?.calendarEventData && note.calendarEventData.attendees && note.calendarEventData.attendees.length > 0 && (
-            <details className="mt-3 ml-12">
-              <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
-                Show attendee details
-              </summary>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {note.calendarEventData.attendees.map((attendee, index) => (
-                  <div
-                    key={index}
-                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs"
-                    style={{
-                      backgroundColor:
-                        attendee.responseStatus === 'accepted' ? '#dcfce7' :
-                        attendee.responseStatus === 'declined' ? '#fee2e2' :
-                        attendee.responseStatus === 'tentative' ? '#fef9c3' :
-                        '#f3f4f6',
-                      color:
-                        attendee.responseStatus === 'accepted' ? '#166534' :
-                        attendee.responseStatus === 'declined' ? '#991b1b' :
-                        attendee.responseStatus === 'tentative' ? '#854d0e' :
-                        '#374151',
-                    }}
-                  >
-                    <span>{attendee.email}</span>
-                    {attendee.organizer && <span className="font-semibold">(Organizer)</span>}
-                    <span className="opacity-70">
-                      {attendee.responseStatus === 'accepted' ? '✓' :
-                       attendee.responseStatus === 'declined' ? '✗' :
-                       attendee.responseStatus === 'tentative' ? '?' :
-                       '⋯'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
         </div>
       </div>
 
@@ -453,32 +556,16 @@ function NoteEditPage() {
               onChange={setContent}
               placeholder="Start taking notes..."
               disabled={!isEditMode}
-              attendees={[]}
+              people={people}
             />
           </div>
 
           {/* Tasks Section */}
-          <div className="rounded-xl border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>
-                Tasks
-              </h3>
-              {isEditMode && (
-                <button
-                  onClick={addTask}
-                  className="px-3 py-1.5 text-sm rounded-md flex items-center gap-2 text-white"
-                  style={{ backgroundColor: 'var(--color-primary)' }}
-                >
-                  <Plus size={14} />
-                  Add Task
-                </button>
-              )}
-            </div>
-
+          <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
             {tasks.length === 0 ? (
               <div
                 onClick={() => isEditMode && addTask()}
-                className={`text-sm text-gray-500 text-center py-8 border-2 border-dashed rounded-lg ${isEditMode ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors' : ''}`}
+                className={`text-sm text-gray-500 text-center py-8 px-6 border-2 border-dashed rounded-lg m-6 ${isEditMode ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors' : ''}`}
                 style={{ borderColor: 'var(--color-border)' }}
               >
                 {isEditMode ? (
@@ -491,135 +578,170 @@ function NoteEditPage() {
                 )}
               </div>
             ) : (
-              <div>
-                <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gray-50 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                        <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          Task Title
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b" style={{ backgroundColor: '#f8fafc', borderColor: 'var(--color-border)' }}>
+                      {isEditMode && (
+                        <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '5%' }} title="Create task in default project">
+                          📋
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          Owner
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          Deadline
-                        </th>
+                      )}
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '50%' }}>
+                        Task Title
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '25%' }}>
+                        Owner
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '20%' }}>
+                        Deadline
+                      </th>
+                      {isEditMode && (
+                        <th className="px-4 py-2.5" style={{ width: '5%' }}></th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tasks.map((task, index) => {
+                      // Check if this task is assigned to the current user
+                      const isMyTask = user?.email && task.owner === user.email;
+                      
+                      return (
+                      <tr
+                        key={task.id}
+                        className="border-b hover:bg-gray-50 transition-colors"
+                        style={{ borderColor: '#f1f5f9' }}
+                      >
                         {isEditMode && (
-                          <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Actions
-                          </th>
+                          <td className="px-4 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={task.createInProject !== false && isMyTask}
+                              onChange={(e) => updateTask(task.id, { createInProject: e.target.checked })}
+                              disabled={!isMyTask}
+                              className="w-4 h-4 rounded border-gray-300"
+                              title={isMyTask ? "Create this task in your default project" : "Only your own tasks can be created in projects"}
+                            />
+                          </td>
+                        )}
+                        <td className="px-4 py-2">
+                          <input
+                            ref={(el) => { taskInputRefs.current[task.id] = el; }}
+                            type="text"
+                            value={task.title}
+                            onChange={(e) => updateTask(task.id, { title: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey && isEditMode && index === tasks.length - 1) {
+                                e.preventDefault();
+                                addTask();
+                              }
+                            }}
+                            placeholder="Task title..."
+                            disabled={!isEditMode}
+                            className="dense-table-input w-full px-2.5 py-1.5 border rounded-md text-sm"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <OwnerSelector
+                            value={task.owner}
+                            onChange={(value) => updateTask(task.id, { owner: value })}
+                            people={people}
+                            disabled={!isEditMode}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <DatePicker
+                            selected={task.deadline ? new Date(task.deadline) : null}
+                            onChange={(date) => updateTask(task.id, { deadline: date ? date.toISOString().split('T')[0] : null })}
+                            dateFormat="dd.MM.yyyy"
+                            placeholderText="dd.mm.yyyy"
+                            className="w-full px-2.5 py-1.5 border rounded-md text-sm"
+                            wrapperClassName="w-full"
+                            calendarClassName="modern-calendar"
+                            popperClassName="datepicker-popper"
+                            disabled={!isEditMode}
+                            isClearable
+                          />
+                        </td>
+                        {isEditMode && (
+                          <td className="px-4 py-2">
+                            <button
+                              onClick={() => removeTask(task.id)}
+                              className="w-7 h-7 flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
+                              title="Remove task"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
                         )}
                       </tr>
-                    </thead>
-                    <tbody>
-                      {tasks.map((task, index) => (
-                        <tr
-                          key={task.id}
-                          className="border-b"
-                          style={{ borderColor: 'var(--color-border)' }}
-                        >
-                          <td className="px-4 py-3">
-                            <input
-                              ref={(el) => { taskInputRefs.current[task.id] = el; }}
-                              type="text"
-                              value={task.title}
-                              onChange={(e) => updateTask(task.id, { title: e.target.value })}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && isEditMode && index === tasks.length - 1) {
-                                  e.preventDefault();
-                                  addTask();
-                                }
-                              }}
-                              placeholder="Task title..."
-                              disabled={!isEditMode}
-                              className="w-full px-2 py-1 border rounded text-sm"
-                              style={{ borderColor: 'var(--color-border)' }}
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="text"
-                              value={task.owner}
-                              onChange={(e) => updateTask(task.id, { owner: e.target.value })}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && isEditMode && index === tasks.length - 1) {
-                                  e.preventDefault();
-                                  addTask();
-                                }
-                              }}
-                              placeholder="Owner..."
-                              disabled={!isEditMode}
-                              className="w-full px-2 py-1 border rounded text-sm"
-                              style={{ borderColor: 'var(--color-border)' }}
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="date"
-                              value={task.deadline || ''}
-                              onChange={(e) => updateTask(task.id, { deadline: e.target.value || null })}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && isEditMode && index === tasks.length - 1) {
-                                  e.preventDefault();
-                                  addTask();
-                                }
-                              }}
-                              disabled={!isEditMode}
-                              className="w-full px-2 py-1 border rounded text-sm"
-                              style={{ borderColor: 'var(--color-border)' }}
-                            />
-                          </td>
-                          {isEditMode && (
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                onClick={() => removeTask(task.id)}
-                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                title="Remove task"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {isEditMode && (
-                  <div
-                    onClick={addTask}
-                    className="mt-2 py-4 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2 text-sm text-gray-500"
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    <Plus size={16} />
-                    <span>Click here or press Enter to add another task</span>
-                  </div>
-                )}
+                    )})}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            {/* Add Row - Dashed Border Row */}
+            {isEditMode && tasks.length > 0 && (
+              <div
+                onClick={addTask}
+                className="border-t-2 border-dashed px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm text-gray-500"
+                style={{ borderColor: 'var(--color-border)' }}
+              >
+                <Plus size={16} />
+                <span>Click here or press Enter to add another task</span>
               </div>
             )}
           </div>
 
-          {/* Calendar Attachment Option */}
-          {isEditMode && note?.calendarEventId && (
-            <div className="rounded-xl border p-4" style={{ backgroundColor: '#f0f9ff', borderColor: '#bfdbfe' }}>
-              <div className="flex items-center gap-3">
+          {/* Previous Meeting Section - Only show if there's a previous note */}
+          {previousNote && (
+            <PreviousMeetingSection 
+              previousNote={previousNote}
+              userTimezone={userTimezone}
+            />
+          )}
+
+          {/* Create/Update Google Doc Checkbox - Only show when editing and calendar event is linked */}
+          {isEditMode && note?.calendarEventData && (
+            <div className="rounded-xl border p-5" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <label className="flex items-start gap-3 cursor-pointer group">
                 <input
                   type="checkbox"
-                  id="attach-to-calendar"
-                  checked={attachToCalendar}
-                  onChange={(e) => setAttachToCalendar(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                  checked={updateGoogleDoc}
+                  onChange={(e) => setUpdateGoogleDoc(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
                 />
-                <label 
-                  htmlFor="attach-to-calendar"
-                  className="text-sm font-medium cursor-pointer select-none flex items-center gap-2"
-                  style={{ color: '#1e40af' }}
-                >
-                  <Calendar size={14} />
-                  <span>Attach to calendar event on save (creates Google Doc)</span>
-                </label>
-              </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900 group-hover:text-gray-700 transition-colors">
+                    {hasGoogleDocAttached 
+                      ? 'Update existing Google Doc with latest changes'
+                      : 'Create and attach Google Doc to calendar event'}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {hasGoogleDocAttached ? (
+                      <>
+                        The Google Doc will be updated with your latest note content.
+                        {note.googleDocUrl && (
+                          <> <a 
+                            href={note.googleDocUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            View document →
+                          </a></>
+                        )}
+                      </>
+                    ) : (
+                      isOrganizer 
+                        ? 'A Google Doc will be created and linked to the calendar event description. All attendees will have comment access.'
+                        : 'A Google Doc will be created and shared with all attendees. You are not the organizer, so it cannot be added to the event description.'
+                    )}
+                  </div>
+                </div>
+              </label>
             </div>
           )}
         </div>
@@ -643,8 +765,6 @@ function NoteEditPage() {
         type="danger"
       />
 
-      {/* Toast Notifications */}
-      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

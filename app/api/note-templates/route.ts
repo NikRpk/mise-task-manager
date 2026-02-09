@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       
       const newTemplate: Omit<NoteTemplate, 'id'> = {
         name: body.name || 'Untitled Template',
-        sections: body.sections || [],
+        content: body.content || '',
         createdBy: user.uid,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

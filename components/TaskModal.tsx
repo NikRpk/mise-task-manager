@@ -4,20 +4,25 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Plus, Trash2, Send, Edit2, Check, Share2 } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { Task, SubTask, TaskStatus, Priority, Comment, CustomField, StatusOption, PriorityOption } from '@/types';
-import RichTextEditor from './RichTextEditor';
+import TipTapEditor from './TipTapEditor';
 import AlertDialog from './AlertDialog';
 import InputDialog from './InputDialog';
+import ConfirmDialog from './ConfirmDialog';
 import { debounce } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { AUTO_SAVE_DELAY_MS, TOAST_DURATION_MS, DEFAULT_PROJECT_ICON } from '@/lib/constants';
 import { logger } from '@/lib/logger';
+import OwnerSelector from './OwnerSelector';
+import { usePeopleData } from '@/hooks/usePeopleData';
 
 interface TaskModalProps {
   task: Task | null;
   isOpen: boolean;
   onClose: () => void;
   onSave: (task: Partial<Task>) => void;
+  onDelete?: (taskId: string) => void; // Optional callback for deletion
+  onUpdate?: (taskId: string, updates: Partial<Task>) => void; // Optional callback for optimistic updates
   projects: { id: string; name: string }[];
   defaultProjectId?: string; // Add default project context
 }
@@ -28,8 +33,9 @@ const priorityColors: Record<Priority, { bg: string; text: string; border: strin
   low: { bg: '#f0fdf4', text: '#00a61c', border: '#bbf7d0' },
 };
 
-export default function TaskModal({ task, isOpen, onClose, onSave, projects, defaultProjectId }: TaskModalProps) {
+export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onUpdate, projects, defaultProjectId }: TaskModalProps) {
   const { user } = useAuth();
+  const { people } = usePeopleData();
   const [formData, setFormData] = useState<Partial<Task>>({
     title: '',
     description: '',
@@ -56,6 +62,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState('');
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'warning' | 'info' | 'success' }>({ isOpen: false, title: '', message: '', type: 'info' });
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState(false);
   
   // Input dialog states
   const [inputDialog, setInputDialog] = useState<{ isOpen: boolean; title: string; placeholder: string; defaultValue: string; onConfirm: (value: string) => void }>({
@@ -70,6 +77,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Refs to avoid stale closures
   const taskRef = useRef<Task | null>(task);
@@ -94,9 +102,21 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
     setSaveError(null);
     
     try {
+      // Ensure we're sending the complete task data with updates
+      const taskToSave = {
+        ...taskRef.current,
+        ...data,
+        id: taskRef.current.id, // Ensure ID is preserved
+      };
+      
+      // Optimistically update the parent's task list immediately
+      if (onUpdate && taskRef.current.id) {
+        onUpdate(taskRef.current.id, data);
+      }
+      
       await authenticatedFetch(`/api/tasks/${taskRef.current.id}`, {
         method: 'PUT',
-        body: JSON.stringify(data),
+        body: JSON.stringify(taskToSave),
       });
       setHasUnsavedChanges(false);
     } catch (error) {
@@ -115,7 +135,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
       setIsSaving(false);
       saveInProgressRef.current = false;
     }
-  }, []);
+  }, [onUpdate]);
 
   // Debounced auto-save function with stable reference
   const debouncedSave = useRef(
@@ -210,6 +230,25 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
     };
   }, [isOpen]);
 
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        // Don't close if we're in edit mode for title or if dialogs are open
+        if (!isEditingTitle && !alertDialog.isOpen && !inputDialog.isOpen && !deleteConfirmDialog) {
+          handleClose();
+        }
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscKey);
+      return () => {
+        document.removeEventListener('keydown', handleEscKey);
+      };
+    }
+  }, [isOpen, isEditingTitle, alertDialog.isOpen, inputDialog.isOpen, deleteConfirmDialog]);
+
   // Update formData and trigger auto-save
   const updateFormData = (updates: Partial<Task>) => {
     const newData = { ...formData, ...updates };
@@ -270,6 +309,46 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
         message: `Copy this link to share:\n\n${shareUrl}`,
         type: 'info',
       });
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!task) return;
+
+    setIsDeleting(true);
+
+    try {
+      const response = await authenticatedFetch(`/api/tasks/${task.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete task');
+      }
+
+      logger.info('Task deleted successfully', { taskId: task.id });
+
+      // Call the onDelete callback if provided
+      if (onDelete) {
+        onDelete(task.id);
+      }
+
+      // Close the modal
+      onClose();
+    } catch (error) {
+      logger.error('Failed to delete task', error as Error, {
+        taskId: task.id,
+      });
+
+      setAlertDialog({
+        isOpen: true,
+        title: 'Delete Failed',
+        message: error instanceof Error ? error.message : 'Failed to delete task. Please try again.',
+        type: 'error',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -485,15 +564,16 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
   };
 
   return (
-    <div
-      className="fixed inset-0 flex items-center justify-center z-[100] p-4 overflow-y-auto"
-      style={{
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-      }}
-      onClick={handleClose}
-    >
+    <>
+      <div
+        className="fixed inset-0 flex items-center justify-center z-[100] p-4 overflow-y-auto"
+        style={{
+          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+        }}
+        onClick={handleClose}
+      >
       <div
         className="bg-surface rounded-lg w-full max-w-7xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -506,7 +586,18 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
           className="sticky top-0 bg-surface px-8 py-2 z-10"
           style={{ borderBottom: '2px solid #e2e8f0' }}
         >
-          <div className="flex justify-between items-center">
+          {/* Close button - absolutely positioned in top right */}
+          <button
+            onClick={handleClose}
+            type="button"
+            className="absolute top-2 right-2 p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 hover:shadow-md transition-all cursor-pointer z-20"
+            style={{ color: 'var(--color-text-secondary)' }}
+            title="Close"
+          >
+            <X size={20} />
+          </button>
+
+          <div className="flex justify-between items-center pr-12">
             <div className="flex-1">
               {task ? (
                 isEditingTitle ? (
@@ -554,22 +645,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
                 </h2>
               )}
               {task && (
-                <div className="flex gap-4 text-xs items-center" style={{ color: 'var(--color-text-secondary)' }}>
-                  <div className="flex items-center gap-2">
-                    <span>🎯</span>
-                    <select
-                      value={formData.projectId || ''}
-                      onChange={(e) => updateFormData({ projectId: e.target.value })}
-                      className="border-0 bg-transparent text-xs font-medium cursor-pointer hover:underline focus:outline-none"
-                      style={{ color: 'var(--color-text-secondary)' }}
-                    >
-                      <option value="">No Project</option>
-                      {projects.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <span>•</span>
+                <div className="flex gap-3 text-xs px-2" style={{ color: 'var(--color-text-secondary)' }}>
                   <span>Created {task.createdAt ? new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}</span>
                   <span>•</span>
                   <span>Last updated {task.updatedAt ? new Date(task.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' }) : 'N/A'}</span>
@@ -609,38 +685,54 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
                   <Share2 size={16} />
                   <span className="text-sm font-medium">Share</span>
                 </button>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDeleteConfirmDialog(true);
+                  }}
+                  type="button"
+                  disabled={isDeleting}
+                  className="flex items-center gap-2 px-3 py-1 rounded-md transition-colors hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ color: '#f30047' }}
+                  title="Delete task"
+                >
+                  <Trash2 size={16} />
+                  <span className="text-sm font-medium">
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </span>
+                </button>
                 <div className="flex gap-4">
-                  {/* Complete % - Only show if there are sub-tasks */}
-                  {formData.subTasks && formData.subTasks.length > 0 && (
-                    <div className="text-center px-4 py-2 bg-surface border rounded-lg" style={{ borderColor: 'var(--color-border)' }}>
-                      <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                        {Math.round(((formData.subTasks.filter(st => st.completed).length || 0) / formData.subTasks.length) * 100)}%
+                  {/* Days Left/Overdue - Only show if there's a deadline */}
+                  {formData.deadline && (() => {
+                    const daysRemaining = Math.ceil((new Date(formData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                    const isOverdue = daysRemaining < 0;
+                    const daysCount = Math.abs(daysRemaining);
+                    
+                    return (
+                      <div className="text-center px-4 py-2 bg-surface border rounded-lg" style={{ borderColor: isOverdue ? '#fecaca' : 'var(--color-border)', backgroundColor: isOverdue ? '#fef2f2' : undefined }}>
+                        {isOverdue ? (
+                          <>
+                            <div className="text-[10px] uppercase tracking-wide font-semibold mb-0.5" style={{ color: '#f30047' }}>Overdue</div>
+                            <div className="text-sm font-bold" style={{ color: '#f30047' }}>
+                              {daysCount} day{daysCount !== 1 ? 's' : ''}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
+                              {daysCount}d
+                            </div>
+                            <div className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>Left</div>
+                          </>
+                        )}
                       </div>
-                      <div className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>Complete</div>
-                    </div>
-                  )}
-                  {/* Days Left - Only show if there's a deadline */}
-                  {formData.deadline && (
-                    <div className="text-center px-4 py-2 bg-surface border rounded-lg" style={{ borderColor: 'var(--color-border)' }}>
-                      <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                        {Math.ceil((new Date(formData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))}d
-                      </div>
-                      <div className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>Left</div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
             )}
             <div className="flex items-center gap-3 ml-6">
-              <button
-                onClick={handleClose}
-                type="button"
-                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 hover:shadow-md transition-all cursor-pointer"
-                style={{ color: 'var(--color-text-secondary)' }}
-                title="Close"
-              >
-                <X size={20} />
-              </button>
             </div>
           </div>
         </div>
@@ -655,17 +747,24 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
                   <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text)' }}>
                     Title
                   </label>
-                  <input
-                    type="text"
+                  <textarea
                     value={formData.title || ''}
-                    onChange={(e) => updateFormData({ title: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-all"
+                    onChange={(e) => {
+                      updateFormData({ title: e.target.value });
+                      // Auto-resize
+                      e.target.style.height = 'auto';
+                      e.target.style.height = e.target.scrollHeight + 'px';
+                    }}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-all resize-none overflow-hidden"
                     style={{
                       borderColor: 'var(--color-border)',
+                      minHeight: '42px',
+                      maxHeight: '200px',
                     }}
                     onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px var(--color-primary)'}
                     onBlur={(e) => e.target.style.boxShadow = ''}
-                    placeholder="Enter task title"
+                    placeholder="Task title..."
+                    rows={1}
                     required
                   />
                 </div>
@@ -676,11 +775,16 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
                 <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text)' }}>
                   Description
                 </label>
-                <RichTextEditor
-                  value={formData.description || ''}
-                  onChange={(value) => updateFormData({ description: value })}
-                  placeholder="Task description (supports rich text formatting)"
-                />
+                {isOpen && (
+                  <TipTapEditor
+                    key={task?.id || 'new-task'}
+                    value={formData.description || ''}
+                    onChange={(value) => updateFormData({ description: value })}
+                    placeholder="Task description (supports rich text formatting and @mentions)"
+                    people={people}
+                    disabled={false}
+                  />
+                )}
               </div>
 
               {/* Sub-tasks - Table Format */}
@@ -690,25 +794,6 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
                     <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text)', letterSpacing: '0.5px' }}>
                       Sub-tasks ({formData.subTasks?.length || 0})
                     </label>
-                    
-                    {/* Progress Bar - Inline */}
-                    {formData.subTasks && formData.subTasks.length > 0 && (
-                      <div className="flex items-center gap-2 flex-1">
-                        <div style={{ flex: 1, height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden', maxWidth: '200px' }}>
-                          <div 
-                            style={{ 
-                              height: '100%', 
-                              background: 'linear-gradient(90deg, var(--color-primary) 0%, var(--color-success) 100%)',
-                              width: `${(formData.subTasks.filter(st => st.completed).length / formData.subTasks.length) * 100}%`,
-                              transition: 'width 0.3s ease'
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs font-medium" style={{ color: 'var(--color-primary)', minWidth: '50px' }}>
-                          {formData.subTasks.filter(st => st.completed).length}/{formData.subTasks.length}
-                        </span>
-                      </div>
-                    )}
                   </div>
                   <button
                     type="button"
@@ -975,6 +1060,93 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
                     </div>
                   )}
 
+                  {/* Project */}
+                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                      Project
+                    </label>
+                    <select
+                      value={formData.projectId || ''}
+                      onChange={(e) => {
+                        const newProjectId = e.target.value;
+                        
+                        // Reload project settings when project changes
+                        if (newProjectId) {
+                          authenticatedFetch(`/api/projects/${newProjectId}/settings`)
+                            .then(res => {
+                              if (!res.ok) throw new Error('Failed to fetch settings');
+                              return res.json();
+                            })
+                            .then(data => {
+                              const newStatusOptions = data.statusOptions || [];
+                              const newPriorityOptions = data.priorityOptions || [];
+                              const newCustomFields = data.customFields || [];
+
+                              // Update options
+                              if (Array.isArray(newStatusOptions)) {
+                                setStatusOptions(newStatusOptions);
+                              }
+                              if (Array.isArray(newPriorityOptions)) {
+                                setPriorityOptions(newPriorityOptions);
+                              }
+                              if (Array.isArray(newCustomFields)) {
+                                setCustomFields(newCustomFields);
+                              }
+
+                              // Check if current field values exist in new project's options
+                              const updatedFormData: Partial<Task> = { projectId: newProjectId };
+
+                              // Clear status if it doesn't exist in new project
+                              if (formData.status && !newStatusOptions.find((opt: StatusOption) => opt.id === formData.status)) {
+                                updatedFormData.status = newStatusOptions[0]?.id || 'todo';
+                                logger.info('Cleared incompatible status when moving to new project', {
+                                  oldStatus: formData.status,
+                                  newStatus: updatedFormData.status,
+                                  newProjectId,
+                                });
+                              }
+
+                              // Clear priority if it doesn't exist in new project
+                              if (formData.priority && !newPriorityOptions.find((opt: PriorityOption) => opt.id === formData.priority)) {
+                                updatedFormData.priority = newPriorityOptions[0]?.id || 'medium';
+                                logger.info('Cleared incompatible priority when moving to new project', {
+                                  oldPriority: formData.priority,
+                                  newPriority: updatedFormData.priority,
+                                  newProjectId,
+                                });
+                              }
+
+                              // Clear custom fields if they don't exist in new project
+                              // (Assuming customFields is an object with field IDs as keys)
+                              // This would need to be adjusted based on your actual custom fields structure
+
+                              // Apply all updates at once
+                              updateFormData(updatedFormData);
+                            })
+                            .catch((error) => {
+                              logger.error('Failed to fetch project settings after project change', error as Error, {
+                                projectId: newProjectId,
+                              });
+                              // Still update the projectId even if settings fetch fails
+                              updateFormData({ projectId: newProjectId });
+                            });
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-md focus:outline-none text-sm font-medium"
+                      style={{
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        border: '2px solid var(--color-primary)',
+                      }}
+                    >
+                      {projects.map(project => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Status */}
                   <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
@@ -1068,17 +1240,15 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
                       Owner
                     </label>
-                    <input
-                      type="text"
-                      value={formData.owner || ''}
-                      onChange={(e) => updateFormData({ owner: e.target.value })}
-                      className="w-full px-3 py-2 border-0 rounded-md focus:outline-none text-sm font-medium"
-                      style={{
-                        background: '#ffffff',
-                        color: 'var(--color-text)',
-                      }}
-                      placeholder="Task owner"
-                    />
+                    {isOpen && (
+                      <OwnerSelector
+                        key={`owner-${task?.id || 'new'}-${people.length}`}
+                        value={formData.owner || ''}
+                        onChange={(value) => updateFormData({ owner: value })}
+                        people={people}
+                        disabled={false}
+                      />
+                    )}
                   </div>
 
                   {/* Links */}
@@ -1098,29 +1268,35 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
                       </button>
                     </div>
                     <div className="space-y-2">
-                      {formData.links?.map((link, idx) => (
-                        <div key={idx} className="flex items-center gap-2 p-2 rounded-md" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                          <a
-                            href={link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 truncate transition-colors text-xs"
-                            style={{
-                              color: '#009646',
-                            }}
-                          >
-                            {link}
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => removeLink(idx)}
-                            className="transition-colors"
-                            style={{ color: '#f30047' }}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      ))}
+                      {formData.links?.map((link, idx) => {
+                        // Handle both string links and object links {url, label}
+                        const linkUrl = typeof link === 'string' ? link : (link as any).url || '';
+                        const linkLabel = typeof link === 'string' ? link : (link as any).label || linkUrl;
+                        
+                        return (
+                          <div key={idx} className="flex items-center gap-2 p-2 rounded-md" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                            <a
+                              href={linkUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 truncate transition-colors text-xs"
+                              style={{
+                                color: '#009646',
+                              }}
+                            >
+                              {linkLabel}
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => removeLink(idx)}
+                              className="transition-colors"
+                              style={{ color: '#f30047' }}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -1290,5 +1466,26 @@ export default function TaskModal({ task, isOpen, onClose, onSave, projects, def
         defaultValue={inputDialog.defaultValue}
       />
     </div>
+
+    {/* Delete Confirmation Dialog - Rendered outside modal with higher z-index */}
+    {deleteConfirmDialog && (
+      <div style={{ position: 'relative', zIndex: 150 }}>
+        <ConfirmDialog
+          isOpen={deleteConfirmDialog}
+          onClose={() => {
+            setDeleteConfirmDialog(false);
+          }}
+          onConfirm={() => {
+            handleDeleteTask();
+          }}
+          title="Delete Task"
+          message="Are you sure you want to delete this task? This action cannot be undone and all associated data will be permanently removed."
+          confirmText="Delete Task"
+          cancelText="Cancel"
+          type="danger"
+        />
+      </div>
+    )}
+    </>
   );
 }

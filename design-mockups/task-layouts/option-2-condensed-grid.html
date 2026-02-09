@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Option 2: Condensed Grid</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #fffdfa;
+      color: #0f172a;
+      padding: 40px 20px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .back-link {
+      display: inline-block;
+      color: #009646;
+      text-decoration: none;
+      margin-bottom: 24px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .add-btn {
+      background: #ff5c00;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .add-btn:hover {
+      background: #e54e00;
+    }
+
+    .tasks-card {
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      padding: 16px;
+    }
+
+    .task-item {
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      transition: background 0.15s;
+      position: relative;
+    }
+
+    .task-item:hover {
+      background: #f8fafc;
+    }
+
+    .task-title-row {
+      margin-bottom: 10px;
+    }
+
+    .task-title-row input {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+
+    .task-title-row input:focus {
+      outline: none;
+      border-color: #009646;
+    }
+
+    .task-title-row input::placeholder {
+      color: #94a3b8;
+    }
+
+    .task-meta-row {
+      display: grid;
+      grid-template-columns: 1fr 180px 40px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .owner-select {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      width: 100%;
+      background: white;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .owner-select:focus {
+      outline: none;
+      border-color: #009646;
+    }
+
+    .task-meta-row input[type="date"] {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      width: 100%;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .task-meta-row input[type="date"]:focus {
+      outline: none;
+      border-color: #009646;
+    }
+
+    .delete-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .delete-btn:hover {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+
+    .add-row {
+      border: 2px dashed #e2e8f0;
+      border-radius: 6px;
+      padding: 12px;
+      text-align: center;
+      color: #64748b;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-top: 8px;
+    }
+
+    .add-row:hover {
+      border-color: #009646;
+      color: #009646;
+      background: #f0fdf4;
+    }
+
+    @media (max-width: 768px) {
+      .task-meta-row {
+        grid-template-columns: 1fr;
+      }
+
+      .delete-btn {
+        position: absolute;
+        right: 12px;
+        top: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="index.html" class="back-link">← Back to all options</a>
+
+    <div class="header">
+      <h1>TASKS</h1>
+      <button class="add-btn">+ Add Task</button>
+    </div>
+
+    <div class="tasks-card">
+      <!-- Sample Tasks -->
+      <div class="task-item">
+        <div class="task-title-row">
+          <input type="text" placeholder="Task title..." value="Review Q1 marketing proposals">
+        </div>
+        <div class="task-meta-row">
+          <select class="owner-select">
+            <option>Niklas Röpke</option>
+            <option>Sarah Schmidt</option>
+            <option>Max Weber</option>
+          </select>
+          <input type="date" value="2026-02-15">
+          <button class="delete-btn">🗑️</button>
+        </div>
+      </div>
+
+      <div class="task-item">
+        <div class="task-title-row">
+          <input type="text" placeholder="Task title..." value="Update team documentation">
+        </div>
+        <div class="task-meta-row">
+          <select class="owner-select">
+            <option>Niklas Röpke</option>
+          </select>
+          <input type="date" value="2026-02-10">
+          <button class="delete-btn">🗑️</button>
+        </div>
+      </div>
+
+      <div class="task-item">
+        <div class="task-title-row">
+          <input type="text" placeholder="Task title..." value="Schedule client meetings for February">
+        </div>
+        <div class="task-meta-row">
+          <select class="owner-select">
+            <option>Sarah Schmidt</option>
+          </select>
+          <input type="date" value="2026-02-08">
+          <button class="delete-btn">🗑️</button>
+        </div>
+      </div>
+
+      <div class="task-item">
+        <div class="task-title-row">
+          <input type="text" placeholder="Task title..." value="Prepare sprint planning deck">
+        </div>
+        <div class="task-meta-row">
+          <select class="owner-select">
+            <option>Max Weber</option>
+          </select>
+          <input type="date" value="2026-02-12">
+          <button class="delete-btn">🗑️</button>
+        </div>
+      </div>
+
+      <div class="task-item">
+        <div class="task-title-row">
+          <input type="text" placeholder="Task title..." value="Review and merge pending PRs">
+        </div>
+        <div class="task-meta-row">
+          <select class="owner-select">
+            <option>Niklas Röpke</option>
+          </select>
+          <input type="date" value="2026-02-07">
+          <button class="delete-btn">🗑️</button>
+        </div>
+      </div>
+
+      <div class="add-row">
+        + Click here or press Enter to add another task
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { AlertTriangle, Info, CheckCircle2, XCircle, X } from 'lucide-react';
 
 interface AlertDialogProps {
@@ -19,6 +20,21 @@ export default function AlertDialog({
   type = 'info',
   confirmText = 'OK',
 }: AlertDialogProps) {
+  // Handle Enter key to close
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const iconColors = {

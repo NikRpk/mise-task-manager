@@ -4,18 +4,35 @@ import { useDroppable } from '@dnd-kit/core';
 import { Task } from '@/types';
 import TaskCard from './TaskCard';
 import { KANBAN_COLUMN_MIN_HEIGHT } from '@/lib/constants';
+import { memo } from 'react';
 
 interface KanbanColumnProps {
   id: string;
   title: string;
   tasks: Task[];
   onTaskClick: (task: Task) => void;
+  onQuickComplete?: (taskId: string) => void;
   color?: string;
   viewMode?: 'normal' | 'compact';
   canEdit?: boolean;
+  showOwner?: boolean;
+  showPriority?: boolean;
+  showDueDate?: boolean;
 }
 
-export default function KanbanColumn({ id, title, tasks, onTaskClick, color, viewMode = 'normal', canEdit = true }: KanbanColumnProps) {
+const KanbanColumn = memo(function KanbanColumn({ 
+  id, 
+  title, 
+  tasks, 
+  onTaskClick, 
+  onQuickComplete, 
+  color, 
+  viewMode = 'normal', 
+  canEdit = true, 
+  showOwner = false,
+  showPriority = true,
+  showDueDate = true,
+}: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id,
     disabled: !canEdit,
@@ -35,18 +52,19 @@ export default function KanbanColumn({ id, title, tasks, onTaskClick, color, vie
   return (
     <div
       ref={setNodeRef}
-      className={`bg-surface rounded-xl border shadow-sm transition-all duration-200 ${
+      className={`bg-surface rounded-xl border shadow-sm transition-all duration-200 flex-shrink-0 flex flex-col ${
         isOver ? 'ring-2 ring-offset-2 scale-[1.02]' : ''
       }`}
       style={{ 
-        minHeight: KANBAN_COLUMN_MIN_HEIGHT,
+        height: '100%',
+        width: '280px',
         borderColor: isOver ? columnColor : '#e2e8f0',
         ringColor: isOver ? columnColor : undefined,
         backgroundColor: isOver ? '#fafbfc' : 'white',
       }}
     >
       <div 
-        className="flex items-center justify-between px-5 py-4" 
+        className="flex items-center justify-between px-5 py-4 flex-shrink-0" 
         style={{ 
           borderBottom: `3px solid ${columnColor}`,
           background: color ? `linear-gradient(135deg, rgba(${hexToRgb(color)}, 0.03) 0%, rgba(${hexToRgb(color)}, 0.01) 100%)` : 'linear-gradient(135deg, rgba(var(--color-primary-rgb, 0, 150, 70), 0.03) 0%, rgba(var(--color-primary-rgb, 0, 150, 70), 0.01) 100%)'
@@ -65,18 +83,41 @@ export default function KanbanColumn({ id, title, tasks, onTaskClick, color, vie
           {tasks.length}
         </span>
       </div>
-      <div className={viewMode === 'compact' ? 'p-2 space-y-1.5' : 'p-3.5 space-y-3'}>
+      <div className={`flex-1 ${viewMode === 'compact' ? 'p-2 space-y-1.5' : 'p-3.5 space-y-3'} overflow-y-auto`}>
         {tasks.map(task => (
           <TaskCard
             key={task.id}
             task={task}
             onClick={() => onTaskClick(task)}
+            onQuickComplete={onQuickComplete}
             statusColor={columnColor}
             viewMode={viewMode}
             canDrag={canEdit}
+            showOwner={showOwner}
+            showPriority={showPriority}
+            showDueDate={showDueDate}
           />
         ))}
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Only re-render if tasks array changed, or column config changed
+  return (
+    prevProps.id === nextProps.id &&
+    prevProps.title === nextProps.title &&
+    prevProps.tasks.length === nextProps.tasks.length &&
+    prevProps.tasks.every((task, idx) => 
+      task.id === nextProps.tasks[idx]?.id && 
+      task.updatedAt === nextProps.tasks[idx]?.updatedAt
+    ) &&
+    prevProps.color === nextProps.color &&
+    prevProps.viewMode === nextProps.viewMode &&
+    prevProps.canEdit === nextProps.canEdit &&
+    prevProps.showOwner === nextProps.showOwner &&
+    prevProps.showPriority === nextProps.showPriority &&
+    prevProps.showDueDate === nextProps.showDueDate
+  );
+});
+
+export default KanbanColumn;
