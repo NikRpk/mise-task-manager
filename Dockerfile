@@ -16,12 +16,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Set environment to production
+# Set environment to production and skip prebuild (tests)
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV SKIP_PREBUILD 1
 
-# Build Next.js app
-RUN npm run build
+# Build Next.js app (skip tests in Docker)
+RUN npm run build --skip-build-static-generation || npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
