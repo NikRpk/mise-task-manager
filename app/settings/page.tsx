@@ -2464,7 +2464,7 @@ function SettingsContent() {
                     No custom fields yet. Add fields to collect additional information on tasks.
                   </p>
                 ) : (
-                  {(projectSettings.customFields || []).map((field) => (
+                  (projectSettings.customFields || []).map((field) => (
                     <div
                       key={field.id}
                       className="p-4 border rounded-lg space-y-3"
