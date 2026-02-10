@@ -36,8 +36,7 @@ gcloud run deploy $SERVICE_NAME \
   --cpu=1 \
   --min-instances=0 \
   --max-instances=10 \
-  --timeout=60s \
-  --service-account=firebase-adminsdk-8jn3k@dach-ai-mvps.iam.gserviceaccount.com
+  --timeout=60s
 
 echo ""
 echo "✅ Deployment complete!"
