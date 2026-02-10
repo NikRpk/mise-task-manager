@@ -14,7 +14,7 @@ interface TaskDetailsProps {
   isNewTask: boolean;
   status: TaskStatus;
   priority: Priority;
-  deadline: string | null;
+  deadline: string | null | undefined;
   owner: string;
   projectId: string;
   links: string[];

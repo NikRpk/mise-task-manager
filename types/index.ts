@@ -46,8 +46,12 @@ export interface Project {
   id: string;
   name: string;
   description: string;
+  icon?: string;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string;
+  members?: ProjectMember[];
+  settings?: ProjectSettings;
 }
 
 export type ProjectRole = 'VIEW' | 'EDIT' | 'ADMIN';

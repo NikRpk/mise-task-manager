@@ -174,7 +174,7 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
     editorRef.current.focus();
     
     try {
-      document.execCommand(command, false, value || null);
+      document.execCommand(command, false, value || undefined);
       updateContent();
       setTimeout(() => checkActiveFormats(), 10);
     } catch (error) {
@@ -321,7 +321,11 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
             blockElement = el;
           }
         }
-        currentNode = currentNode.parentNode;
+        if (currentNode.parentNode) {
+          currentNode = currentNode.parentNode;
+        } else {
+          break;
+        }
       }
       
       if (codeBlockElement) {

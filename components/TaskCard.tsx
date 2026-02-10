@@ -166,7 +166,7 @@ const TaskCard = memo(function TaskCard({
         {/* Drag area - covers most of the card */}
         {canDrag && (
           <div
-            ref={setActivatorNodeRef}
+            ref={setNodeRef}
             {...listeners}
             {...attributes}
             className="absolute inset-0 z-0"

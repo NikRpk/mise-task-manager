@@ -14,7 +14,7 @@ interface TaskHeaderProps {
   title: string;
   projectId: string;
   projects: { id: string; name: string }[];
-  deadline: string | null;
+  deadline: string | null | undefined;
   isSaving: boolean;
   saveError: string | null;
   onClose: () => void;
