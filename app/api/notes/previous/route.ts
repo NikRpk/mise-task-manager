@@ -48,10 +48,11 @@ export async function GET(request: NextRequest) {
         
         if (!previousNotesQuery.empty) {
           const previousNoteDoc = previousNotesQuery.docs[0];
+          const previousNoteData = previousNoteDoc.data();
           const previousNote = {
             id: previousNoteDoc.id,
-            ...previousNoteDoc.data()
-          };
+            ...previousNoteData
+          } as { id: string; title?: string; recurringInstanceDate?: string };
           
           console.log('[PREVIOUS NOTE API] Found previous note:', {
             id: previousNote.id,

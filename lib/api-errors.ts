@@ -10,7 +10,7 @@ import { logger } from './logger';
 interface ErrorResponse {
   error: string;
   code: string;
-  details?: any;
+  details?: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -20,7 +20,7 @@ interface ErrorResponse {
  * @param context Additional context for logging
  * @returns NextResponse with appropriate status code and error message
  */
-export function handleApiError(error: unknown, context?: Record<string, any>): NextResponse {
+export function handleApiError(error: unknown, context?: Record<string, unknown>): NextResponse {
   const timestamp = new Date().toISOString();
 
   // Handle known AppError instances
@@ -80,10 +80,10 @@ export function handleApiError(error: unknown, context?: Record<string, any>): N
  * @param handler The API route handler function
  * @returns Wrapped handler with automatic error handling
  */
-export function withErrorHandling<T extends (...args: any[]) => Promise<NextResponse>>(
+export function withErrorHandling<T extends (...args: unknown[]) => Promise<NextResponse>>(
   handler: T
 ): T {
-  return (async (...args: any[]) => {
+  return (async (...args: unknown[]) => {
     try {
       return await handler(...args);
     } catch (error) {

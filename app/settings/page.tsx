@@ -322,7 +322,11 @@ function SettingsContent() {
       const res = await authenticatedFetch('/api/projects');
       if (res.ok) {
         const projects = await res.json();
-        setUserProjects(projects.map((p: any) => ({ id: p.id, name: p.name })));
+        interface ProjectBasic {
+          id: string;
+          name: string;
+        }
+        setUserProjects(projects.map((p: ProjectBasic) => ({ id: p.id, name: p.name })));
         
         // If no default project is set, set it to the first project
         if (!userSettings.defaultProjectId && projects.length > 0) {
@@ -521,8 +525,14 @@ function SettingsContent() {
       const res = await authenticatedFetch(`/api/tasks?projectId=${projectId}`);
       const tasks = await res.json();
       
+      interface TaskWithStatus {
+        status: string;
+        id: string;
+        [key: string]: unknown;
+      }
+      
       const statusValue = projectSettings.statusOptions.find(opt => opt.id === statusId)?.id;
-      const tasksWithStatus = tasks.filter((task: any) => task.status === statusValue);
+      const tasksWithStatus = (tasks as TaskWithStatus[]).filter((task: TaskWithStatus) => task.status === statusValue);
       
       if (tasksWithStatus.length > 0) {
         // Show migration dialog
@@ -574,14 +584,20 @@ function SettingsContent() {
       const res = await authenticatedFetch(`/api/tasks?projectId=${projectId}`);
       const tasks = await res.json();
       
+      interface TaskWithStatus {
+        status: string;
+        id: string;
+        [key: string]: unknown;
+      }
+      
       const sourceStatusValue = projectSettings.statusOptions.find(opt => opt.id === migrationSourceId)?.id;
       const targetStatusValue = projectSettings.statusOptions.find(opt => opt.id === migrationTargetId)?.id;
       
-      const tasksToUpdate = tasks.filter((task: any) => task.status === sourceStatusValue);
+      const tasksToUpdate = (tasks as TaskWithStatus[]).filter((task: TaskWithStatus) => task.status === sourceStatusValue);
       
       // Update all tasks
       await Promise.all(
-        tasksToUpdate.map((task: any) =>
+        tasksToUpdate.map((task: TaskWithStatus) =>
           authenticatedFetch(`/api/tasks/${task.id}`, {
             method: 'PUT',
             body: JSON.stringify({ ...task, status: targetStatusValue }),
@@ -983,7 +999,7 @@ function SettingsContent() {
                     ))}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    When you create tasks in notes and check "Create in project", they will be added to this project
+                    When you create tasks in notes and check &quot;Create in project&quot;, they will be added to this project
                   </p>
                 </div>
                 <div>
@@ -1742,7 +1758,7 @@ function SettingsContent() {
                       notifications: {
                         ...userSettings.notifications,
                         email: e.target.checked,
-                      } as any,
+                      },
                     })}
                     className="w-4 h-4 rounded"
                   />
@@ -1764,7 +1780,7 @@ function SettingsContent() {
                       notifications: {
                         ...userSettings.notifications,
                         desktop: e.target.checked,
-                      } as any,
+                      },
                     })}
                     className="w-4 h-4 rounded"
                   />
@@ -2523,7 +2539,7 @@ function SettingsContent() {
   };
 
   return (
-    <SettingsLayout activeSection={section as any}>
+    <SettingsLayout activeSection={section as 'profile' | 'appearance' | 'notifications' | 'note-templates' | 'project-details' | 'project-status' | 'project-priority' | 'project-custom-fields' | 'project-members'}>
       {renderContent()}
       
       {/* Alert Dialog */}

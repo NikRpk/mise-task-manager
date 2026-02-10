@@ -5,7 +5,7 @@
 
 'use client';
 
-import { createContext, useContext, ReactNode, useEffect, useState } from 'react';
+import { createContext, useContext, ReactNode } from 'react';
 import { useCachedFetch, useCache } from '@/lib/cache-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';

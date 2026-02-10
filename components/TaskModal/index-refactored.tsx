@@ -7,6 +7,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Check } from 'lucide-react';
 import { Task, SubTask, Comment, StatusOption, PriorityOption, CustomField } from '@/types';
 import RichTextEditor from '../RichTextEditor';
 import AlertDialog from '../AlertDialog';

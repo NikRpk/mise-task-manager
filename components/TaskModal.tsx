@@ -881,7 +881,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                   </div>
                 ) : (
                   <div className="text-center py-8 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                    No sub-tasks yet. Click "Add" to create one.
+                    No sub-tasks yet. Click &quot;Add&quot; to create one.
                   </div>
                 )}
               </div>
@@ -1270,8 +1270,12 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                     <div className="space-y-2">
                       {formData.links?.map((link, idx) => {
                         // Handle both string links and object links {url, label}
-                        const linkUrl = typeof link === 'string' ? link : (link as any).url || '';
-                        const linkLabel = typeof link === 'string' ? link : (link as any).label || linkUrl;
+                        interface LinkObject {
+                          url?: string;
+                          label?: string;
+                        }
+                        const linkUrl = typeof link === 'string' ? link : (link as LinkObject).url || '';
+                        const linkLabel = typeof link === 'string' ? link : (link as LinkObject).label || linkUrl;
                         
                         return (
                           <div key={idx} className="flex items-center gap-2 p-2 rounded-md" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>

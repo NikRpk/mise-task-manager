@@ -50,6 +50,21 @@ export interface Project {
   updatedAt: string;
 }
 
+export type ProjectRole = 'VIEW' | 'EDIT' | 'ADMIN';
+
+export interface ProjectMember {
+  userId: string;
+  email?: string;
+  displayName?: string;
+  role: ProjectRole;
+  addedAt?: string;
+  addedBy?: string;
+}
+
+export interface ProjectSettings {
+  [key: string]: string | number | boolean | undefined;
+}
+
 export interface FilterOptions {
   deadline?: 'overdue' | 'today' | 'this-week' | 'this-month' | 'future';
   status?: TaskStatus[];

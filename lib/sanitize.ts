@@ -61,7 +61,7 @@ export function sanitizeHTML(html: string): string {
     const tagName = element.tagName.toLowerCase();
 
     // Check if tag is allowed
-    if (!ALLOWED_TAGS.includes(tagName as any)) {
+    if (!ALLOWED_TAGS.includes(tagName as typeof ALLOWED_TAGS[number])) {
       // If tag not allowed, return its children instead
       const fragment = document.createDocumentFragment();
       Array.from(element.childNodes).forEach(child => {

@@ -59,7 +59,10 @@ export function useProjectData(userId: string | undefined): UseProjectDataResult
   // Auto-select first project if none selected
   useEffect(() => {
     if (projects && projects.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(projects[0].id);
+      // Use React's own scheduling via callback form to avoid immediate setState
+      setTimeout(() => {
+        setSelectedProjectId(projects[0].id);
+      }, 0);
     }
   }, [projects, selectedProjectId]);
 

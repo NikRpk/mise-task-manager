@@ -11,7 +11,7 @@ interface LogContext {
   taskId?: string;
   endpoint?: string;
   method?: string;
-  [key: string]: any;
+  [key: string]: string | number | boolean | undefined;
 }
 
 class Logger {
@@ -31,15 +31,15 @@ class Logger {
    * Send log to external service in production
    * TODO: Integrate with Sentry, DataDog, or similar
    */
-  private sendToService(level: LogLevel, message: string, context?: LogContext, error?: Error) {
+  private sendToService(_level: LogLevel, _message: string, _context?: LogContext, _error?: Error) {
     if (!this.isProduction) return;
 
     // TODO: Implement actual service integration
     // Example with Sentry:
-    // if (level === 'error' && error) {
-    //   Sentry.captureException(error, {
+    // if (_level === 'error' && _error) {
+    //   Sentry.captureException(_error, {
     //     level: 'error',
-    //     extra: context,
+    //     extra: _context,
     //   });
     // }
   }

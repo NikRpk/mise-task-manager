@@ -21,7 +21,28 @@ export async function POST(request: NextRequest) {
     }
     
     const slack = new WebClient(slackToken);
-    const results: any = {
+    
+    interface TestResult {
+      success: boolean;
+      error?: string;
+      needsScope?: string;
+      userId?: string;
+      userName?: string;
+      messageTs?: string;
+    }
+    
+    interface TestResults {
+      email: string;
+      tests: Record<string, TestResult>;
+      summary?: {
+        total: number;
+        successful: number;
+        failed: number;
+        canSendNotifications: boolean;
+      };
+    }
+    
+    const results: TestResults = {
       email,
       tests: {}
     };
@@ -34,16 +55,17 @@ export async function POST(request: NextRequest) {
         userId: userLookup.user?.id,
         userName: userLookup.user?.name
       };
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as Error & { data?: { error?: string }; message: string };
       results.tests.lookupUserByEmail = {
         success: false,
-        error: error.data?.error || error.message,
+        error: err.data?.error || err.message,
         needsScope: 'users:read.email'
       };
     }
     
     // Test 2: Can we send a message? (only if user lookup succeeded)
-    if (results.tests.lookupUserByEmail.success) {
+    if (results.tests.lookupUserByEmail.success && results.tests.lookupUserByEmail.userId) {
       const userId = results.tests.lookupUserByEmail.userId;
       
       try {
@@ -55,10 +77,11 @@ export async function POST(request: NextRequest) {
           success: true,
           messageTs: message.ts
         };
-      } catch (error: any) {
+      } catch (error) {
+        const err = error as Error & { data?: { error?: string }; message: string };
         results.tests.sendMessage = {
           success: false,
-          error: error.data?.error || error.message,
+          error: err.data?.error || err.message,
           needsScope: 'chat:write'
         };
       }
@@ -74,10 +97,11 @@ export async function POST(request: NextRequest) {
         results.tests.uploadFile = {
           success: true
         };
-      } catch (error: any) {
+      } catch (error) {
+        const err = error as Error & { data?: { error?: string }; message: string };
         results.tests.uploadFile = {
           success: false,
-          error: error.data?.error || error.message,
+          error: err.data?.error || err.message,
           needsScope: 'files:write'
         };
       }
@@ -85,7 +109,7 @@ export async function POST(request: NextRequest) {
     
     // Summary
     const allTests = Object.values(results.tests);
-    const successCount = allTests.filter((t: any) => t.success).length;
+    const successCount = allTests.filter((t: TestResult) => t.success).length;
     results.summary = {
       total: allTests.length,
       successful: successCount,
@@ -93,15 +117,21 @@ export async function POST(request: NextRequest) {
       canSendNotifications: successCount === allTests.length
     };
     
-    logger.info('Capability test complete', results);
+    logger.info('Capability test complete', { 
+      email: results.email,
+      totalTests: results.summary?.total,
+      successful: results.summary?.successful,
+      canSendNotifications: results.summary?.canSendNotifications
+    });
     
     return NextResponse.json(results);
     
-  } catch (error: any) {
-    logger.error('Capability test error', error);
+  } catch (error) {
+    const err = error as Error & { message: string };
+    logger.error('Capability test error', err);
     return NextResponse.json({ 
       success: false, 
-      message: error.message 
+      message: err.message 
     }, { status: 500 });
   }
 }

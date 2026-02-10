@@ -5,8 +5,8 @@
 
 'use client';
 
-import { useState } from 'react';
-import { X, Share2, Check } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { X, Share2 } from 'lucide-react';
 import { Task } from '@/types';
 
 interface TaskHeaderProps {
@@ -46,9 +46,12 @@ export function TaskHeader({
     setIsEditingTitle(false);
   };
 
-  const daysLeft = deadline 
-    ? Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : null;
+  // Calculate days left - using current time for deadline calculation
+  const [currentTime] = useState(() => Date.now());
+  const daysLeft = useMemo(() => {
+    if (!deadline) return null;
+    return Math.ceil((new Date(deadline).getTime() - currentTime) / (1000 * 60 * 60 * 24));
+  }, [deadline, currentTime]);
 
   return (
     <div

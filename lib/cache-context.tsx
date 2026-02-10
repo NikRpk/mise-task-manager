@@ -26,7 +26,7 @@ const CacheContext = createContext<CacheContextValue | null>(null);
 const DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
 
 export function CacheProvider({ children }: { children: ReactNode }) {
-  const [cache, setCache] = useState<Map<string, CacheEntry<any>>>(new Map());
+  const [cache, setCache] = useState<Map<string, CacheEntry<unknown>>>(new Map());
 
   // Cleanup expired entries every minute
   useEffect(() => {

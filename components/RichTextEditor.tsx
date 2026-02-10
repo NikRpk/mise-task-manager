@@ -303,7 +303,7 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
       if (!selection || selection.rangeCount === 0) return;
       
       const range = selection.getRangeAt(0);
-      let node: Node | null = range.commonAncestorContainer;
+      const node: Node | null = range.commonAncestorContainer;
       
       // Find if we're in a PRE block or a block element
       let codeBlockElement: HTMLElement | null = null;

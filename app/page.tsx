@@ -159,7 +159,13 @@ function HomePage() {
       const data = await res.json();
       
       if (data.settings && data.settings.statusOptions && Array.isArray(data.settings.statusOptions)) {
-        setStatusColumns(data.settings.statusOptions.map((opt: any) => ({
+        interface StatusOptionData {
+          id: string;
+          label: string;
+          color: string;
+        }
+        
+        setStatusColumns(data.settings.statusOptions.map((opt: StatusOptionData) => ({
           id: opt.id,
           label: opt.label,
           value: opt.id as TaskStatus,
@@ -296,7 +302,7 @@ function HomePage() {
     setIsModalOpen(true);
   }, []);
 
-  const handleDragStart = useCallback((event: any) => {
+  const handleDragStart = useCallback((event: { active: { id: string | number } }) => {
     const task = tasks.find(t => t.id === event.active.id);
     setActiveTask(task || null);
   }, [tasks]);

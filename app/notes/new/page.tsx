@@ -66,7 +66,7 @@ function NewNotePage() {
 
   // Load template from settings on mount
   useEffect(() => {
-    if (settings?.noteTemplate) {
+    if (settings?.noteTemplate && typeof settings.noteTemplate === 'string') {
       setContent(settings.noteTemplate);
     } else {
       // Use default template
@@ -344,7 +344,7 @@ function NewNotePage() {
                 });
               } else {
                 updateToast(slackToastId, {
-                  type: 'warning',
+                  type: 'error',
                   title: 'Slack notifications partially sent',
                   message: `${summary.successful} succeeded, ${summary.failed} failed`,
                   duration: 5000,
@@ -680,7 +680,7 @@ function NewNotePage() {
                         <td className="px-4 py-2">
                           <DatePicker
                             selected={task.deadline ? new Date(task.deadline) : null}
-                            onChange={(date) => updateTask(task.id, { deadline: date ? date.toISOString().split('T')[0] : null })}
+                            onChange={(date: Date | null) => updateTask(task.id, { deadline: date ? date.toISOString().split('T')[0] : null })}
                             dateFormat="dd.MM.yyyy"
                             placeholderText="dd.mm.yyyy"
                             className="w-full px-2.5 py-1.5 border rounded-md text-sm"

@@ -11,11 +11,8 @@ export async function GET(
     try {
       const { id } = await params;
 
-      // Check if user has access to view members
-      const hasAccess = await checkProjectPermission(user.uid, id, 'VIEW');
-      if (!hasAccess) {
-        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-      }
+      // Check if user has access to view members (throws if no access)
+      await checkProjectPermission(user.uid, id, 'VIEW');
 
       const projectRef = adminDb.collection('projects').doc(id);
       const projectDoc = await projectRef.get();
@@ -44,11 +41,8 @@ export async function POST(
       const { id } = await params;
       const body = await request.json();
 
-      // Check if user has ADMIN permission
-      const hasPermission = await checkProjectPermission(user.uid, id, 'ADMIN');
-      if (!hasPermission) {
-        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-      }
+      // Check if user has ADMIN permission (throws if no access)
+      await checkProjectPermission(user.uid, id, 'ADMIN');
 
       const { email, role } = body;
 
@@ -106,11 +100,8 @@ export async function PATCH(
       const { id } = await params;
       const body = await request.json();
 
-      // Check if user has ADMIN permission
-      const hasPermission = await checkProjectPermission(user.uid, id, 'ADMIN');
-      if (!hasPermission) {
-        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-      }
+      // Check if user has ADMIN permission (throws if no access)
+      await checkProjectPermission(user.uid, id, 'ADMIN');
 
       const { userId, role } = body;
 
@@ -163,11 +154,8 @@ export async function DELETE(
         return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
       }
 
-      // Check if user has ADMIN permission
-      const hasPermission = await checkProjectPermission(user.uid, id, 'ADMIN');
-      if (!hasPermission) {
-        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-      }
+      // Check if user has ADMIN permission (throws if no access)
+      await checkProjectPermission(user.uid, id, 'ADMIN');
 
       const projectRef = adminDb.collection('projects').doc(id);
       const projectDoc = await projectRef.get();

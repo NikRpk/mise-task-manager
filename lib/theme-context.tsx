@@ -267,7 +267,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     });
     
     return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setScheme = (schemeId: string) => {

@@ -80,27 +80,6 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
     }
   );
 
-  // Check connection status on mount
-  useEffect(() => {
-    if (userId && !checkedConnection) {
-      checkConnection();
-    }
-  }, [userId, checkedConnection]);
-
-  // Preload calendar events after 2 seconds if connected
-  useEffect(() => {
-    if (!connected || !userId) return;
-    
-    const timer = setTimeout(() => {
-      // Preemptively load calendar in background
-      refetch().catch(() => {
-        // Silently fail - this is just a preload
-      });
-    }, 2000);
-    
-    return () => clearTimeout(timer);
-  }, [connected, userId, refetch]);
-
   const clearError = useCallback(() => {
     setError(null);
     setIsAuthError(false);
@@ -129,6 +108,30 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
       setCheckedConnection(true);
     }
   }, [userId, refetch]);
+
+  // Check connection status on mount
+  useEffect(() => {
+    if (userId && !checkedConnection) {
+      // Use setTimeout to defer state update and avoid cascading renders
+      setTimeout(() => {
+        checkConnection();
+      }, 0);
+    }
+  }, [userId, checkedConnection, checkConnection]);
+
+  // Preload calendar events after 2 seconds if connected
+  useEffect(() => {
+    if (!connected || !userId) return;
+    
+    const timer = setTimeout(() => {
+      // Preemptively load calendar in background
+      refetch().catch(() => {
+        // Silently fail - this is just a preload
+      });
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [connected, userId, refetch]);
 
   const fetchEvents = useCallback(async () => {
     await refetch();

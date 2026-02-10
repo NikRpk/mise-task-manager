@@ -34,8 +34,14 @@ export async function GET(request: NextRequest) {
       }
 
       const projectData = projectDoc.data();
-      const members = projectData?.members || [];
-      const isMember = members.some((m: any) => m.userId === user.uid);
+      
+      interface ProjectMember {
+        userId: string;
+        role?: string;
+      }
+      
+      const members = (projectData?.members || []) as ProjectMember[];
+      const isMember = members.some((m: ProjectMember) => m.userId === user.uid);
 
       if (!isMember) {
         throw new AuthorizationError('You do not have access to this project');
@@ -130,8 +136,14 @@ export async function POST(request: NextRequest) {
       }
 
       const projectData = projectDoc.data();
-      const members = projectData?.members || [];
-      const member = members.find((m: any) => m.userId === user.uid);
+      
+      interface ProjectMember {
+        userId: string;
+        role?: string;
+      }
+      
+      const members = (projectData?.members || []) as ProjectMember[];
+      const member = members.find((m: ProjectMember) => m.userId === user.uid);
 
       if (!member) {
         throw new AuthorizationError('You are not a member of this project');

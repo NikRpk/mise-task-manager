@@ -1,5 +1,5 @@
 // Server-side authentication middleware for API routes
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { adminAuth, adminDb } from './firebase-admin';
 import { ProjectRole } from '@/types';
 import { AuthenticationError, AuthorizationError, NotFoundError, DatabaseError } from './errors';
@@ -71,7 +71,12 @@ export async function checkProjectPermission(
     const projectData = projectDoc.data();
     const members = projectData?.members || [];
 
-    const member = members.find((m: any) => m.userId === userId);
+    interface ProjectMember {
+      userId: string;
+      role: ProjectRole;
+    }
+
+    const member = (members as ProjectMember[]).find((m) => m.userId === userId);
     if (!member) {
       throw new AuthorizationError('You are not a member of this project');
     }
@@ -123,7 +128,12 @@ export async function getUserProjectRole(
     const projectData = projectDoc.data();
     const members = projectData?.members || [];
 
-    const member = members.find((m: any) => m.userId === userId);
+    interface ProjectMember {
+      userId: string;
+      role: ProjectRole;
+    }
+
+    const member = (members as ProjectMember[]).find((m) => m.userId === userId);
     return member?.role || null;
   } catch (error) {
     if (error instanceof NotFoundError) {

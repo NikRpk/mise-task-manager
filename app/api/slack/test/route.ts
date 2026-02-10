@@ -14,14 +14,15 @@ export async function GET(request: NextRequest) {
     const result = await testSlackConnection();
     
     return NextResponse.json(result);
-  } catch (error: any) {
-    logger.error('Slack connection test failed', error);
+  } catch (error) {
+    const err = error as Error & { message?: string };
+    logger.error('Slack connection test failed', err);
     
     return NextResponse.json(
       { 
         success: false,
-        message: error.message || 'Connection test failed',
-        error: error.toString()
+        message: err.message || 'Connection test failed',
+        error: err.toString()
       },
       { status: 500 }
     );

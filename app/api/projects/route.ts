@@ -16,16 +16,30 @@ export async function GET(request: NextRequest) {
       const snapshot = await projectsRef.get();
 
       // Filter projects where user is a member (client-side filtering)
+      interface ProjectMember {
+        userId: string;
+        email?: string;
+        displayName?: string;
+        role: string;
+      }
+      
+      interface ProjectData {
+        id: string;
+        members?: ProjectMember[];
+        updatedAt?: string;
+        [key: string]: unknown;
+      }
+      
       const projects = snapshot.docs
         .map(doc => ({
           id: doc.id,
           ...doc.data(),
         }))
-        .filter((project: any) => {
+        .filter((project: ProjectData) => {
           const members = project.members || [];
-          return members.some((member: any) => member.userId === user.uid);
+          return members.some((member: ProjectMember) => member.userId === user.uid);
         })
-        .sort((a: any, b: any) => {
+        .sort((a: ProjectData, b: ProjectData) => {
           const aDate = new Date(a.updatedAt || 0).getTime();
           const bDate = new Date(b.updatedAt || 0).getTime();
           return bDate - aDate;

@@ -28,12 +28,13 @@ export async function POST(request: NextRequest) {
     );
     
     return NextResponse.json(result);
-  } catch (error: any) {
-    logger.error('Debug endpoint error', error);
+  } catch (error) {
+    const err = error as Error & { message: string; stack?: string };
+    logger.error('Debug endpoint error', err);
     return NextResponse.json({ 
       success: false, 
-      message: error.message,
-      stack: error.stack 
+      message: err.message,
+      stack: err.stack 
     }, { status: 500 });
   }
 }

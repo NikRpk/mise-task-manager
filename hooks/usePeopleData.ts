@@ -6,7 +6,16 @@
 import { usePeople } from '@/lib/people-context';
 
 interface UsePeopleDataResult {
-  people: Array<{ email: string; displayName: string; photoUrl?: string; source: 'calendar' | 'workspace' }>;
+  people: Array<{ 
+    id: string;
+    email: string; 
+    displayName: string; 
+    photoUrl?: string; 
+    source: 'calendar' | 'workspace';
+    lastSeen: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
   loading: boolean;
   error: string | null;
   fetchPeople: () => Promise<void>;

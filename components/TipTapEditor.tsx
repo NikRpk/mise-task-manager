@@ -63,7 +63,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
       let popup: HTMLDivElement;
       
       return {
-        onStart: (props: any) => {
+        onStart: (props: { items: Array<{ id: string; label: string }>; command: (item: { id: string; label: string }) => void }) => {
           popup = document.createElement('div');
           popup.className = 'mention-suggestions';
           popup.style.cssText = 'position: absolute; background: white; border: 1px solid #e2e8f0; border-radius: 0.375rem; padding: 0.25rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 9999;';
@@ -81,10 +81,10 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           
           document.body.appendChild(popup);
         },
-        onUpdate: (props: any) => {
+        onUpdate: (props: { items: unknown[] }) => {
           // Update position
         },
-        onKeyDown: (props: any) => {
+        onKeyDown: (props: { event: KeyboardEvent }) => {
           if (props.event.key === 'Escape') {
             popup?.remove();
             return true;

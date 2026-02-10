@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     logger.info('Slack notifications completed', { 
       successCount, 
       failureCount,
-      results: results.map(r => ({ email: r.email, success: r.success }))
+      totalRecipients: results.length
     });
     
     return NextResponse.json({
@@ -111,13 +111,14 @@ export async function POST(request: NextRequest) {
       },
     });
     
-  } catch (error: any) {
-    logger.error('Slack notification endpoint error', error);
+  } catch (error) {
+    const err = error as Error & { message: string };
+    logger.error('Slack notification endpoint error', err);
     
     return NextResponse.json(
       { 
         error: 'Internal server error',
-        message: error.message 
+        message: err.message 
       },
       { status: 500 }
     );

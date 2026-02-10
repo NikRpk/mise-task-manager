@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/lib/auth-context';
-import { LogOut, Settings, User, MessageSquare } from 'lucide-react';
+import { LogOut, Settings, MessageSquare } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { logger } from '@/lib/logger';

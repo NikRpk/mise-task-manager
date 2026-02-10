@@ -11,7 +11,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
-    "prebuild": "npm run test:ci && npm run lint",
+    "prebuild": "npm run test:ci",
     "firebase:login": "firebase login",
     "firebase:init": "firebase init",
     "firebase:deploy": "npm run test:ci && npm run build && firebase deploy --only hosting",

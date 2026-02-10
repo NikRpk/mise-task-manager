@@ -23,7 +23,7 @@ interface TaskDetailsProps {
   statusOptions: StatusOption[];
   priorityOptions: PriorityOption[];
   customFields: CustomField[];
-  onUpdate: (field: string, value: any) => void;
+  onUpdate: (field: string, value: string | null | string[]) => void;
   onAddLink: () => void;
   onRemoveLink: (index: number) => void;
   onAddTag: () => void;

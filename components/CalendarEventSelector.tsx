@@ -220,7 +220,7 @@ export default function CalendarEventSelector({
                 No Upcoming Meetings
               </h3>
               <p className="text-sm text-gray-500 mb-6">
-                You don't have any meetings scheduled in the next 30 days
+                You don&apos;t have any meetings scheduled in the next 30 days
               </p>
               <button
                 onClick={handleNoMeeting}

@@ -263,7 +263,7 @@ export default function OwnerSelector({ value, onChange, people, disabled = fals
                   }}
                 >
                   <div className="text-sm font-medium text-blue-700">
-                    Use "{searchQuery.trim()}"
+                    Use &quot;{searchQuery.trim()}&quot;
                   </div>
                   <div className="text-xs text-blue-600 mt-0.5">
                     Click or press Enter

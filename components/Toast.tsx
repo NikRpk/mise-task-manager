@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { X, CheckCircle, AlertCircle, Info, Loader2 } from 'lucide-react';
 
 export interface ToastMessage {
@@ -24,6 +24,13 @@ interface ToastProps {
 function Toast({ toast, onDismiss }: ToastProps) {
   const [isExiting, setIsExiting] = useState(false);
 
+  const handleDismiss = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onDismiss(toast.id);
+    }, 300); // Match animation duration
+  }, [onDismiss, toast.id]);
+
   useEffect(() => {
     if (toast.duration && toast.duration > 0 && toast.type !== 'loading') {
       const timer = setTimeout(() => {
@@ -31,14 +38,7 @@ function Toast({ toast, onDismiss }: ToastProps) {
       }, toast.duration);
       return () => clearTimeout(timer);
     }
-  }, [toast.duration, toast.type]);
-
-  const handleDismiss = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      onDismiss(toast.id);
-    }, 300); // Match animation duration
-  };
+  }, [toast.duration, toast.type, handleDismiss]);
 
   const getIcon = () => {
     switch (toast.type) {

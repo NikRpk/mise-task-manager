@@ -18,11 +18,11 @@ export async function DELETE(request: NextRequest) {
       const searchParams = request.nextUrl.searchParams;
       const source = searchParams.get('source') || 'calendar';
       
-      let query = adminDb.collection('people');
+      let query: FirebaseFirestore.Query = adminDb.collection('people');
       
       // Filter by source if not clearing all
       if (source !== 'all') {
-        query = query.where('source', '==', source) as any;
+        query = query.where('source', '==', source);
       }
       
       const snapshot = await query.get();

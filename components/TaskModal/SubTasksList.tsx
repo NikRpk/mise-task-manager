@@ -112,7 +112,7 @@ export function SubTasksList({ subTasks, onAdd, onUpdate, onRemove }: SubTasksLi
         </div>
       ) : (
         <div className="text-center py-8 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-          No sub-tasks yet. Click "Add" to create one.
+          No sub-tasks yet. Click &quot;Add&quot; to create one.
         </div>
       )}
     </div>

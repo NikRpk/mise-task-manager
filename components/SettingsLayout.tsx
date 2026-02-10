@@ -16,10 +16,6 @@ export default function SettingsLayout({ children, activeSection }: SettingsLayo
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
   const fetchProjects = async () => {
     try {
       const res = await authenticatedFetch('/api/projects');
@@ -39,6 +35,10 @@ export default function SettingsLayout({ children, activeSection }: SettingsLayo
       logger.error('Failed to fetch projects', error as Error);
     }
   };
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
 
   const handleSectionClick = (section: string) => {
     if (section.startsWith('project-')) {

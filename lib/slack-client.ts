@@ -41,8 +41,9 @@ async function getUserIdByEmail(email: string): Promise<string | null> {
   try {
     const result = await slack.users.lookupByEmail({ email });
     return result.user?.id || null;
-  } catch (error: any) {
-    if (error.data?.error === 'users_not_found') {
+  } catch (error: unknown) {
+    const slackError = error as { data?: { error?: string } };
+    if (slackError.data?.error === 'users_not_found') {
       logger.warn('Slack user not found', { email });
       return null;
     }
@@ -69,8 +70,9 @@ function htmlToPlainText(html: string): string {
 }
 
 /**
- * Generates markdown content for the note
+ * Generates markdown content for the note (currently unused, kept for future use)
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function generateMarkdownContent(
   noteTitle: string,
   noteContent: string,
@@ -108,7 +110,7 @@ function formatMessageBlocks(
   noteUrl: string,
   meetingDate: string,
   userTasks: NoteTask[]
-): any[] {
+): Array<Record<string, unknown>> {
   // Format date as dd.MM.YYYY (German format)
   const formattedDate = new Date(meetingDate).toLocaleDateString('de-DE', {
     day: '2-digit',
@@ -116,7 +118,7 @@ function formatMessageBlocks(
     year: 'numeric',
   });
 
-  const blocks: any[] = [
+  const blocks: Array<Record<string, unknown>> = [
     {
       type: 'section',
       text: {
@@ -188,7 +190,7 @@ export async function sendNoteToSlackUser(
   noteUrl: string,
   meetingDate: string,
   userTasks: NoteTask[],
-  allTasks: NoteTask[]
+  _allTasks: NoteTask[]
 ): Promise<{ success: boolean; message: string }> {
   // Check if Slack is configured
   if (!slack) {
@@ -231,8 +233,8 @@ export async function sendNoteToSlackUser(
       success: true,
       message: 'Notification sent successfully',
     };
-  } catch (error: any) {
-    logger.error('Failed to send Slack notification', error, { email, noteTitle });
+  } catch (error: unknown) {
+    logger.error('Failed to send Slack notification', error as Error, { email, noteTitle });
     
     // Provide more helpful error messages
     let errorMessage = error.message || 'Failed to send notification';
@@ -306,8 +308,8 @@ export async function testSlackConnection(): Promise<{ success: boolean; message
       success: true,
       message: `Connected to workspace: ${result.team}`,
     };
-  } catch (error: any) {
-    logger.error('Slack connection test failed', error);
+  } catch (error: unknown) {
+    logger.error('Slack connection test failed', error as Error);
     return {
       success: false,
       message: error.message || 'Connection failed',

@@ -37,11 +37,8 @@ export async function PUT(
       const { id } = await params;
       const body = await request.json();
 
-      // Check if user has ADMIN permission
-      const hasPermission = await checkProjectPermission(user.uid, id, 'ADMIN');
-      if (!hasPermission) {
-        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-      }
+      // Check if user has ADMIN permission (throws if not)
+      await checkProjectPermission(user.uid, id, 'ADMIN');
 
       const projectRef = adminDb.collection('projects').doc(id);
       const projectDoc = await projectRef.get();

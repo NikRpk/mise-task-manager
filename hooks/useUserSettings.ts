@@ -14,7 +14,7 @@ interface UserSettings {
   timezone?: string;
   theme?: 'light' | 'dark' | 'auto';
   googleCalendarRefreshToken?: string;
-  [key: string]: any;
+  [key: string]: string | number | boolean | undefined;
 }
 
 const USER_SETTINGS_KEY = 'user-settings';

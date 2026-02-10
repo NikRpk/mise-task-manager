@@ -652,7 +652,7 @@ function NoteEditPage() {
                         <td className="px-4 py-2">
                           <DatePicker
                             selected={task.deadline ? new Date(task.deadline) : null}
-                            onChange={(date) => updateTask(task.id, { deadline: date ? date.toISOString().split('T')[0] : null })}
+                            onChange={(date: Date | null) => updateTask(task.id, { deadline: date ? date.toISOString().split('T')[0] : null })}
                             dateFormat="dd.MM.yyyy"
                             placeholderText="dd.mm.yyyy"
                             className="w-full px-2.5 py-1.5 border rounded-md text-sm"

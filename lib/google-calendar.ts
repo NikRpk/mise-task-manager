@@ -5,7 +5,7 @@
 
 console.log('[MODULE] google-calendar.ts is loading...');
 
-import { google } from 'googleapis';
+import { google, Auth } from 'googleapis';
 
 console.log('[MODULE] googleapis imported');
 
@@ -175,7 +175,7 @@ export async function removeUserRefreshToken(userId: string): Promise<void> {
  * Same pattern as the working Apps Script: try Directory first, then People API
  * Falls back to email if both fail
  */
-async function fetchDisplayName(email: string, oauth2Client: any, isFirstLookup: boolean = false): Promise<string> {
+async function fetchDisplayName(email: string, oauth2Client: Auth.OAuth2Client, isFirstLookup: boolean = false): Promise<string> {
   // Try Admin Directory API first (for workspace users)
   try {
     const admin = google.admin({ version: 'directory_v1', auth: oauth2Client });
@@ -253,7 +253,7 @@ async function fetchDisplayName(email: string, oauth2Client: any, isFirstLookup:
  */
 async function enrichAttendeesWithNames(
   attendees: Array<{ email: string; displayName?: string }>,
-  oauth2Client: any
+  oauth2Client: Auth.OAuth2Client
 ): Promise<Array<{ email: string; displayName: string }>> {
   if (!attendees || attendees.length === 0) {
     return [];
@@ -480,7 +480,11 @@ export async function attachNoteToCalendarEvent(
     const dateString = new Date().toLocaleDateString('de-DE'); // dd.MM.yyyy
     const fileName = `Meeting Notes | ${noteTitle} (${dateString})`;
     
-    const fileMetadata: any = {
+    const fileMetadata: {
+      name: string;
+      mimeType: string;
+      parents?: string[];
+    } = {
       name: fileName,
       mimeType: 'application/vnd.google-apps.document',
     };
@@ -520,7 +524,8 @@ export async function attachNoteToCalendarEvent(
       console.log('[ATTACH] File ID:', fileId, 'Link:', fileLink);
     } catch (driveError) {
       console.error('[ATTACH] Drive API error:', driveError);
-      console.error('[ATTACH] Error details:', (driveError as any).message);
+      const errorWithMessage = driveError as { message?: string };
+      console.error('[ATTACH] Error details:', errorWithMessage.message);
       throw driveError;
     }
     
@@ -667,11 +672,18 @@ export async function attachNoteToCalendarEvent(
       docUrl: fileLink,
     };
   } catch (error) {
+    interface ErrorWithDetails {
+      message?: string;
+      code?: string;
+      status?: number;
+      errors?: unknown;
+    }
+    const errorObj = error as ErrorWithDetails;
     const errorDetails = {
-      message: (error as any).message,
-      code: (error as any).code,
-      status: (error as any).status,
-      errors: (error as any).errors,
+      message: errorObj.message,
+      code: errorObj.code,
+      status: errorObj.status,
+      errors: errorObj.errors,
     };
     console.error('Failed to attach note to calendar', error as Error, {
       userId,
@@ -691,7 +703,7 @@ export async function updateGoogleDoc(
   docId: string,
   noteTitle: string,
   noteContent: string,
-  userEmail: string
+  _userEmail: string
 ): Promise<void> {
   console.log('[UPDATE] Starting doc update', { userId, docId, noteTitle });
   
@@ -728,10 +740,16 @@ export async function updateGoogleDoc(
     
     console.log('[UPDATE] Document updated successfully');
   } catch (error) {
+    interface ErrorWithDetails {
+      message?: string;
+      code?: string;
+      status?: number;
+    }
+    const errorObj = error as ErrorWithDetails;
     const errorDetails = {
-      message: (error as any).message,
-      code: (error as any).code,
-      status: (error as any).status,
+      message: errorObj.message,
+      code: errorObj.code,
+      status: errorObj.status,
     };
     console.error('[UPDATE] Failed to update Google Doc', error as Error, {
       userId,
@@ -754,7 +772,7 @@ export async function isCalendarConnected(userId: string): Promise<boolean> {
  * Extract recurring event information from a calendar event
  * Used to link notes from the same recurring meeting series
  */
-export function extractRecurringInfo(calendarEvent: any): {
+export function extractRecurringInfo(calendarEvent: { recurringEventId?: string; start?: { dateTime?: string; date?: string } }): {
   recurringEventId: string | null;
   instanceDate: string | null;
 } {
