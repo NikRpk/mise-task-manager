@@ -13,7 +13,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import AlertDialog from '@/components/AlertDialog';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/api-client';
-import { colorSchemes, useTheme } from '@/lib/theme-context';
+import { colorSchemes, useTheme, ColorScheme } from '@/lib/theme-context';
 import TipTapEditor from '@/components/TipTapEditor';
 import { ProjectSettings, StatusOption, PriorityOption, CustomField, ProjectMember, ProjectRole } from '@/types';
 
@@ -68,7 +68,9 @@ const SortableStatusItem = React.memo(({
       {...(status.isDefault ? {} : { ...attributes })}
     >
       {status.isDefault ? (
-        <Lock size={16} className="text-green-600" title="Default status - cannot be deleted" />
+        <div title="Default status - cannot be deleted">
+          <Lock size={16} className="text-green-600" />
+        </div>
       ) : (
         <div {...listeners} className="cursor-grab active:cursor-grabbing">
           <GripVertical size={16} className="text-gray-400" />

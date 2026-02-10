@@ -62,7 +62,32 @@ export interface ProjectMember {
 }
 
 export interface ProjectSettings {
-  [key: string]: string | number | boolean | undefined;
+  statusOptions?: StatusOption[];
+  priorityOptions?: PriorityOption[];
+  customFields?: CustomField[];
+  [key: string]: string | number | boolean | undefined | StatusOption[] | PriorityOption[] | CustomField[];
+}
+
+export interface StatusOption {
+  id: string;
+  label: string;
+  color: string;
+  isDefault?: boolean;
+}
+
+export interface PriorityOption {
+  id: string;
+  label: string;
+  color: string;
+  isDefault?: boolean;
+}
+
+export interface CustomField {
+  id: string;
+  name: string;
+  type: 'text' | 'number' | 'date' | 'select';
+  options?: string[];
+  required?: boolean;
 }
 
 export interface FilterOptions {
