@@ -7,8 +7,8 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json* ./
-RUN npm ci
+COPY package.json ./
+RUN npm install --production=false
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -17,19 +17,19 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Set environment to production and skip prebuild (tests)
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV SKIP_PREBUILD 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV SKIP_PREBUILD=1
 
 # Build Next.js app (skip tests in Docker)
-RUN npm run build --skip-build-static-generation || npm run build
+RUN npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -46,8 +46,8 @@ USER nextjs
 
 EXPOSE 8080
 
-ENV PORT 8080
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=8080
+ENV HOSTNAME="0.0.0.0"
 
 # Start Next.js
 CMD ["node", "server.js"]
