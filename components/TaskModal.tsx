@@ -139,7 +139,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
 
   // Debounced auto-save function with stable reference
   const debouncedSave = useRef(
-    debounce((data: Partial<Task>) => {
+    debounce((...args: unknown[]) => {
+      const data = args[0] as Partial<Task>;
       saveTaskToServer(data);
     }, AUTO_SAVE_DELAY_MS)
   ).current;

@@ -10,12 +10,9 @@ import { useCachedFetch, useCache } from '@/lib/cache-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 
-export interface Person {
-  email: string;
-  displayName: string;
-  photoUrl?: string;
-  source: 'calendar' | 'workspace';
-}
+// Re-export Person from types to avoid duplicates
+import type { Person } from '@/types';
+export type { Person };
 
 interface PeopleContextValue {
   people: Person[];

@@ -20,7 +20,7 @@ interface ErrorResponse {
  * @param context Additional context for logging
  * @returns NextResponse with appropriate status code and error message
  */
-export function handleApiError(error: unknown, context?: Record<string, unknown>): NextResponse {
+export function handleApiError(error: unknown, context?: Record<string, string | number | boolean>): NextResponse {
   const timestamp = new Date().toISOString();
 
   // Handle known AppError instances

@@ -44,9 +44,9 @@ export default function UserProfile() {
         style={{ color: 'var(--color-text)' }}
       >
         <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium" style={{ background: 'var(--color-primary)' }}>
-          {user.displayName.charAt(0).toUpperCase()}
+          {(user.displayName || 'U').charAt(0).toUpperCase()}
         </div>
-        <span className="font-medium hidden sm:block">{user.displayName}</span>
+        <span className="font-medium hidden sm:block">{user.displayName || 'User'}</span>
       </button>
 
       {isOpen && (
@@ -57,7 +57,7 @@ export default function UserProfile() {
           <div className="p-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ background: 'var(--color-primary)' }}>
-                {user.displayName.charAt(0).toUpperCase()}
+                {(user.displayName || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold truncate" style={{ color: 'var(--color-text)' }}>

@@ -5,20 +5,13 @@
 
 import { usePeople } from '@/lib/people-context';
 
+import { Person } from '@/types';
+
 interface UsePeopleDataResult {
-  people: Array<{ 
-    id: string;
-    email: string; 
-    displayName: string; 
-    photoUrl?: string; 
-    source: 'calendar' | 'workspace';
-    lastSeen: string;
-    createdAt: string;
-    updatedAt: string;
-  }>;
+  people: Person[];
   loading: boolean;
   error: string | null;
-  fetchPeople: () => Promise<void>;
+  fetchPeople: () => Promise<unknown>;
   syncWorkspace: () => Promise<void>;
   clearPeople: (source?: 'calendar' | 'workspace' | 'all') => Promise<void>;
   clearError: () => void;
@@ -35,7 +28,7 @@ export function usePeopleData(): UsePeopleDataResult {
     people,
     loading: isLoading,
     error: error?.message || null,
-    fetchPeople: refetch,
+    fetchPeople: async () => { await refetch(); },
     syncWorkspace: syncFromWorkspace,
     clearPeople: contextClearPeople,
     clearError: () => {}, // No-op since errors are managed by context

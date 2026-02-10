@@ -89,7 +89,8 @@ export function useTaskForm(
 
   // Debounced save
   const debouncedSave = useRef(
-    debounce((data: Partial<Task>) => {
+    debounce((...args: unknown[]) => {
+      const data = args[0] as Partial<Task>;
       saveToServer(data);
     }, AUTO_SAVE_DELAY_MS)
   ).current;

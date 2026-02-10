@@ -616,7 +616,7 @@ function NoteEditPage() {
                           <td className="px-4 py-2 text-center">
                             <input
                               type="checkbox"
-                              checked={task.createInProject !== false && isMyTask}
+                              checked={!!(task.createInProject !== false && isMyTask)}
                               onChange={(e) => updateTask(task.id, { createInProject: e.target.checked })}
                               disabled={!isMyTask}
                               className="w-4 h-4 rounded border-gray-300"

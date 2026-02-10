@@ -164,7 +164,8 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               const reader = new FileReader();
               reader.onload = (e) => {
                 const base64 = e.target?.result as string;
-                editor?.commands.setImage({ src: base64 });
+                // Insert image as HTML since commands.setImage might not be available
+                editor?.commands.insertContent(`<img src="${base64}" alt="Uploaded image" class="rounded-md max-w-full h-auto" />`);
               };
               reader.readAsDataURL(file);
             }
@@ -322,7 +323,8 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
             onClick={() => {
               const url = window.prompt('Enter image URL (or paste image with Ctrl+V):');
               if (url) {
-                editor.commands.setImage({ src: url });
+                // Insert image as HTML
+                editor.commands.insertContent(`<img src="${url}" alt="Image from URL" class="rounded-md max-w-full h-auto" />`);
               }
             }}
             className="p-1.5 rounded hover:bg-gray-200 transition-colors"

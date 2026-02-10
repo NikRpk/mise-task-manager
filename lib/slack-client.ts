@@ -218,7 +218,7 @@ export async function sendNoteToSlackUser(
     const messageResult = await slack.chat.postMessage({
       channel: userId,
       text: `Meeting notes: ${noteTitle}`,
-      blocks: blocks as unknown[],
+      blocks: blocks as never,
     });
 
     if (!messageResult.ok) {
