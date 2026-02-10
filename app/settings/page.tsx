@@ -2176,7 +2176,7 @@ function SettingsContent() {
                           className="w-full px-3 py-2 border rounded-md"
                           style={{ borderColor: 'var(--color-border)' }}
                         >
-                          {projectSettings.statusOptions?
+                          {(projectSettings.statusOptions || [])
                             .filter(opt => opt.id !== migrationSourceId)
                             .map(opt => (
                               <option key={opt.id} value={opt.id}>
@@ -2272,11 +2272,11 @@ function SettingsContent() {
                 onDragEnd={handlePriorityDragEnd}
               >
                 <SortableContext
-                  items={projectSettings.priorityOptions.map(p => p.id)}
+                  items={projectSettings.priorityOptions?.map(p => p.id) || []}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="space-y-3">
-                    {projectSettings.priorityOptions.map((priority) => (
+                    {projectSettings.priorityOptions?.map((priority) => (
                       <SortablePriorityItem 
                         key={priority.id} 
                         priority={priority}
@@ -2356,7 +2356,7 @@ function SettingsContent() {
                       <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
                         style={{ backgroundColor: 'var(--color-primary)' }}
                       >
-                        {member.displayName.charAt(0).toUpperCase()}
+                        {(member.displayName || 'U').charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1">
                         <p className="font-medium" style={{ color: 'var(--color-text)' }}>
@@ -2459,12 +2459,12 @@ function SettingsContent() {
               </div>
               
               <div className="space-y-3">
-                {projectSettings.customFields.length === 0 ? (
+                {(projectSettings.customFields || []).length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-8">
                     No custom fields yet. Add fields to collect additional information on tasks.
                   </p>
                 ) : (
-                  projectSettings.customFields.map((field) => (
+                  {(projectSettings.customFields || []).map((field) => (
                     <div
                       key={field.id}
                       className="p-4 border rounded-lg space-y-3"
