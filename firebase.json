@@ -1,11 +1,20 @@
 {
   "hosting": {
     "target": "hf-tasks",
-    "public": ".next",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "hf-tasks",
+          "region": "europe-west1"
+        }
+      }
     ]
   },
   "firestore": {
