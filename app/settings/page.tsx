@@ -596,8 +596,8 @@ function SettingsContent() {
         [key: string]: unknown;
       }
       
-      const sourceStatusValue = projectSettings.statusOptions.find(opt => opt.id === migrationSourceId)?.id;
-      const targetStatusValue = projectSettings.statusOptions.find(opt => opt.id === migrationTargetId)?.id;
+      const sourceStatusValue = projectSettings.statusOptions?.find(opt => opt.id === migrationSourceId)?.id;
+      const targetStatusValue = projectSettings.statusOptions?.find(opt => opt.id === migrationTargetId)?.id;
       
       const tasksToUpdate = (tasks as TaskWithStatus[]).filter((task: TaskWithStatus) => task.status === sourceStatusValue);
       
@@ -614,7 +614,7 @@ function SettingsContent() {
       // Remove the status option from settings
       const updatedSettings = {
         ...projectSettings,
-        statusOptions: projectSettings.statusOptions.filter(opt => opt.id !== migrationSourceId),
+        statusOptions: projectSettings.statusOptions?.filter(opt => opt.id !== migrationSourceId),
       };
       
       // Save to database immediately
@@ -653,7 +653,7 @@ function SettingsContent() {
     setProjectSettings({
       ...projectSettings,
       priorityOptions: [
-        ...projectSettings.priorityOptions,
+        ...(projectSettings.priorityOptions || []),
         { id, label: 'New Priority', color: '#64748b' },
       ],
     });
@@ -662,7 +662,7 @@ function SettingsContent() {
   const handlePriorityDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
+    if (over && active.id !== over.id && projectSettings.priorityOptions) {
       const oldIndex = projectSettings.priorityOptions.findIndex((item) => item.id === active.id);
       const newIndex = projectSettings.priorityOptions.findIndex((item) => item.id === over.id);
 
@@ -674,6 +674,7 @@ function SettingsContent() {
   };
 
   const updatePriorityOption = (id: string, updates: Partial<PriorityOption>) => {
+    if (!projectSettings.priorityOptions) return;
     setProjectSettings({
       ...projectSettings,
       priorityOptions: projectSettings.priorityOptions.map(opt =>
@@ -683,6 +684,7 @@ function SettingsContent() {
   };
 
   const deletePriorityOption = async (id: string) => {
+    if (!projectSettings.priorityOptions) return;
     const priorityToDelete = projectSettings.priorityOptions.find(opt => opt.id === id);
     
     // Prevent deletion of default options
@@ -707,7 +709,7 @@ function SettingsContent() {
         try {
           const updatedSettings = {
             ...projectSettings,
-            priorityOptions: projectSettings.priorityOptions.filter(opt => opt.id !== id),
+            priorityOptions: projectSettings.priorityOptions?.filter(opt => opt.id !== id),
           };
           
           // Save to database immediately
@@ -737,13 +739,14 @@ function SettingsContent() {
     setProjectSettings({
       ...projectSettings,
       customFields: [
-        ...projectSettings.customFields,
+        ...(projectSettings.customFields || []),
         { id, name: 'New Field', type: 'text', required: false },
       ],
     });
   };
 
   const updateCustomField = (id: string, updates: Partial<CustomField>) => {
+    if (!projectSettings.customFields) return;
     setProjectSettings({
       ...projectSettings,
       customFields: projectSettings.customFields.map(field =>
@@ -753,6 +756,7 @@ function SettingsContent() {
   };
 
   const deleteCustomField = async (id: string) => {
+    if (!projectSettings.customFields) return;
     if (!projectId) return;
     
     setConfirmDialog({
@@ -764,7 +768,7 @@ function SettingsContent() {
         try {
           const updatedSettings = {
             ...projectSettings,
-            customFields: projectSettings.customFields.filter(field => field.id !== id),
+            customFields: projectSettings.customFields?.filter(field => field.id !== id),
           };
           
           // Save to database immediately
