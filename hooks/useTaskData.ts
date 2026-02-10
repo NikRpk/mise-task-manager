@@ -132,9 +132,9 @@ export function useTaskData(
     } catch (error) {
       logger.error('Failed to save task', error as Error, {
         isUpdate: !!taskData.id,
-        taskId: taskData.id,
-        projectId,
-        userId,
+        taskId: taskData.id || 'new',
+        projectId: projectId || 'none',
+        userId: userId || 'unknown',
       });
       throw error;
     }

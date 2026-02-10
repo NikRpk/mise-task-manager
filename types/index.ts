@@ -181,3 +181,11 @@ export interface Person {
   createdAt: string;
   updatedAt: string;
 }
+
+// Auth User type (Firebase User simplified)
+export interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}

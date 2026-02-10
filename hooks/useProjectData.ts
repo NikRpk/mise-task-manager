@@ -17,7 +17,7 @@ interface UseProjectDataResult {
   setSelectedProjectId: (id: string | null) => void;
   loading: boolean;
   createProject: (name: string, icon?: string) => Promise<void>;
-  refetchProjects: () => Promise<void>;
+  refetchProjects: () => Promise<unknown>;
 }
 
 /**

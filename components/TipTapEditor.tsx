@@ -120,7 +120,6 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
       Underline,
       ResizableImage.configure({
         inline: true,
-        allowBase64: true,
       }),
       CodeBlock.configure({
         HTMLAttributes: {
@@ -165,7 +164,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               const reader = new FileReader();
               reader.onload = (e) => {
                 const base64 = e.target?.result as string;
-                editor?.chain().focus().setImage({ src: base64 }).run();
+                editor?.commands.setImage({ src: base64 });
               };
               reader.readAsDataURL(file);
             }
@@ -323,7 +322,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
             onClick={() => {
               const url = window.prompt('Enter image URL (or paste image with Ctrl+V):');
               if (url) {
-                editor.chain().focus().setImage({ src: url }).run();
+                editor.commands.setImage({ src: url });
               }
             }}
             className="p-1.5 rounded hover:bg-gray-200 transition-colors"

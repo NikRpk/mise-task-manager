@@ -47,7 +47,8 @@ async function getUserIdByEmail(email: string): Promise<string | null> {
       logger.warn('Slack user not found', { email });
       return null;
     }
-    logger.error('Failed to lookup Slack user', error, { email });
+    const err = error as Error & { message?: string };
+    logger.error('Failed to lookup Slack user', err, { email });
     throw error;
   }
 }
@@ -217,7 +218,7 @@ export async function sendNoteToSlackUser(
     const messageResult = await slack.chat.postMessage({
       channel: userId,
       text: `Meeting notes: ${noteTitle}`,
-      blocks,
+      blocks: blocks as unknown[],
     });
 
     if (!messageResult.ok) {
@@ -237,11 +238,12 @@ export async function sendNoteToSlackUser(
     logger.error('Failed to send Slack notification', error as Error, { email, noteTitle });
     
     // Provide more helpful error messages
-    let errorMessage = error.message || 'Failed to send notification';
+    const err = error as { message?: string; data?: { error?: string } };
+    let errorMessage = err.message || 'Failed to send notification';
     
-    if (error.data?.error === 'channel_not_found') {
+    if (err.data?.error === 'channel_not_found') {
       errorMessage = 'Cannot send DM - user may need to message the bot first';
-    } else if (error.data?.error === 'not_in_channel') {
+    } else if (err.data?.error === 'not_in_channel') {
       errorMessage = 'Bot does not have permission to send DMs';
     }
     
@@ -310,9 +312,10 @@ export async function testSlackConnection(): Promise<{ success: boolean; message
     };
   } catch (error: unknown) {
     logger.error('Slack connection test failed', error as Error);
+    const err = error as { message?: string };
     return {
       success: false,
-      message: error.message || 'Connection failed',
+      message: err.message || 'Connection failed',
     };
   }
 }

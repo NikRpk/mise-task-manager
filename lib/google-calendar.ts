@@ -402,7 +402,7 @@ export async function fetchUpcomingEvents(userId: string): Promise<CalendarEvent
           self: attendee.self || false,
           resource: attendee.resource || false, // Meeting rooms have resource: true
         })) || [],
-        hangoutLink: event.hangoutLink,
+        hangoutLink: event.hangoutLink || undefined,
         conferenceData: event.conferenceData ? {
           entryPoints: event.conferenceData.entryPoints?.map(ep => ({
             uri: ep.uri || '',

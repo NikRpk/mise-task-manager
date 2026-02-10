@@ -21,7 +21,7 @@ interface PeopleContextValue {
   people: Person[];
   isLoading: boolean;
   error: Error | null;
-  refetch: () => Promise<void>;
+  refetch: () => Promise<unknown>;
   syncFromCalendar: () => Promise<void>;
   syncFromWorkspace: () => Promise<void>;
   clearPeople: (source?: 'calendar' | 'workspace' | 'all') => Promise<void>;
