@@ -1,8 +1,8 @@
 // Client-side Firebase configuration
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getAnalytics, isSupported } from 'firebase/analytics';
+import { initializeApp, getApps, getApp as getFirebaseApp, FirebaseApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,15 +14,93 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase (singleton pattern)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+let firebaseApp: FirebaseApp | null = null;
+let firebaseAuth: Auth | null = null;
+let firebaseDb: Firestore | null = null;
+let firebaseGoogleProvider: GoogleAuthProvider | null = null;
 
-// Initialize Firebase services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const googleProvider = new GoogleAuthProvider();
+/**
+ * Initialize Firebase app (lazy, browser-only)
+ * Only initializes when actually running in browser, not during SSR/build
+ */
+function initializeFirebaseApp(): FirebaseApp {
+  // Skip initialization during SSR/build
+  if (typeof window === 'undefined') {
+    // Return a dummy object during SSR - will never be used in practice
+    // because client components don't execute during static generation
+    return {} as FirebaseApp;
+  }
+
+  if (firebaseApp) {
+    return firebaseApp;
+  }
+
+  if (getApps().length > 0) {
+    firebaseApp = getFirebaseApp();
+    return firebaseApp;
+  }
+
+  firebaseApp = initializeApp(firebaseConfig);
+  return firebaseApp;
+}
+
+/**
+ * Get Firebase Auth instance (lazy)
+ */
+export function getFirebaseAuthInstance(): Auth {
+  if (!firebaseAuth && typeof window !== 'undefined') {
+    const app = initializeFirebaseApp();
+    firebaseAuth = getAuth(app);
+  }
+  return firebaseAuth as Auth;
+}
+
+/**
+ * Get Firebase Firestore instance (lazy)
+ */
+export function getFirebaseDbInstance(): Firestore {
+  if (!firebaseDb && typeof window !== 'undefined') {
+    const app = initializeFirebaseApp();
+    firebaseDb = getFirestore(app);
+  }
+  return firebaseDb as Firestore;
+}
+
+/**
+ * Get Google Auth Provider instance (lazy)
+ */
+export function getGoogleProviderInstance(): GoogleAuthProvider {
+  if (!firebaseGoogleProvider && typeof window !== 'undefined') {
+    firebaseGoogleProvider = new GoogleAuthProvider();
+  }
+  return firebaseGoogleProvider as GoogleAuthProvider;
+}
+
+// Backward compatibility - use Proxies that delegate to lazy getters
+export const auth = new Proxy({} as Auth, {
+  get(_target, prop) {
+    const authInstance = getFirebaseAuthInstance();
+    return authInstance?.[prop as keyof Auth];
+  }
+});
+
+export const db = new Proxy({} as Firestore, {
+  get(_target, prop) {
+    const dbInstance = getFirebaseDbInstance();
+    return dbInstance?.[prop as keyof Firestore];
+  }
+});
+
+export const googleProvider = new Proxy({} as GoogleAuthProvider, {
+  get(_target, prop) {
+    const providerInstance = getGoogleProviderInstance();
+    return providerInstance?.[prop as keyof GoogleAuthProvider];
+  }
+});
 
 // Initialize Analytics (only in browser and if supported)
-export const analytics = typeof window !== 'undefined' && isSupported().then(yes => yes ? getAnalytics(app) : null);
+export const analytics = typeof window !== 'undefined' 
+  ? isSupported().then(yes => yes ? getAnalytics(initializeFirebaseApp()) : null)
+  : Promise.resolve(null);
 
-export default app;
+export default initializeFirebaseApp;
