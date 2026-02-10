@@ -29,6 +29,7 @@ interface TipTapEditorProps {
   placeholder?: string;
   disabled?: boolean;
   people?: Person[]; // Changed from attendees: string[]
+  attendees?: unknown[]; // For backward compatibility
 }
 
 const COLORS = [
