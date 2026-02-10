@@ -59,7 +59,6 @@ const KanbanColumn = memo(function KanbanColumn({
         height: '100%',
         width: '280px',
         borderColor: isOver ? columnColor : '#e2e8f0',
-        ringColor: isOver ? columnColor : undefined,
         backgroundColor: isOver ? '#fafbfc' : 'white',
       }}
     >
