@@ -147,7 +147,9 @@ const SortablePriorityItem = React.memo(({
       {...(priority.isDefault ? {} : { ...attributes })}
     >
       {priority.isDefault ? (
-        <Lock size={16} className="text-green-600" title="Default priority - cannot be deleted" />
+        <div title="Default priority - cannot be deleted">
+          <Lock size={16} className="text-green-600" />
+        </div>
       ) : (
         <div {...listeners} className="cursor-grab active:cursor-grabbing">
           <GripVertical size={16} className="text-gray-400" />
@@ -473,7 +475,7 @@ function SettingsContent() {
     setProjectSettings({
       ...projectSettings,
       statusOptions: [
-        ...projectSettings.statusOptions,
+        ...(projectSettings.statusOptions || []),
         { id, label: 'New Status', color: '#64748b' },
       ],
     });
@@ -482,7 +484,7 @@ function SettingsContent() {
   const handleStatusDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
+    if (over && active.id !== over.id && projectSettings.statusOptions) {
       const oldIndex = projectSettings.statusOptions.findIndex((item) => item.id === active.id);
       const newIndex = projectSettings.statusOptions.findIndex((item) => item.id === over.id);
 
@@ -494,6 +496,7 @@ function SettingsContent() {
   };
 
   const updateStatusOption = (id: string, updates: Partial<StatusOption>) => {
+    if (!projectSettings.statusOptions) return;
     setProjectSettings({
       ...projectSettings,
       statusOptions: projectSettings.statusOptions.map(opt =>
@@ -503,6 +506,7 @@ function SettingsContent() {
   };
 
   const deleteStatusOption = (id: string) => {
+    if (!projectSettings.statusOptions) return;
     const statusToDelete = projectSettings.statusOptions.find(opt => opt.id === id);
     
     // Prevent deletion of default options
@@ -533,14 +537,14 @@ function SettingsContent() {
         [key: string]: unknown;
       }
       
-      const statusValue = projectSettings.statusOptions.find(opt => opt.id === statusId)?.id;
+      const statusValue = projectSettings.statusOptions?.find(opt => opt.id === statusId)?.id;
       const tasksWithStatus = (tasks as TaskWithStatus[]).filter((task: TaskWithStatus) => task.status === statusValue);
       
       if (tasksWithStatus.length > 0) {
         // Show migration dialog
         setMigrationSourceId(statusId);
         setMigrationTaskCount(tasksWithStatus.length);
-        const firstAvailableStatus = projectSettings.statusOptions.find(opt => opt.id !== statusId);
+        const firstAvailableStatus = projectSettings.statusOptions?.find(opt => opt.id !== statusId);
         setMigrationTargetId(firstAvailableStatus?.id || '');
         setShowMigrationDialog(true);
       } else {
@@ -553,7 +557,7 @@ function SettingsContent() {
           onConfirm: async () => {
             const updatedSettings = {
               ...projectSettings,
-              statusOptions: projectSettings.statusOptions.filter(opt => opt.id !== statusId),
+              statusOptions: projectSettings.statusOptions?.filter(opt => opt.id !== statusId),
             };
             
             // Save to database immediately
