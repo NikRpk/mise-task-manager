@@ -1766,8 +1766,8 @@ function SettingsContent() {
                     onChange={(e) => setUserSettings({
                       ...userSettings,
                       notifications: {
-                        ...userSettings.notifications,
                         email: e.target.checked,
+                        desktop: userSettings.notifications?.desktop || false,
                       },
                     })}
                     className="w-4 h-4 rounded"
@@ -1788,7 +1788,7 @@ function SettingsContent() {
                     onChange={(e) => setUserSettings({
                       ...userSettings,
                       notifications: {
-                        ...userSettings.notifications,
+                        email: userSettings.notifications?.email || false,
                         desktop: e.target.checked,
                       },
                     })}
@@ -2124,11 +2124,11 @@ function SettingsContent() {
                 onDragEnd={handleStatusDragEnd}
               >
                 <SortableContext
-                  items={projectSettings.statusOptions.map(s => s.id)}
+                  items={projectSettings.statusOptions?.map(s => s.id) || []}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="space-y-3">
-                    {projectSettings.statusOptions.map((status) => (
+                    {projectSettings.statusOptions?.map((status) => (
                       <SortableStatusItem 
                         key={status.id} 
                         status={status}
@@ -2176,7 +2176,7 @@ function SettingsContent() {
                           className="w-full px-3 py-2 border rounded-md"
                           style={{ borderColor: 'var(--color-border)' }}
                         >
-                          {projectSettings.statusOptions
+                          {projectSettings.statusOptions?
                             .filter(opt => opt.id !== migrationSourceId)
                             .map(opt => (
                               <option key={opt.id} value={opt.id}>
