@@ -59,7 +59,7 @@ const Filters = memo(function Filters({ filters, onChange, owners }: FiltersProp
     if (settings?.statusOptions && Array.isArray(settings.statusOptions)) {
       setStatusOptions(prevOptions => {
         // Only update if different to avoid infinite loops
-        const newOptions = settings.statusOptions || [];
+        const newOptions = Array.isArray(settings.statusOptions) ? settings.statusOptions as StatusOption[] : [];
         if (JSON.stringify(prevOptions) === JSON.stringify(newOptions)) {
           return prevOptions;
         }
