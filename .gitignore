@@ -55,3 +55,5 @@ next-env.d.ts
 # Service account keys
 *firebase-adminsdk*.json
 service-account*.json
+*-service-account-key.json
+temp-service-account-key.json

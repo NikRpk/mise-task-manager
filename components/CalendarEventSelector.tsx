@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { X, Calendar, Clock, Link as LinkIcon, Plus, AlertCircle } from 'lucide-react';
 import { CalendarEvent } from '@/types';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
@@ -303,24 +303,29 @@ export default function CalendarEventSelector({
           ) : (
             /* Events List - show immediately if we have any events */
             <>
-              {/* Sticky Search Bar */}
+              {/* Sticky Search Bar with Loading Indicator */}
               <div className="sticky top-0 z-20 px-6 pt-6 pb-4" style={{ backgroundColor: 'var(--color-surface)' }}>
-                <input
-                  type="text"
-                  placeholder="Search meetings..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg"
-                  style={{ borderColor: 'var(--color-border)' }}
-                />
-                
-                {/* Optional: Show a subtle loading indicator if refreshing events */}
-                {loading && (
-                  <div className="flex items-center justify-center gap-2 py-2 text-sm text-gray-500">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: 'var(--color-primary)' }}></div>
-                    <span>Refreshing...</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="text"
+                    placeholder="Search meetings..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 px-4 py-2 border rounded-lg"
+                    style={{ borderColor: 'var(--color-border)' }}
+                  />
+                  
+                  {/* Subtle loading indicator in header - no layout shift */}
+                  {loading && (
+                    <div className="flex-shrink-0">
+                      <div 
+                        className="animate-spin rounded-full h-5 w-5 border-b-2" 
+                        style={{ borderColor: 'var(--color-primary)' }}
+                        title="Refreshing events..."
+                      ></div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Scrollable Events Area */}

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "./dev-local.sh",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -12,7 +13,9 @@
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --maxWorkers=2 --passWithNoTests",
     "prebuild": "if [ \"$SKIP_PREBUILD\" != \"1\" ]; then npm run test:ci; fi",
-    "deploy:cloud-run": "./deploy-cloud-run.sh",
+    "deploy": "./deploy-fast.sh",
+    "deploy:standard": "./deploy.sh",
+    "deploy:custom-domain": "./deploy-to-custom-domain.sh",
     "firebase:login": "firebase login",
     "firebase:init": "firebase init",
     "firebase:deploy": "npm run test:ci && npm run build && firebase deploy --only hosting",

@@ -23,7 +23,7 @@ let firebaseGoogleProvider: GoogleAuthProvider | null = null;
 if (typeof window !== 'undefined') {
   firebaseApp = initializeFirebaseApp();
   firebaseAuth = getAuth(firebaseApp);
-  firebaseDb = getFirestore(firebaseApp);
+  firebaseDb = getFirestore(firebaseApp, 'task-and-note-manager');
   firebaseGoogleProvider = new GoogleAuthProvider();
 }
 

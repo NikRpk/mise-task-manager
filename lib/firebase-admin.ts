@@ -59,7 +59,7 @@ function getAdminAuth(): Auth {
 function getAdminDb(): Firestore {
   if (!adminDbInstance) {
     const app = initializeFirebaseAdmin();
-    adminDbInstance = getFirestore(app);
+    adminDbInstance = getFirestore(app, 'task-and-note-manager');
   }
   return adminDbInstance;
 }

@@ -34,7 +34,7 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
   const [isAuthError, setIsAuthError] = useState(false);
   const cache = useCache();
 
-  // Use cached fetch with 15-minute TTL, but manual refetch only
+  // Use cached fetch with 15-minute TTL
   const { data: cachedEvents, isLoading, refetch } = useCachedFetch<CalendarEvent[]>(
     'calendar-events',
     async () => {
@@ -70,8 +70,6 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
     {
       ttl: 15 * 60 * 1000, // 15 minutes
       enabled: connected && !!userId,
-      refetchOnMount: false, // Don't auto-refetch on mount
-      refetchInterval: false, // Disable auto-refetch interval
       onError: (err) => {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
         setError(errorMessage);
@@ -121,19 +119,28 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
     }
   }, [userId, checkedConnection, checkConnection]);
 
-  // Preload calendar events after 2 seconds if connected
+  // Preload calendar events after 2 seconds if connected (only once)
   useEffect(() => {
     if (!connected || !userId) return;
     
+    // Use a flag to ensure this only runs once per connection
+    let hasRun = false;
+    
     const timer = setTimeout(() => {
-      // Preemptively load calendar in background
-      refetch().catch(() => {
-        // Silently fail - this is just a preload
-      });
+      if (!hasRun) {
+        hasRun = true;
+        // Preemptively load calendar in background
+        refetch().catch(() => {
+          // Silently fail - this is just a preload
+        });
+      }
     }, 2000);
     
-    return () => clearTimeout(timer);
-  }, [connected, userId, refetch]);
+    return () => {
+      clearTimeout(timer);
+      hasRun = true; // Prevent execution if unmounted
+    };
+  }, [connected, userId]); // Removed refetch from dependencies
 
   const fetchEvents = useCallback(async () => {
     await refetch();

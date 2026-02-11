@@ -111,23 +111,50 @@ Global user preferences:
 
 ## Deployment
 
-See `DEPLOYMENT.md` for detailed deployment instructions to Firebase Hosting.
-
-Quick deploy:
+### Quick Deploy (2-3 minutes)
 
 ```bash
-npm run firebase:deploy
+npm run deploy
 ```
 
-The app will be deployed to: `https://hf-tasks.web.app`
+### Deploy to Custom Domain (hf-tasks.web.app)
+
+```bash
+npm run deploy:custom-domain
+```
+
+For detailed deployment options and troubleshooting, see [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).
 
 ## Development Workflow
 
-### Running Locally
+### Local Development (Instant!)
 
 ```bash
+# Standard local development (uses production Firebase)
 npm run dev
+
+# Local development with emulators (isolated testing)
+npm run dev:local
 ```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+**All API routes work locally!** ✅
+
+### Deployment
+
+```bash
+# Fast deployment (2-3 minutes) - RECOMMENDED!
+npm run deploy
+
+# Standard deployment (5-8 minutes)
+npm run deploy:standard
+
+# Deploy to custom domain (hf-tasks.web.app)
+npm run deploy:custom-domain
+```
+
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed instructions.
 
 ### Testing
 
@@ -189,13 +216,9 @@ npm run firebase:indexes
 
 ## Documentation
 
-- `FIREBASE_SETUP.md` - Step-by-step Firebase project setup
-- `DEPLOYMENT.md` - Deployment guide and troubleshooting
-- `DESIGN_GUIDELINES.md` - Design system and UI guidelines
-- `TESTING_GUIDE.md` - Testing documentation and best practices
-- `REFACTORING_GUIDE.md` - Code structure analysis and improvements
-- `FIXES_APPLIED.md` - Complete code review fixes documentation
-- `CODE_REVIEW_SUMMARY.md` - Executive summary of all improvements
+- [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) - Fast deployment & local development
+- [FIREBASE_SETUP.md](FIREBASE_SETUP.md) - Step-by-step Firebase project setup
+- [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md) - Design system and UI guidelines
 
 ## Contributing
 
