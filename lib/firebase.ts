@@ -94,11 +94,15 @@ export function getGoogleProviderInstance(): GoogleAuthProvider | null {
 // Backward compatibility - use Proxies that delegate to lazy getters
 export const auth = new Proxy({} as Auth, {
   get(_target, prop) {
+    console.log('[FIREBASE PROXY] Auth proxy accessed, property:', prop);
     const authInstance = getFirebaseAuthInstance();
+    console.log('[FIREBASE PROXY] Auth instance:', authInstance);
     if (!authInstance) {
       throw new Error('Firebase Auth not initialized - must be used in browser context');
     }
-    return authInstance[prop as keyof Auth];
+    const value = authInstance[prop as keyof Auth];
+    console.log('[FIREBASE PROXY] Returning value:', typeof value, value);
+    return value;
   }
 });
 
@@ -114,11 +118,15 @@ export const db = new Proxy({} as Firestore, {
 
 export const googleProvider = new Proxy({} as GoogleAuthProvider, {
   get(_target, prop) {
+    console.log('[FIREBASE PROXY] GoogleProvider proxy accessed, property:', prop);
     const providerInstance = getGoogleProviderInstance();
+    console.log('[FIREBASE PROXY] Provider instance:', providerInstance);
     if (!providerInstance) {
       throw new Error('Google Auth Provider not initialized - must be used in browser context');
     }
-    return providerInstance[prop as keyof GoogleAuthProvider];
+    const value = providerInstance[prop as keyof GoogleAuthProvider];
+    console.log('[FIREBASE PROXY] Returning value:', typeof value, value);
+    return value;
   }
 });
 
