@@ -57,27 +57,6 @@ function initializeFirebaseApp(): FirebaseApp {
   return firebaseApp;
 }
 
-/**
- * Get Firebase Auth instance (lazy)
- */
-export function getFirebaseAuthInstance(): Auth | null {
-  return firebaseAuth;
-}
-
-/**
- * Get Firebase Firestore instance (lazy)
- */
-export function getFirebaseDbInstance(): Firestore | null {
-  return firebaseDb;
-}
-
-/**
- * Get Google Auth Provider instance (lazy)
- */
-export function getGoogleProviderInstance(): GoogleAuthProvider | null {
-  return firebaseGoogleProvider;
-}
-
 // Initialize Analytics (only in browser and if supported)
 export const analytics = typeof window !== 'undefined' 
   ? isSupported().then(yes => yes ? getAnalytics(firebaseApp!) : null)

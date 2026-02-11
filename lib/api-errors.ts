@@ -76,25 +76,6 @@ export function handleApiError(error: unknown, context?: Record<string, string |
 }
 
 /**
- * Wrap API route handlers with error handling
- * @param handler The API route handler function
- * @returns Wrapped handler with automatic error handling
- */
-export function withErrorHandling<T extends (...args: unknown[]) => Promise<NextResponse>>(
-  handler: T
-): T {
-  return (async (...args: unknown[]) => {
-    try {
-      return await handler(...args);
-    } catch (error) {
-      return handleApiError(error, {
-        handler: handler.name,
-      });
-    }
-  }) as T;
-}
-
-/**
  * Create a success response with consistent formatting
  */
 export function successResponse<T>(data: T, status: number = 200): NextResponse {

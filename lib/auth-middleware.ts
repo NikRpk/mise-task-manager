@@ -167,27 +167,3 @@ export async function withAuth(
     });
   }
 }
-
-/**
- * Middleware wrapper for project-specific routes with permission check
- * Automatically handles authentication and authorization errors
- */
-export async function withProjectPermission(
-  request: NextRequest,
-  projectId: string,
-  requiredRole: ProjectRole,
-  handler: (request: NextRequest, user: { uid: string; email: string; displayName: string }) => Promise<Response>
-): Promise<Response> {
-  try {
-    const user = await verifyAuth(request);
-    await checkProjectPermission(user.uid, projectId, requiredRole);
-    return await handler(request, user);
-  } catch (error) {
-    return handleApiError(error, {
-      endpoint: request.nextUrl.pathname,
-      method: request.method,
-      projectId,
-      requiredRole,
-    });
-  }
-}

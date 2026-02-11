@@ -769,17 +769,3 @@ export async function isCalendarConnected(userId: string): Promise<boolean> {
   const refreshToken = await getUserRefreshToken(userId);
   return !!refreshToken;
 }
-
-/**
- * Extract recurring event information from a calendar event
- * Used to link notes from the same recurring meeting series
- */
-export function extractRecurringInfo(calendarEvent: { recurringEventId?: string; start?: { dateTime?: string; date?: string } }): {
-  recurringEventId: string | null;
-  instanceDate: string | null;
-} {
-  return {
-    recurringEventId: calendarEvent.recurringEventId || null,
-    instanceDate: calendarEvent.start?.dateTime || calendarEvent.start?.date || null
-  };
-}
