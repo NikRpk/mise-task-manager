@@ -10,6 +10,9 @@ let adminDbInstance: Firestore | null = null;
 /**
  * Initialize Firebase Admin (lazy initialization)
  * Called on first access to avoid initialization during build time
+ * 
+ * Uses Application Default Credentials (ADC) in production (Cloud Run)
+ * Falls back to explicit credentials from env vars in development
  */
 function initializeFirebaseAdmin(): App {
   if (adminApp) {
@@ -21,13 +24,25 @@ function initializeFirebaseAdmin(): App {
     return adminApp;
   }
 
-  adminApp = initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
+  // In production (Cloud Run), use Application Default Credentials
+  // In development, use explicit credentials from .env.local
+  const isProduction = process.env.NODE_ENV === 'production' && !process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+  
+  if (isProduction) {
+    // Cloud Run automatically provides credentials via ADC
+    adminApp = initializeApp({
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.FIREBASE_ADMIN_PROJECT_ID,
+    });
+  } else {
+    // Local development: use explicit credentials
+    adminApp = initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }),
+    });
+  }
 
   return adminApp;
 }

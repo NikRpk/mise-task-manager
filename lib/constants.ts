@@ -200,3 +200,6 @@ export const NOTES_PER_PAGE = 50;
 
 /** Number of days to fetch upcoming calendar events */
 export const CALENDAR_FETCH_DAYS = 30;
+
+/** Number of hours to look back for recent past events */
+export const CALENDAR_LOOKBACK_HOURS = 2;

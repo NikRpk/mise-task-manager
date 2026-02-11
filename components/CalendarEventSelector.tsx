@@ -27,9 +27,18 @@ export default function CalendarEventSelector({
   onSelectEvent,
 }: CalendarEventSelectorProps) {
   const { user } = useAuth();
-  const { events, loading, connected, checkedConnection, error, isAuthError, connectCalendar, clearError } = useCalendarEvents(user?.uid);
+  const { events, loading, connected, checkedConnection, error, isAuthError, connectCalendar, clearError, fetchEvents } = useCalendarEvents(user?.uid);
   const [searchQuery, setSearchQuery] = useState('');
   const [userTimezone, setUserTimezone] = useState(DEFAULT_TIMEZONE);
+  const [hasRefreshedOnOpen, setHasRefreshedOnOpen] = useState(false);
+  const [pastEvents, setPastEvents] = useState<CalendarEvent[]>([]);
+  const [loadingPast, setLoadingPast] = useState(false);
+  const [canLoadMore, setCanLoadMore] = useState(true);
+
+  // Combine current and past events
+  const allEvents = useMemo(() => {
+    return [...pastEvents, ...events];
+  }, [pastEvents, events]);
 
   // Fetch user's timezone setting
   useEffect(() => {
@@ -51,6 +60,22 @@ export default function CalendarEventSelector({
     }
   }, [user]);
 
+  // Fetch events in background when dialog opens (only once per open)
+  useEffect(() => {
+    if (isOpen && connected && !hasRefreshedOnOpen) {
+      setHasRefreshedOnOpen(true);
+      // Background fetch - doesn't block UI
+      fetchEvents().catch(() => {
+        // Silently fail - we already have cached data
+      });
+    }
+    
+    // Reset when dialog closes
+    if (!isOpen && hasRefreshedOnOpen) {
+      setHasRefreshedOnOpen(false);
+    }
+  }, [isOpen, connected, hasRefreshedOnOpen, fetchEvents]);
+
   // Handle ESC key to close
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -65,10 +90,49 @@ export default function CalendarEventSelector({
 
   // Filter events by search query
   const filteredEvents = useMemo(() => {
-    return events.filter(event =>
+    return allEvents.filter(event =>
       event.summary.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [events, searchQuery]);
+  }, [allEvents, searchQuery]);
+
+  // Load more past events
+  const loadMorePastEvents = useCallback(async () => {
+    if (loadingPast || !canLoadMore) return;
+    
+    setLoadingPast(true);
+    try {
+      // Get the earliest event we have
+      const earliestEvent = allEvents.length > 0 
+        ? allEvents.reduce((earliest, event) => 
+            new Date(event.start) < new Date(earliest.start) ? event : earliest
+          )
+        : null;
+      
+      if (!earliestEvent) {
+        setCanLoadMore(false);
+        return;
+      }
+      
+      const beforeDate = new Date(earliestEvent.start).toISOString();
+      const res = await authenticatedFetch(`/api/calendar/events/past?before=${beforeDate}`);
+      
+      if (!res.ok) {
+        throw new Error('Failed to load past events');
+      }
+      
+      const data = await res.json();
+      
+      if (data.events.length === 0) {
+        setCanLoadMore(false);
+      } else {
+        setPastEvents(prev => [...data.events, ...prev]);
+      }
+    } catch (error) {
+      console.error('Failed to load past events:', error);
+    } finally {
+      setLoadingPast(false);
+    }
+  }, [loadingPast, canLoadMore, allEvents]);
 
   // Group events by day
   const eventsByDay = useMemo(() => {
@@ -261,6 +325,30 @@ export default function CalendarEventSelector({
 
               {/* Scrollable Events Area */}
               <div className="flex-1 overflow-y-auto px-6 pb-6">
+                {/* Load More Past Events Button */}
+                {canLoadMore && allEvents.length > 0 && (
+                  <div className="mb-4">
+                    <button
+                      onClick={loadMorePastEvents}
+                      disabled={loadingPast}
+                      className="w-full p-3 border rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm"
+                      style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+                    >
+                      {loadingPast ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: 'var(--color-primary)' }}></div>
+                          <span>Loading earlier events...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock size={16} />
+                          <span>Load earlier events (past week)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+                
                 {/* Events Grouped by Day */}
                 <div className="space-y-4">
                   {Object.entries(eventsByDay)

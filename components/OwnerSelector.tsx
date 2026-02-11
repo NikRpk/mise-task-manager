@@ -50,9 +50,6 @@ export default function OwnerSelector({ value, onChange, people, disabled = fals
   // Close dropdown when clicking outside (must check both container and dropdown)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/95e11960-e412-410c-be98-153e2d25f6e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OwnerSelector.tsx:47',message:'handleClickOutside triggered',data:{isContainer:containerRef.current?.contains(event.target as Node),isDropdown:dropdownRef.current?.contains(event.target as Node),targetTag:(event.target as HTMLElement)?.tagName,targetClass:(event.target as HTMLElement)?.className},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H'})}).catch(()=>{});
-      // #endregion
       const isInsideContainer = containerRef.current?.contains(event.target as Node);
       const isInsideDropdown = dropdownRef.current?.contains(event.target as Node);
       
@@ -68,9 +65,6 @@ export default function OwnerSelector({ value, onChange, people, disabled = fals
   }, [isOpen]);
 
   const handleSelect = (email: string, displayName: string) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/95e11960-e412-410c-be98-153e2d25f6e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OwnerSelector.tsx:47',message:'handleSelect called',data:{email,displayName,currentValue:value},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     onChange(email);
     setSearchQuery(displayName);
     setIsOpen(false);
@@ -145,9 +139,6 @@ export default function OwnerSelector({ value, onChange, people, disabled = fals
             }, 200);
           }}
           onKeyDown={(e) => {
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/95e11960-e412-410c-be98-153e2d25f6e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OwnerSelector.tsx:95',message:'Key pressed in input',data:{key:e.key,filteredCount:filteredPeople.length,firstPerson:filteredPeople[0]?.displayName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'J'})}).catch(()=>{});
-            // #endregion
             if (e.key === 'Enter') {
               e.preventDefault();
               if (filteredPeople.length > 0) {
@@ -178,9 +169,6 @@ export default function OwnerSelector({ value, onChange, people, disabled = fals
         <div 
           ref={(el) => {
             dropdownRef.current = el;
-            // #region agent log
-            if (el) fetch('http://127.0.0.1:7243/ingest/95e11960-e412-410c-be98-153e2d25f6e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OwnerSelector.tsx:106',message:'Dropdown rendered',data:{position:window.getComputedStyle(el).position,zIndex:window.getComputedStyle(el).zIndex,boundingRect:{top:el.getBoundingClientRect().top,left:el.getBoundingClientRect().left,bottom:el.getBoundingClientRect().bottom},parentOverflow:el.parentElement?window.getComputedStyle(el.parentElement).overflow:'none',isClipped:el.getBoundingClientRect().bottom>window.innerHeight},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
-            // #endregion
           }}
           className="fixed z-[150] rounded-md shadow-lg border overflow-hidden"
           style={{ 
@@ -222,9 +210,6 @@ export default function OwnerSelector({ value, onChange, people, disabled = fals
                 type="button"
                 onMouseDown={(e) => {
                   // Use onMouseDown instead of onClick to fire before onBlur
-                  // #region agent log
-                  fetch('http://127.0.0.1:7243/ingest/95e11960-e412-410c-be98-153e2d25f6e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OwnerSelector.tsx:147',message:'Person button clicked',data:{email:person.email,displayName:person.displayName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'I'})}).catch(()=>{});
-                  // #endregion
                   e.preventDefault();
                   e.stopPropagation();
                   handleSelect(person.email, person.displayName);

@@ -18,7 +18,7 @@ import { CalendarEvent } from '@/types';
 console.log('[MODULE] types imported');
 
 import { logger } from './logger';
-import { CALENDAR_FETCH_DAYS } from './constants';
+import { CALENDAR_FETCH_DAYS, CALENDAR_LOOKBACK_HOURS } from './constants';
 import { addPeopleFromAttendees } from './google-directory';
 
 console.log('[MODULE] google-calendar.ts fully loaded');
@@ -296,13 +296,15 @@ export async function fetchUpcomingEvents(userId: string): Promise<CalendarEvent
     
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
     
+    // Fetch events from 2 hours ago to 30 days in the future
     const now = new Date();
+    const pastTime = new Date(now.getTime() - (CALENDAR_LOOKBACK_HOURS * 60 * 60 * 1000));
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + CALENDAR_FETCH_DAYS);
     
     const response = await calendar.events.list({
       calendarId: 'primary',
-      timeMin: now.toISOString(),
+      timeMin: pastTime.toISOString(),
       timeMax: futureDate.toISOString(),
       maxResults: 50,
       singleEvents: true,

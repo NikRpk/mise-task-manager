@@ -14,17 +14,22 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state'); // Contains user ID
     const error = searchParams.get('error');
     
+    // Get the proper base URL from the request headers
+    const host = request.headers.get('host') || 'hf-tasks-4e5l57e4iq-ew.a.run.app';
+    const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    const baseUrl = `${protocol}://${host}`;
+    
     // Check if user denied access
     if (error) {
       logger.info('User denied Google Calendar access', { error });
       return NextResponse.redirect(
-        new URL('/settings?section=profile&calendar=denied', request.url)
+        new URL('/settings?section=profile&calendar=denied', baseUrl)
       );
     }
     
     if (!code || !state) {
       return NextResponse.redirect(
-        new URL('/settings?section=profile&calendar=error', request.url)
+        new URL('/settings?section=profile&calendar=error', baseUrl)
       );
     }
     
@@ -40,12 +45,18 @@ export async function GET(request: NextRequest) {
     
     // Redirect back to settings with success message
     return NextResponse.redirect(
-      new URL('/settings?section=profile&calendar=connected', request.url)
+      new URL('/settings?section=profile&calendar=connected', baseUrl)
     );
   } catch (error) {
     logger.error('OAuth callback error', error as Error);
+    
+    // Use proper base URL for error redirect too
+    const host = request.headers.get('host') || 'hf-tasks-4e5l57e4iq-ew.a.run.app';
+    const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    const baseUrl = `${protocol}://${host}`;
+    
     return NextResponse.redirect(
-      new URL('/settings?section=profile&calendar=error', request.url)
+      new URL('/settings?section=profile&calendar=error', baseUrl)
     );
   }
 }

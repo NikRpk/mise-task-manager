@@ -1,0 +1,34 @@
+# Buildpack configuration for Cloud Run
+# This file tells buildpacks how to handle environment variables
+
+[[build.env]]
+name = "NEXT_PUBLIC_FIREBASE_API_KEY"
+value = "AIzaSyAfzXqbXpP-XqbrQCo72WDquWd8Yiu-gBY"
+
+[[build.env]]
+name = "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"
+value = "dach-ai-mvps.firebaseapp.com"
+
+[[build.env]]
+name = "NEXT_PUBLIC_FIREBASE_PROJECT_ID"
+value = "dach-ai-mvps"
+
+[[build.env]]
+name = "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"
+value = "dach-ai-mvps.firebasestorage.app"
+
+[[build.env]]
+name = "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"
+value = "1014309748045"
+
+[[build.env]]
+name = "NEXT_PUBLIC_FIREBASE_APP_ID"
+value = "1:1014309748045:web:5bba4f0910e8f556ffcb04"
+
+[[build.env]]
+name = "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID"
+value = "G-HJL2Y0VRXJ"
+
+[[build.env]]
+name = "NODE_ENV"
+value = "production"

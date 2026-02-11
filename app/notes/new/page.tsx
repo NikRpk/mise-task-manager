@@ -602,17 +602,9 @@ function NewNotePage() {
                 <p>Click here to create your first task</p>
               </div>
             ) : (
-              <div className="overflow-x-auto max-h-96 overflow-y-auto" ref={(el) => {
-                // #region agent log
-                if (el) fetch('http://127.0.0.1:7243/ingest/95e11960-e412-410c-be98-153e2d25f6e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'notes/new/page.tsx:428',message:'Table container rendered',data:{hasOverflow:el.style.overflow,computedOverflow:window.getComputedStyle(el).overflow,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-                // #endregion
-              }}>
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="w-full">
-                  <thead ref={(el) => {
-                    // #region agent log
-                    if (el) fetch('http://127.0.0.1:7243/ingest/95e11960-e412-410c-be98-153e2d25f6e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'notes/new/page.tsx:430',message:'Table header rendered',data:{position:window.getComputedStyle(el).position,top:window.getComputedStyle(el).top,sticky:window.getComputedStyle(el).position==='sticky'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
-                    // #endregion
-                  }} className="sticky top-0 z-10">
+                  <thead className="sticky top-0 z-10">
                     <tr className="border-b" style={{ backgroundColor: '#f8fafc', borderColor: 'var(--color-border)' }}>
                       <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '5%' }} title="Create task in default project">
                         📋
@@ -666,11 +658,7 @@ function NewNotePage() {
                             className="dense-table-input w-full px-2.5 py-1.5 border rounded-md text-sm"
                           />
                         </td>
-                        <td className="px-4 py-2" ref={(el) => {
-                          // #region agent log
-                          if (el && index === 0) fetch('http://127.0.0.1:7243/ingest/95e11960-e412-410c-be98-153e2d25f6e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'notes/new/page.tsx:467',message:'Owner cell rendered',data:{overflow:window.getComputedStyle(el).overflow,position:window.getComputedStyle(el).position,parentOverflow:el.parentElement?window.getComputedStyle(el.parentElement).overflow:'none'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-                          // #endregion
-                        }}>
+                        <td className="px-4 py-2">
                           <OwnerSelector
                             value={task.owner}
                             onChange={(value) => updateTask(task.id, { owner: value })}

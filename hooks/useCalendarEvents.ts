@@ -34,7 +34,7 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
   const [isAuthError, setIsAuthError] = useState(false);
   const cache = useCache();
 
-  // Use cached fetch with 15-minute TTL
+  // Use cached fetch with 15-minute TTL, but manual refetch only
   const { data: cachedEvents, isLoading, refetch } = useCachedFetch<CalendarEvent[]>(
     'calendar-events',
     async () => {
@@ -70,6 +70,8 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
     {
       ttl: 15 * 60 * 1000, // 15 minutes
       enabled: connected && !!userId,
+      refetchOnMount: false, // Don't auto-refetch on mount
+      refetchInterval: false, // Disable auto-refetch interval
       onError: (err) => {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
         setError(errorMessage);
