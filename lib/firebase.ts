@@ -19,6 +19,19 @@ let firebaseAuth: Auth | null = null;
 let firebaseDb: Firestore | null = null;
 let firebaseGoogleProvider: GoogleAuthProvider | null = null;
 
+// Initialize on first module evaluation in browser
+if (typeof window !== 'undefined') {
+  firebaseApp = initializeFirebaseApp();
+  firebaseAuth = getAuth(firebaseApp);
+  firebaseDb = getFirestore(firebaseApp);
+  firebaseGoogleProvider = new GoogleAuthProvider();
+}
+
+// Export the instances directly (will be null during SSR, initialized in browser)
+export const auth = firebaseAuth as Auth;
+export const db = firebaseDb as Firestore;
+export const googleProvider = firebaseGoogleProvider as GoogleAuthProvider;
+
 /**
  * Initialize Firebase app (lazy, browser-only)
  * Only initializes when actually running in browser, not during SSR/build
@@ -48,15 +61,6 @@ function initializeFirebaseApp(): FirebaseApp {
  * Get Firebase Auth instance (lazy)
  */
 export function getFirebaseAuthInstance(): Auth | null {
-  // Always check if we're in browser before attempting to initialize
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  
-  if (!firebaseAuth) {
-    const app = initializeFirebaseApp();
-    firebaseAuth = getAuth(app);
-  }
   return firebaseAuth;
 }
 
@@ -64,15 +68,6 @@ export function getFirebaseAuthInstance(): Auth | null {
  * Get Firebase Firestore instance (lazy)
  */
 export function getFirebaseDbInstance(): Firestore | null {
-  // Always check if we're in browser before attempting to initialize
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  
-  if (!firebaseDb) {
-    const app = initializeFirebaseApp();
-    firebaseDb = getFirestore(app);
-  }
   return firebaseDb;
 }
 
@@ -80,59 +75,12 @@ export function getFirebaseDbInstance(): Firestore | null {
  * Get Google Auth Provider instance (lazy)
  */
 export function getGoogleProviderInstance(): GoogleAuthProvider | null {
-  // Always check if we're in browser before attempting to initialize
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  
-  if (!firebaseGoogleProvider) {
-    firebaseGoogleProvider = new GoogleAuthProvider();
-  }
   return firebaseGoogleProvider;
 }
 
-// Backward compatibility - use Proxies that delegate to lazy getters
-export const auth = new Proxy({} as Auth, {
-  get(_target, prop) {
-    console.log('[FIREBASE PROXY] Auth proxy accessed, property:', prop);
-    const authInstance = getFirebaseAuthInstance();
-    console.log('[FIREBASE PROXY] Auth instance:', authInstance);
-    if (!authInstance) {
-      throw new Error('Firebase Auth not initialized - must be used in browser context');
-    }
-    const value = authInstance[prop as keyof Auth];
-    console.log('[FIREBASE PROXY] Returning value:', typeof value, value);
-    return value;
-  }
-});
-
-export const db = new Proxy({} as Firestore, {
-  get(_target, prop) {
-    const dbInstance = getFirebaseDbInstance();
-    if (!dbInstance) {
-      throw new Error('Firebase Firestore not initialized - must be used in browser context');
-    }
-    return dbInstance[prop as keyof Firestore];
-  }
-});
-
-export const googleProvider = new Proxy({} as GoogleAuthProvider, {
-  get(_target, prop) {
-    console.log('[FIREBASE PROXY] GoogleProvider proxy accessed, property:', prop);
-    const providerInstance = getGoogleProviderInstance();
-    console.log('[FIREBASE PROXY] Provider instance:', providerInstance);
-    if (!providerInstance) {
-      throw new Error('Google Auth Provider not initialized - must be used in browser context');
-    }
-    const value = providerInstance[prop as keyof GoogleAuthProvider];
-    console.log('[FIREBASE PROXY] Returning value:', typeof value, value);
-    return value;
-  }
-});
-
 // Initialize Analytics (only in browser and if supported)
 export const analytics = typeof window !== 'undefined' 
-  ? isSupported().then(yes => yes ? getAnalytics(initializeFirebaseApp()) : null)
+  ? isSupported().then(yes => yes ? getAnalytics(firebaseApp!) : null)
   : Promise.resolve(null);
 
 export default initializeFirebaseApp;
