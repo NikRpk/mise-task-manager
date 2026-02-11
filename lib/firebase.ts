@@ -47,54 +47,78 @@ function initializeFirebaseApp(): FirebaseApp {
 /**
  * Get Firebase Auth instance (lazy)
  */
-export function getFirebaseAuthInstance(): Auth {
-  if (!firebaseAuth && typeof window !== 'undefined') {
+export function getFirebaseAuthInstance(): Auth | null {
+  // Always check if we're in browser before attempting to initialize
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  
+  if (!firebaseAuth) {
     const app = initializeFirebaseApp();
     firebaseAuth = getAuth(app);
   }
-  return firebaseAuth as Auth;
+  return firebaseAuth;
 }
 
 /**
  * Get Firebase Firestore instance (lazy)
  */
-export function getFirebaseDbInstance(): Firestore {
-  if (!firebaseDb && typeof window !== 'undefined') {
+export function getFirebaseDbInstance(): Firestore | null {
+  // Always check if we're in browser before attempting to initialize
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  
+  if (!firebaseDb) {
     const app = initializeFirebaseApp();
     firebaseDb = getFirestore(app);
   }
-  return firebaseDb as Firestore;
+  return firebaseDb;
 }
 
 /**
  * Get Google Auth Provider instance (lazy)
  */
-export function getGoogleProviderInstance(): GoogleAuthProvider {
-  if (!firebaseGoogleProvider && typeof window !== 'undefined') {
+export function getGoogleProviderInstance(): GoogleAuthProvider | null {
+  // Always check if we're in browser before attempting to initialize
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  
+  if (!firebaseGoogleProvider) {
     firebaseGoogleProvider = new GoogleAuthProvider();
   }
-  return firebaseGoogleProvider as GoogleAuthProvider;
+  return firebaseGoogleProvider;
 }
 
 // Backward compatibility - use Proxies that delegate to lazy getters
 export const auth = new Proxy({} as Auth, {
   get(_target, prop) {
     const authInstance = getFirebaseAuthInstance();
-    return authInstance?.[prop as keyof Auth];
+    if (!authInstance) {
+      throw new Error('Firebase Auth not initialized - must be used in browser context');
+    }
+    return authInstance[prop as keyof Auth];
   }
 });
 
 export const db = new Proxy({} as Firestore, {
   get(_target, prop) {
     const dbInstance = getFirebaseDbInstance();
-    return dbInstance?.[prop as keyof Firestore];
+    if (!dbInstance) {
+      throw new Error('Firebase Firestore not initialized - must be used in browser context');
+    }
+    return dbInstance[prop as keyof Firestore];
   }
 });
 
 export const googleProvider = new Proxy({} as GoogleAuthProvider, {
   get(_target, prop) {
     const providerInstance = getGoogleProviderInstance();
-    return providerInstance?.[prop as keyof GoogleAuthProvider];
+    if (!providerInstance) {
+      throw new Error('Google Auth Provider not initialized - must be used in browser context');
+    }
+    return providerInstance[prop as keyof GoogleAuthProvider];
   }
 });
 
