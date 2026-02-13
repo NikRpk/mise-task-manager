@@ -12,7 +12,7 @@ import { usePeopleData } from '@/hooks/usePeopleData';
 interface TaskCardProps {
   task: Task;
   onClick: () => void;
-  onQuickComplete?: (taskId: string) => void; // Handler for quick complete checkbox
+  onQuickComplete?: (taskId: string) => Promise<boolean> | boolean; // Handler returns true if completion should proceed
   statusColor?: string;
   viewMode?: 'normal' | 'compact';
   canDrag?: boolean;
@@ -113,16 +113,18 @@ const TaskCard = memo(function TaskCard({
     }
   }, [isDragging, onClick]);
   
-  const handleQuickComplete = useCallback((e: React.MouseEvent) => {
+  const handleQuickComplete = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card click
     if (onQuickComplete && task.status !== 'done') {
-      // Trigger animation
-      setIsCompleting(true);
+      // Call handler first to check if completion should proceed
+      const shouldProceed = await onQuickComplete(task.id);
       
-      // Update status after animation completes (2 seconds)
-      setTimeout(() => {
-        onQuickComplete(task.id);
-      }, 2000);
+      // Only start animation if validation passed
+      if (shouldProceed) {
+        setIsCompleting(true);
+        
+        // Animation plays for 2 seconds, status is already updated by parent
+      }
     }
   }, [onQuickComplete, task.id, task.status]);
   

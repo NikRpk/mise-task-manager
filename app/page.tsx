@@ -18,6 +18,7 @@ import UserProfile from '@/components/UserProfile';
 import EmptyProjectState from '@/components/EmptyProjectState';
 import InputDialog from '@/components/InputDialog';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import AlertDialog from '@/components/AlertDialog';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
@@ -117,6 +118,12 @@ function HomePage() {
     isOpen: false,
     message: '',
     onConfirm: () => {},
+  });
+  const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type?: 'error' | 'warning' | 'info' | 'success' }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'warning',
   });
   
   // Fetch user permissions for selected project
@@ -281,16 +288,43 @@ function HomePage() {
     );
   }, [setTasks]);
   
+  // Helper function to check if task has incomplete subtasks
+  const hasIncompleteSubtasks = useCallback((task: Task): boolean => {
+    return task.subTasks && task.subTasks.some(subtask => !subtask.completed);
+  }, []);
+  
+  // Get count of incomplete subtasks
+  const getIncompleteSubtasksCount = useCallback((task: Task): number => {
+    if (!task.subTasks) return 0;
+    return task.subTasks.filter(subtask => !subtask.completed).length;
+  }, []);
+  
   // Quick complete handler for task cards
-  const handleQuickComplete = useCallback(async (taskId: string) => {
+  const handleQuickComplete = useCallback(async (taskId: string): Promise<boolean> => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return false;
+    
+    // Check for incomplete subtasks
+    if (hasIncompleteSubtasks(task)) {
+      const incompleteCount = getIncompleteSubtasksCount(task);
+      setAlertDialog({
+        isOpen: true,
+        title: 'Cannot Complete Task',
+        message: `This task has ${incompleteCount} incomplete subtask${incompleteCount > 1 ? 's' : ''}. Please complete all subtasks before marking the task as done.`,
+        type: 'warning',
+      });
+      return false; // Don't proceed with animation
+    }
+    
     try {
-      // Update status immediately - the card's animation will play before it's removed
+      // Update status immediately - validation passed
       await updateTaskStatus(taskId, 'done');
+      return true; // Proceed with animation
     } catch (error) {
       // Error already logged and rolled back in hook
-      // Could show error toast here
+      return false; // Don't animate on error
     }
-  }, [updateTaskStatus]);
+  }, [tasks, updateTaskStatus, hasIncompleteSubtasks, getIncompleteSubtasksCount]);
 
   const handleTaskClick = useCallback((task: Task) => {
     setSelectedTask(task);
@@ -315,6 +349,21 @@ function HomePage() {
 
     const taskId = active.id as string;
     const newStatus = over.id as TaskStatus;
+    
+    // Check for incomplete subtasks when moving to 'done'
+    if (newStatus === 'done') {
+      const task = tasks.find(t => t.id === taskId);
+      if (task && hasIncompleteSubtasks(task)) {
+        const incompleteCount = getIncompleteSubtasksCount(task);
+        setAlertDialog({
+          isOpen: true,
+          title: 'Cannot Complete Task',
+          message: `This task has ${incompleteCount} incomplete subtask${incompleteCount > 1 ? 's' : ''}. Please complete all subtasks before moving the task to done.`,
+          type: 'warning',
+        });
+        return;
+      }
+    }
 
     try {
       await updateTaskStatus(taskId, newStatus);
@@ -322,7 +371,7 @@ function HomePage() {
       // Error already logged and UI rolled back in hook
       setError('Failed to update task status. The change has been reverted.');
     }
-  }, [updateTaskStatus]);
+  }, [tasks, updateTaskStatus, hasIncompleteSubtasks, getIncompleteSubtasksCount]);
   
   const handleDragCancel = useCallback(() => {
     setActiveTask(null);
@@ -958,6 +1007,14 @@ function HomePage() {
         title="Delete Note"
         message={confirmDialog.message}
         type="danger"
+      />
+      
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        type={alertDialog.type}
       />
       
       <InputDialog

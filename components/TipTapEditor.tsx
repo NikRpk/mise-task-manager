@@ -152,6 +152,32 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
       }
     },
     editorProps: {
+      handleKeyDown: (view, event) => {
+        // Handle Enter key on empty list items to un-indent
+        if (event.key === 'Enter' && !event.shiftKey) {
+          const { state } = view;
+          const { selection } = state;
+          const { $from } = selection;
+          
+          // Check if we're in a list item
+          const listItem = $from.node($from.depth - 1);
+          const isList = listItem?.type.name === 'listItem';
+          
+          if (isList) {
+            // Check if the list item is empty
+            const listItemContent = listItem?.textContent || '';
+            if (listItemContent.trim() === '') {
+              // Check if we can lift (un-indent)
+              if (editor?.can().liftListItem('listItem')) {
+                event.preventDefault();
+                editor?.chain().focus().liftListItem('listItem').run();
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      },
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items;
         if (!items) return false;
@@ -447,6 +473,25 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         .ProseMirror ul:not([data-type="taskList"]) {
           list-style-type: disc;
         }
+        /* Nested bullet list styling - alternating colors */
+        .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) {
+          list-style-type: circle !important; /* Second level - white/hollow circle */
+        }
+        .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) > li {
+          list-style-type: circle !important;
+        }
+        .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) {
+          list-style-type: disc !important; /* Third level - back to disc */
+        }
+        .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) > li {
+          list-style-type: disc !important;
+        }
+        .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) {
+          list-style-type: circle !important; /* Fourth level - circle again */
+        }
+        .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) > li {
+          list-style-type: circle !important;
+        }
         .ProseMirror ol {
           list-style-type: decimal;
         }
@@ -457,6 +502,19 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         }
         .ProseMirror ul:not([data-type="taskList"]) li {
           list-style: disc;
+          list-style-position: outside;
+        }
+        /* Override for nested levels - alternating bullet styles */
+        .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) > li {
+          list-style: circle !important;
+          list-style-position: outside;
+        }
+        .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) > li {
+          list-style: disc !important;
+          list-style-position: outside;
+        }
+        .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) > li {
+          list-style: circle !important;
           list-style-position: outside;
         }
         .ProseMirror ol li {
@@ -548,18 +606,24 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         }
         .ProseMirror ul[data-type="taskList"] li {
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           gap: 0.5rem;
           min-height: 1.5em; /* Ensure task items have minimum height */
         }
         .ProseMirror ul[data-type="taskList"] li label {
           flex: 0 0 auto;
-          margin-top: 0.25rem;
+          display: flex;
+          align-items: center;
         }
         .ProseMirror ul[data-type="taskList"] li input[type="checkbox"] {
           cursor: pointer;
         }
-        /* Fix cursor visibility in empty task list items */
+        /* Fix cursor visibility in task list items */
+        .ProseMirror ul[data-type="taskList"] li > div,
+        .ProseMirror ul[data-type="taskList"] li > p {
+          cursor: text;
+          flex: 1;
+        }
         .ProseMirror ul[data-type="taskList"] li > div:empty::after,
         .ProseMirror ul[data-type="taskList"] li > p:empty::after {
           content: '\\u200B'; /* Zero-width space */

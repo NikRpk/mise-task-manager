@@ -97,6 +97,17 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
   const saveTaskToServer = useCallback(async (data: Partial<Task>) => {
     if (!taskRef.current || saveInProgressRef.current) return;
     
+    // Validate: Don't save if trying to set status to 'done' with incomplete subtasks
+    if (data.status === 'done' && taskRef.current) {
+      const currentSubtasks = formDataRef.current.subTasks || [];
+      const hasIncomplete = currentSubtasks.some(st => !st.completed);
+      
+      if (hasIncomplete) {
+        // Silently prevent the save - the UI has already shown the alert
+        return;
+      }
+    }
+    
     saveInProgressRef.current = true;
     setIsSaving(true);
     setSaveError(null);
@@ -252,6 +263,32 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
 
   // Update formData and trigger auto-save
   const updateFormData = (updates: Partial<Task>) => {
+    // Check for incomplete subtasks when changing status to 'done'
+    if (updates.status === 'done' && task) {
+      const currentSubtasks = formData.subTasks || [];
+      const hasIncomplete = currentSubtasks.some(st => !st.completed);
+      
+      if (hasIncomplete) {
+        const incompleteCount = currentSubtasks.filter(st => !st.completed).length;
+        
+        // Cancel any pending saves to prevent issues
+        if (debouncedSave.cancel) {
+          debouncedSave.cancel();
+        }
+        
+        setAlertDialog({
+          isOpen: true,
+          title: 'Cannot Complete Task',
+          message: `This task has ${incompleteCount} incomplete subtask${incompleteCount > 1 ? 's' : ''}. Please complete all subtasks before changing the status to done.`,
+          type: 'warning',
+        });
+        
+        // Force a re-render to ensure the dropdown shows the correct value
+        setFormData({ ...formData });
+        return; // Don't update the status
+      }
+    }
+    
     const newData = { ...formData, ...updates };
     setFormData(newData);
     setHasUnsavedChanges(true);
