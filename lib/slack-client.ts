@@ -112,19 +112,12 @@ function formatMessageBlocks(
   meetingDate: string,
   userTasks: NoteTask[]
 ): Array<Record<string, unknown>> {
-  // Format date as dd.MM.YYYY (German format)
-  const formattedDate = new Date(meetingDate).toLocaleDateString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-
   const blocks: Array<Record<string, unknown>> = [
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `:memo: See the notes from *${noteTitle}*\n\nMeeting date: ${formattedDate}`,
+        text: `Notes from *"${noteTitle}"*`,
       },
     },
     {
@@ -154,10 +147,10 @@ function formatMessageBlocks(
       let taskText = `• ${task.title}`;
       
       if (task.deadline) {
-        // Format deadline as dd.MM (just day and month)
+        // Format deadline as DD.MM (just day and month)
         const deadlineDate = new Date(task.deadline);
         const formattedDeadline = `${String(deadlineDate.getDate()).padStart(2, '0')}.${String(deadlineDate.getMonth() + 1).padStart(2, '0')}`;
-        taskText += ` (Due: ${formattedDeadline})`;
+        taskText += `   \`Due: ${formattedDeadline}\``;
       }
       
       blocks.push({
@@ -219,6 +212,8 @@ export async function sendNoteToSlackUser(
       channel: userId,
       text: `Meeting notes: ${noteTitle}`,
       blocks: blocks as never,
+      unfurl_links: false,
+      unfurl_media: false,
     });
 
     if (!messageResult.ok) {

@@ -8,6 +8,32 @@ import { Task, TaskStatus, StatusHistoryEntry } from '@/types';
 import { authenticatedFetch } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
 
+/**
+ * Calculate the next deadline for a recurring task
+ */
+function calculateNextDeadline(
+  currentDeadline: string | null,
+  interval: number,
+  unit: 'days' | 'weeks' | 'months'
+): string {
+  const baseDate = currentDeadline ? new Date(currentDeadline) : new Date();
+  const newDate = new Date(baseDate);
+  
+  switch (unit) {
+    case 'days':
+      newDate.setDate(newDate.getDate() + interval);
+      break;
+    case 'weeks':
+      newDate.setDate(newDate.getDate() + (interval * 7));
+      break;
+    case 'months':
+      newDate.setMonth(newDate.getMonth() + interval);
+      break;
+  }
+  
+  return newDate.toISOString();
+}
+
 interface UseTaskDataResult {
   tasks: Task[];
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
@@ -91,6 +117,38 @@ export function useTaskData(
           statusHistory: [...(task.statusHistory || []), historyEntry]
         }),
       });
+      
+      // Handle recurring tasks - create new instance when marked as done
+      if (newStatus === 'done' && task.isRecurring && task.recurrenceInterval && task.recurrenceUnit) {
+        const newDeadline = calculateNextDeadline(
+          task.deadline,
+          task.recurrenceInterval,
+          task.recurrenceUnit
+        );
+        
+        // Create new recurring task instance
+        const newRecurringTask: Partial<Task> = {
+          ...task,
+          id: undefined, // Let backend generate new ID
+          status: 'todo',
+          deadline: newDeadline,
+          parentRecurringTaskId: task.id,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          statusHistory: [], // Start fresh status history
+          comments: [], // Start fresh comments
+          subTasks: task.subTasks?.map(st => ({ ...st, completed: false })) || [], // Reset subtasks
+        };
+        
+        // Create the new task
+        await authenticatedFetch('/api/tasks', {
+          method: 'POST',
+          body: JSON.stringify(newRecurringTask),
+        });
+        
+        // Refresh tasks to show the new recurring instance
+        await fetchTasks();
+      }
     } catch (error) {
       logger.error('Failed to update task status', error as Error, {
         taskId,
@@ -108,7 +166,7 @@ export function useTaskData(
       
       throw error; // Re-throw so caller can show error
     }
-  }, [tasks, userId]);
+  }, [tasks, userId, fetchTasks]);
 
   const saveTask = useCallback(async (taskData: Partial<Task>) => {
     try {

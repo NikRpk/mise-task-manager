@@ -376,7 +376,7 @@ function NoteEditPage() {
       <div className="border-b" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
         <div className="px-7 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 flex-1">
+            <div className="flex items-center gap-4 flex-1 min-w-0">
               <Link
                 href="/notes"
                 className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
@@ -384,53 +384,58 @@ function NoteEditPage() {
               >
                 <ArrowLeft size={20} style={{ color: 'var(--color-text)' }} />
               </Link>
-              <div className="flex-1 flex items-center gap-4 flex-wrap">
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Note title..."
-                  disabled={!isEditMode}
-                  className="text-2xl font-semibold bg-transparent border-none focus:outline-none min-w-[200px]"
-                  style={{ color: 'var(--color-text)' }}
-                />
+              <div className="flex items-center gap-4 min-w-0 flex-1">
+                <div className="min-w-0 max-w-md relative">
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Note title..."
+                    disabled={!isEditMode}
+                    className="text-2xl font-semibold bg-transparent border-none focus:outline-none w-full pr-8"
+                    style={{ color: 'var(--color-text)' }}
+                  />
+                  {/* Fade overlay when title is long */}
+                  {!isEditMode && title.length > 30 && (
+                    <div 
+                      className="absolute right-0 top-0 bottom-0 w-16 pointer-events-none"
+                      style={{
+                        background: 'linear-gradient(to left, var(--color-surface) 0%, transparent 100%)'
+                      }}
+                    />
+                  )}
+                </div>
                 {note?.calendarEventData && (
-                  <div className="flex items-center gap-3 text-sm">
+                  <div className="flex items-center gap-3 flex-shrink-0">
                     <Calendar size={14} className="text-blue-600 flex-shrink-0" />
                     
                     {/* 2x2 Grid Layout */}
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-1 items-center text-sm">
                       {/* Row 1, Col 1: Date/Time */}
                       <a
                         href={note.calendarEventData.htmlLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-gray-700 hover:text-blue-600 hover:underline transition-colors"
+                        className="text-gray-700 hover:text-blue-600 hover:underline transition-colors whitespace-nowrap"
                       >
                         {format(toZonedTime(new Date(note.calendarEventData.start), userTimezone), 'dd.MM.yyyy, HH:mm')}
                       </a>
                       
-                      {/* Row 1, Col 2: Google Doc Badge */}
-                      <div>
-                        {note.googleDocId && note.googleDocUrl && (
-                          <a
-                            href={note.googleDocUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-medium hover:opacity-80 transition-opacity"
-                            style={{ color: '#166534' }}
-                            title="Open Google Doc"
-                          >
-                            📄 Google Doc
-                          </a>
-                        )}
-                      </div>
+                      {/* Row 1, Col 2: Change Meeting */}
+                      <a
+                        href={note.calendarEventData.htmlLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline whitespace-nowrap"
+                      >
+                        Change meeting
+                      </a>
                       
                       {/* Row 2, Col 1: Attendees */}
                       <div className="relative group">
                         {note.calendarEventData.attendees && note.calendarEventData.attendees.length > 0 && (
                           <>
-                            <span className="text-gray-600 cursor-help">{note.calendarEventData.attendees.length} attendees</span>
+                            <span className="text-gray-600 cursor-help whitespace-nowrap">{note.calendarEventData.attendees.length} attendees</span>
                             
                             {/* Hover Tooltip */}
                             <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50 w-64">
@@ -477,13 +482,27 @@ function NoteEditPage() {
                             href={note.calendarEventData.hangoutLink || note.calendarEventData.conferenceData?.entryPoints?.[0]?.uri}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
+                            className="text-blue-600 hover:underline whitespace-nowrap"
                           >
                             Join Meeting
                           </a>
                         )}
                       </div>
                     </div>
+                    
+                    {/* Google Doc Badge - Outside the grid */}
+                    {note.googleDocId && note.googleDocUrl && (
+                      <a
+                        href={note.googleDocUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium hover:opacity-80 transition-opacity whitespace-nowrap"
+                        style={{ backgroundColor: '#dcfce7', color: '#166534' }}
+                        title="Open Google Doc"
+                      >
+                        📄 Google Doc
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
@@ -565,12 +584,12 @@ function NoteEditPage() {
             {tasks.length === 0 ? (
               <div
                 onClick={() => isEditMode && addTask()}
-                className={`text-sm text-gray-500 text-center py-8 px-6 border-2 border-dashed rounded-lg m-6 ${isEditMode ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors' : ''}`}
+                className={`text-sm text-gray-500 text-center py-3 px-6 border-2 border-dashed rounded-lg m-6 flex items-center justify-center gap-2 ${isEditMode ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors' : ''}`}
                 style={{ borderColor: 'var(--color-border)' }}
               >
                 {isEditMode ? (
                   <>
-                    <Plus size={20} className="mx-auto mb-2 text-gray-400" />
+                    <Plus size={16} className="text-gray-400" />
                     <p>Click here to create your first task</p>
                   </>
                 ) : (

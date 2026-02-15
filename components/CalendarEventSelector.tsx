@@ -190,16 +190,27 @@ export default function CalendarEventSelector({
               Choose an upcoming meeting or create a standalone note
             </p>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            title="Close"
-          >
-            <X size={20} style={{ color: 'var(--color-text)' }} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleNoMeeting}
+              className="px-3 py-1.5 border rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-sm"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+              title="Create note without linking to a meeting"
+            >
+              <Plus size={16} />
+              <span>Create without linking</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Close"
+            >
+              <X size={20} style={{ color: 'var(--color-text)' }} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -305,7 +316,7 @@ export default function CalendarEventSelector({
             <>
               {/* Sticky Search Bar with Loading Indicator */}
               <div className="sticky top-0 z-20 px-6 pt-6 pb-4" style={{ backgroundColor: 'var(--color-surface)' }}>
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-3">
                   <input
                     type="text"
                     placeholder="Search meetings..."
@@ -404,20 +415,6 @@ export default function CalendarEventSelector({
                         </div>
                       );
                     })}
-                </div>
-
-                {/* No Meeting Option */}
-                <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
-                  <button
-                    onClick={handleNoMeeting}
-                    className="w-full p-4 border-2 border-dashed rounded-lg hover:border-green-500 hover:bg-green-50 transition-all flex items-center justify-center gap-2"
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    <Plus size={18} style={{ color: 'var(--color-primary)' }} />
-                    <span className="font-medium" style={{ color: 'var(--color-text)' }}>
-                      Create Note Without Meeting
-                    </span>
-                  </button>
                 </div>
               </div>
             </>

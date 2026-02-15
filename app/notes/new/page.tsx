@@ -447,26 +447,26 @@ function NewNotePage() {
                   style={{ color: 'var(--color-text)' }}
                 />
                 {selectedCalendarEvent && (
-                  <div className="flex items-center gap-3 text-sm">
+                  <div className="flex items-center gap-3">
                     <Calendar size={14} className="text-blue-600 flex-shrink-0" />
                     
                     {/* 2x2 Grid Layout */}
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-1 items-center text-sm">
                       {/* Row 1, Col 1: Date/Time */}
                       <a
                         href={selectedCalendarEvent.htmlLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-gray-700 hover:text-blue-600 hover:underline transition-colors"
+                        className="text-gray-700 hover:text-blue-600 hover:underline transition-colors whitespace-nowrap"
                       >
                         {format(toZonedTime(new Date(selectedCalendarEvent.start), userTimezone), 'dd.MM.yyyy, HH:mm')}
                       </a>
                       
-                      {/* Row 1, Col 2: Change button (placeholder for alignment) */}
+                      {/* Row 1, Col 2: Change button */}
                       <div>
                         <button
                           onClick={() => setShowCalendarSelector(true)}
-                          className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-0.5 rounded transition-colors"
+                          className="text-blue-600 hover:underline whitespace-nowrap"
                         >
                           Change meeting
                         </button>
@@ -476,7 +476,7 @@ function NewNotePage() {
                       <div className="relative group">
                         {selectedCalendarEvent.attendees && selectedCalendarEvent.attendees.length > 0 && (
                           <>
-                            <span className="text-gray-600 cursor-help">{selectedCalendarEvent.attendees.length} attendees</span>
+                            <span className="text-gray-600 cursor-help whitespace-nowrap">{selectedCalendarEvent.attendees.length} attendees</span>
                             
                             {/* Hover Tooltip */}
                             <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50 w-64">
@@ -523,7 +523,7 @@ function NewNotePage() {
                             href={selectedCalendarEvent.hangoutLink || selectedCalendarEvent.conferenceData?.entryPoints?.[0]?.uri}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
+                            className="text-blue-600 hover:underline whitespace-nowrap"
                           >
                             Join Meeting
                           </a>
@@ -595,10 +595,10 @@ function NewNotePage() {
             {tasks.length === 0 ? (
               <div
                 onClick={addTask}
-                className="text-sm text-gray-500 text-center py-8 px-6 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors m-6"
+                className="text-sm text-gray-500 text-center py-3 px-6 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors m-6 flex items-center justify-center gap-2"
                 style={{ borderColor: 'var(--color-border)' }}
               >
-                <Plus size={20} className="mx-auto mb-2 text-gray-400" />
+                <Plus size={16} className="text-gray-400" />
                 <p>Click here to create your first task</p>
               </div>
             ) : (

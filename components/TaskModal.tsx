@@ -49,6 +49,9 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
     tags: [],
     images: [],
     comments: [],
+    isRecurring: false,
+    recurrenceInterval: undefined,
+    recurrenceUnit: undefined,
   });
 
   const [newComment, setNewComment] = useState('');
@@ -63,6 +66,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
   const [editingTitle, setEditingTitle] = useState('');
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'warning' | 'info' | 'success' }>({ isOpen: false, title: '', message: '', type: 'info' });
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState(false);
+  const [unsavedTaskConfirmDialog, setUnsavedTaskConfirmDialog] = useState(false);
   
   // Input dialog states
   const [inputDialog, setInputDialog] = useState<{ isOpen: boolean; title: string; placeholder: string; defaultValue: string; onConfirm: (value: string) => void }>({
@@ -247,7 +251,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
         // Don't close if we're in edit mode for title or if dialogs are open
-        if (!isEditingTitle && !alertDialog.isOpen && !inputDialog.isOpen && !deleteConfirmDialog) {
+        if (!isEditingTitle && !alertDialog.isOpen && !inputDialog.isOpen && !deleteConfirmDialog && !unsavedTaskConfirmDialog) {
           handleClose();
         }
       }
@@ -259,7 +263,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
         document.removeEventListener('keydown', handleEscKey);
       };
     }
-  }, [isOpen, isEditingTitle, alertDialog.isOpen, inputDialog.isOpen, deleteConfirmDialog]);
+  }, [isOpen, isEditingTitle, alertDialog.isOpen, inputDialog.isOpen, deleteConfirmDialog, unsavedTaskConfirmDialog]);
 
   // Update formData and trigger auto-save
   const updateFormData = (updates: Partial<Task>) => {
@@ -296,15 +300,37 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
   };
 
   const handleClose = async () => {
+    // For new tasks, check if there's any content before closing
+    if (!task) {
+      const hasContent = 
+        formDataRef.current.title?.trim() ||
+        formDataRef.current.description?.trim() ||
+        (formDataRef.current.subTasks && formDataRef.current.subTasks.length > 0) ||
+        (formDataRef.current.links && formDataRef.current.links.length > 0) ||
+        (formDataRef.current.tags && formDataRef.current.tags.length > 0);
+      
+      if (hasContent) {
+        // Show confirmation dialog for unsaved new task
+        setUnsavedTaskConfirmDialog(true);
+        return;
+      }
+    }
+    
     // Cancel any pending debounced saves
     if (debouncedSave.cancel) {
       debouncedSave.cancel();
     }
     
+    // Filter out empty sub-tasks before closing
+    const cleanedFormData = {
+      ...formDataRef.current,
+      subTasks: formDataRef.current.subTasks?.filter(st => st.description.trim() !== '') || [],
+    };
+    
     // Force save if there are unsaved changes
     if (task && hasUnsavedChanges && !saveInProgressRef.current) {
       try {
-        await saveTaskToServer(formDataRef.current);
+        await saveTaskToServer(cleanedFormData);
       } catch (error) {
         // Show warning to user before closing
         setAlertDialog({
@@ -315,6 +341,13 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
         });
         return; // Don't close if save failed
       }
+    } else if (task && !saveInProgressRef.current) {
+      // Even if no unsaved changes tracked, save cleaned data to remove empty sub-tasks
+      try {
+        await saveTaskToServer(cleanedFormData);
+      } catch (error) {
+        // Silently fail - not critical
+      }
     }
     
     // Wait for any in-progress save to complete
@@ -323,6 +356,23 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     
+    onClose();
+  };
+
+  const handleSaveNewTask = () => {
+    // Clean up empty sub-tasks
+    const cleanedFormData = {
+      ...formData,
+      subTasks: formData.subTasks?.filter(st => st.description.trim() !== '') || [],
+    };
+    
+    onSave(cleanedFormData);
+    setUnsavedTaskConfirmDialog(false);
+    onClose();
+  };
+
+  const handleDiscardNewTask = () => {
+    setUnsavedTaskConfirmDialog(false);
     onClose();
   };
 
@@ -395,8 +445,15 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!task) {
+      // Filter out empty sub-tasks before saving new task
+      const cleanedFormData = {
+        ...formData,
+        subTasks: formData.subTasks?.filter(st => st.description.trim() !== '') || [],
+        // Auto-assign owner to current user if not set
+        owner: formData.owner || user?.email || '',
+      };
       // Only save on submit for new tasks
-      onSave(formData);
+      onSave(cleanedFormData);
       onClose();
     }
   };
@@ -418,6 +475,15 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
     if (task) {
       debouncedSave(updatedData);
     }
+    
+    // Focus the new input after it's rendered
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('input[placeholder="Sub-task description"]');
+      const lastInput = inputs[inputs.length - 1] as HTMLInputElement;
+      if (lastInput) {
+        lastInput.focus();
+      }
+    }, 0);
   };
 
   const updateSubTask = (id: string, updates: Partial<SubTask>) => {
@@ -603,23 +669,29 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
 
   return (
     <>
+      {/* Fixed blurred background */}
       <div
-        className="fixed inset-0 flex items-center justify-center z-[100] p-4 overflow-y-auto"
+        className="fixed inset-0 z-[100]"
         style={{
           backgroundColor: 'rgba(0, 0, 0, 0.3)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
         }}
         onClick={handleClose}
-      >
+      />
+      
+      {/* Scrollable modal container */}
       <div
-        className="bg-surface rounded-lg w-full max-w-7xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-        style={{ 
-          border: '1px solid #e2e8f0',
-          zIndex: 101,
-        }}
+        className="fixed inset-0 z-[101] flex items-center justify-center p-4 overflow-y-auto"
+        onClick={handleClose}
       >
+        <div
+          className="bg-surface rounded-lg w-full max-w-7xl max-h-[90vh] overflow-y-auto my-auto"
+          onClick={(e) => e.stopPropagation()}
+          style={{ 
+            border: '1px solid #e2e8f0',
+          }}
+        >
         <div
           className="sticky top-0 bg-surface px-8 py-2 z-10"
           style={{ borderBottom: '2px solid #e2e8f0' }}
@@ -711,7 +783,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                 </div>
               )}
             </div>
-            {task && (
+            {task ? (
               <div className="flex items-center gap-6">
                 <button
                   onClick={handleShare}
@@ -769,9 +841,32 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                   })()}
                 </div>
               </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-md transition-colors text-sm font-medium"
+                  style={{
+                    backgroundColor: 'var(--color-surface)',
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text)',
+                    borderWidth: '1px',
+                    borderStyle: 'solid',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  onClick={handleSubmit}
+                  className="px-4 py-2 text-white rounded-md transition-opacity hover:opacity-90 text-sm font-medium"
+                  style={{ backgroundColor: 'var(--color-primary)' }}
+                >
+                  Create Task
+                </button>
+              </div>
             )}
-            <div className="flex items-center gap-3 ml-6">
-            </div>
           </div>
         </div>
 
@@ -833,19 +928,10 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                       Sub-tasks ({formData.subTasks?.length || 0})
                     </label>
                   </div>
-                  <button
-                    type="button"
-                    onClick={addSubTask}
-                    className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors"
-                    style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}
-                  >
-                    <Plus size={14} />
-                    Add
-                  </button>
                 </div>
                 
-                {formData.subTasks && formData.subTasks.length > 0 ? (
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                {formData.subTasks && formData.subTasks.length > 0 && (
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <tbody>
                         {formData.subTasks.map((st, index) => (
@@ -858,23 +944,29 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                             onMouseEnter={(e) => e.currentTarget.style.background = '#fafbfc'}
                             onMouseLeave={(e) => e.currentTarget.style.background = ''}
                           >
-                            <td style={{ width: '40px', textAlign: 'center', padding: '12px 8px' }}>
+                            <td style={{ width: '32px', textAlign: 'center', padding: '6px 8px' }}>
                               <input
                                 type="checkbox"
                                 checked={st.completed}
                                 onChange={(e) => updateSubTask(st.id, { completed: e.target.checked })}
                                 style={{
-                                  width: '18px',
-                                  height: '18px',
+                                  width: '16px',
+                                  height: '16px',
                                   cursor: 'pointer',
                                 }}
                               />
                             </td>
-                            <td style={{ padding: '12px 8px' }}>
+                            <td style={{ padding: '6px 8px' }}>
                               <input
                                 type="text"
                                 value={st.description}
                                 onChange={(e) => updateSubTask(st.id, { description: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    addSubTask();
+                                  }
+                                }}
                                 className="w-full px-2 py-1 border-0 focus:outline-none"
                                 style={{
                                   fontSize: '14px',
@@ -885,15 +977,15 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                                 placeholder="Sub-task description"
                               />
                             </td>
-                            <td style={{ width: '40px', textAlign: 'center', padding: '12px 8px' }}>
+                            <td style={{ width: '32px', textAlign: 'center', padding: '6px 8px' }}>
                               <button
                                 type="button"
                                 onClick={() => removeSubTask(st.id)}
                                 className="transition-colors"
                                 style={{ 
                                   color: '#cbd5e1',
-                                  width: '24px',
-                                  height: '24px',
+                                  width: '20px',
+                                  height: '20px',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -917,11 +1009,24 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                       </tbody>
                     </table>
                   </div>
-                ) : (
-                  <div className="text-center py-8 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                    No sub-tasks yet. Click &quot;Add&quot; to create one.
-                  </div>
                 )}
+                
+                {/* Add new sub-task field */}
+                <div
+                  onClick={addSubTask}
+                  className="cursor-pointer rounded-lg border-2 border-dashed transition-colors hover:border-gray-400 hover:bg-gray-50"
+                  style={{
+                    borderColor: '#e2e8f0',
+                    padding: '8px 12px',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Plus size={16} style={{ color: 'var(--color-text-secondary)' }} />
+                    <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                      Add sub-task
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Comments Section */}
@@ -1053,7 +1158,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                     onClick={addComment}
                     className="px-4 py-2 rounded-md transition-colors flex items-center gap-2"
                     style={{
-                      backgroundColor: '#009646',
+                      backgroundColor: 'var(--color-primary)',
                       color: '#ffffff',
                     }}
                     disabled={!newComment.trim()}
@@ -1074,30 +1179,6 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
               
               <div className="rounded-lg p-5" style={{ background: '#fafbfc', border: '1px solid #e2e8f0' }}>
                 <div className="space-y-4">
-                  {/* Project - Only show for new tasks */}
-                  {!task && (
-                    <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                        Project
-                      </label>
-                      <select
-                        value={formData.projectId || ''}
-                        onChange={(e) => updateFormData({ projectId: e.target.value })}
-                        className="w-full px-3 py-2 border-0 rounded-md focus:outline-none text-sm font-medium"
-                        style={{
-                          background: '#ffffff',
-                          color: 'var(--color-text)',
-                        }}
-                        required
-                      >
-                        <option value="">Select a project</option>
-                        {projects.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
                   {/* Project */}
                   <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
@@ -1273,6 +1354,63 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                     />
                   </div>
 
+                  {/* Recurring Task */}
+                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <label className="flex items-center gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.isRecurring || false}
+                        onChange={(e) => updateFormData({ 
+                          isRecurring: e.target.checked,
+                          recurrenceInterval: e.target.checked ? (formData.recurrenceInterval || 1) : undefined,
+                          recurrenceUnit: e.target.checked ? (formData.recurrenceUnit || 'weeks') : undefined
+                        })}
+                        className="rounded"
+                      />
+                      <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                        Recurring Task
+                      </span>
+                    </label>
+                    
+                    {formData.isRecurring && (
+                      <div className="flex gap-2 items-center mt-2">
+                        <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Every</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={formData.recurrenceInterval || 1}
+                          onChange={(e) => updateFormData({ recurrenceInterval: parseInt(e.target.value) || 1 })}
+                          className="w-16 px-2 py-1 border rounded-md text-sm text-center"
+                          style={{
+                            borderColor: 'var(--color-border)',
+                            background: '#ffffff',
+                            color: 'var(--color-text)',
+                          }}
+                        />
+                        <select
+                          value={formData.recurrenceUnit || 'weeks'}
+                          onChange={(e) => updateFormData({ recurrenceUnit: e.target.value as 'days' | 'weeks' | 'months' })}
+                          className="flex-1 px-2 py-1 border rounded-md text-sm"
+                          style={{
+                            borderColor: 'var(--color-border)',
+                            background: '#ffffff',
+                            color: 'var(--color-text)',
+                          }}
+                        >
+                          <option value="days">Day(s)</option>
+                          <option value="weeks">Week(s)</option>
+                          <option value="months">Month(s)</option>
+                        </select>
+                      </div>
+                    )}
+                    
+                    {formData.isRecurring && formData.recurrenceInterval && formData.recurrenceUnit && (
+                      <p className="text-xs mt-2" style={{ color: 'var(--color-text-secondary)' }}>
+                        This task will recur every {formData.recurrenceInterval} {formData.recurrenceUnit === 'days' ? 'day' : formData.recurrenceUnit === 'weeks' ? 'week' : 'month'}{formData.recurrenceInterval > 1 ? 's' : ''} when completed.
+                      </p>
+                    )}
+                  </div>
+
                   {/* Owner */}
                   <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
@@ -1299,7 +1437,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                         type="button"
                         onClick={addLink}
                         className="text-xs flex items-center gap-1 transition-colors"
-                        style={{ color: '#009646' }}
+                        style={{ color: 'var(--color-primary)' }}
                       >
                         <Plus size={14} />
                         Add
@@ -1323,7 +1461,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                               rel="noopener noreferrer"
                               className="flex-1 truncate transition-colors text-xs"
                               style={{
-                                color: '#009646',
+                                color: 'var(--color-primary)',
                               }}
                             >
                               {linkLabel}
@@ -1352,7 +1490,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                         type="button"
                         onClick={addTag}
                         className="text-xs flex items-center gap-1 transition-colors"
-                        style={{ color: '#009646' }}
+                        style={{ color: 'var(--color-primary)' }}
                       >
                         <Plus size={14} />
                         Add
@@ -1448,35 +1586,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
             </div>
           </div>
 
-          {!task && (
-            <div
-              className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t"
-              style={{ borderColor: 'var(--color-border)' }}
-            >
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-md transition-colors"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-text)',
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-white rounded-md transition-opacity hover:opacity-90"
-                style={{ backgroundColor: 'var(--color-primary)' }}
-              >
-                Create Task
-              </button>
-            </div>
-          )}
         </form>
+      </div>
       </div>
 
       {/* Share Toast Notification */}
@@ -1507,7 +1618,6 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
         placeholder={inputDialog.placeholder}
         defaultValue={inputDialog.defaultValue}
       />
-    </div>
 
     {/* Delete Confirmation Dialog - Rendered outside modal with higher z-index */}
     {deleteConfirmDialog && (
@@ -1525,6 +1635,25 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
           confirmText="Delete Task"
           cancelText="Cancel"
           type="danger"
+        />
+      </div>
+    )}
+
+    {/* Unsaved Task Confirmation Dialog */}
+    {unsavedTaskConfirmDialog && (
+      <div style={{ position: 'relative', zIndex: 150 }}>
+        <ConfirmDialog
+          isOpen={unsavedTaskConfirmDialog}
+          onClose={() => {
+            setUnsavedTaskConfirmDialog(false);
+          }}
+          onConfirm={handleSaveNewTask}
+          onCancel={handleDiscardNewTask}
+          title="Unsaved Task"
+          message="You have unsaved changes. Do you want to save this task before closing?"
+          confirmText="Save Task"
+          cancelText="Don't Save"
+          type="warning"
         />
       </div>
     )}

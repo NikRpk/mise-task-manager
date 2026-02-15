@@ -80,16 +80,41 @@ const TaskCard = memo(function TaskCard({
   }, [isDragging]);
 
   // Memoize expensive computations
-  const isOverdue = useMemo(() => 
-    task.deadline && new Date(task.deadline) < new Date() && task.status !== 'done',
-    [task.deadline, task.status]
-  );
+  const isOverdue = useMemo(() => {
+    if (!task.deadline || task.status === 'done') return false;
+    const deadline = new Date(task.deadline);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadline.setHours(0, 0, 0, 0);
+    return deadline < today;
+  }, [task.deadline, task.status]);
+  
+  const isToday = useMemo(() => {
+    if (!task.deadline || task.status === 'done') return false;
+    const deadline = new Date(task.deadline);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadline.setHours(0, 0, 0, 0);
+    return deadline.getTime() === today.getTime();
+  }, [task.deadline, task.status]);
+  
+  const isTomorrow = useMemo(() => {
+    if (!task.deadline || task.status === 'done') return false;
+    const deadline = new Date(task.deadline);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    deadline.setHours(0, 0, 0, 0);
+    return deadline.getTime() === tomorrow.getTime();
+  }, [task.deadline, task.status]);
   
   // Calculate days overdue
   const daysOverdue = useMemo(() => {
     if (!task.deadline || task.status === 'done') return 0;
     const deadline = new Date(task.deadline);
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    deadline.setHours(0, 0, 0, 0);
     const diffTime = now.getTime() - deadline.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
@@ -102,6 +127,8 @@ const TaskCard = memo(function TaskCard({
     ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
         zIndex: 999,
+        backfaceVisibility: 'hidden' as const,
+        WebkitFontSmoothing: 'antialiased' as const,
       }
     : {};
   
@@ -139,11 +166,17 @@ const TaskCard = memo(function TaskCard({
   
   // Format deadline display with overdue text
   const formatDeadlineDisplay = useCallback((dateString: string) => {
+    if (isToday) {
+      return 'Today';
+    }
+    if (isTomorrow) {
+      return 'Tomorrow';
+    }
     if (daysOverdue > 0) {
       return `Overdue ${daysOverdue} day${daysOverdue !== 1 ? 's' : ''}`;
     }
     return formatDate(dateString);
-  }, [daysOverdue, formatDate]);
+  }, [isToday, isTomorrow, daysOverdue, formatDate]);
 
   // Compact view rendering
   if (viewMode === 'compact') {
@@ -203,7 +236,7 @@ const TaskCard = memo(function TaskCard({
             {showDueDate && task.deadline && (
               <span
                 className="flex items-center gap-1 text-[10px] font-medium"
-                style={isOverdue ? { color: '#f30047' } : { color: 'var(--color-text-secondary)' }}
+                style={isOverdue ? { color: '#f30047' } : (isToday || isTomorrow) ? { color: '#00a61c', fontWeight: 600 } : { color: 'var(--color-text-secondary)' }}
               >
                 <Calendar size={10} />
                 {formatDeadlineDisplay(task.deadline)}
@@ -326,7 +359,7 @@ const TaskCard = memo(function TaskCard({
           {showDueDate && task.deadline ? (
             <span
               className="flex items-center gap-1"
-              style={isOverdue ? { color: '#f30047', fontWeight: 600 } : { fontWeight: 500 }}
+              style={isOverdue ? { color: '#f30047', fontWeight: 600 } : (isToday || isTomorrow) ? { color: '#00a61c', fontWeight: 600 } : { fontWeight: 500 }}
             >
               <Calendar size={11} />
               {formatDeadlineDisplay(task.deadline)}

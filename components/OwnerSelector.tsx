@@ -158,6 +158,8 @@ export default function OwnerSelector({ value, onChange, people, disabled = fals
           style={{ 
             color: 'var(--color-text)'
           }}
+          autoComplete="off"
+          data-form-type="other"
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
           <User size={14} style={{ color: 'var(--color-text-secondary)' }} className="flex-shrink-0" />

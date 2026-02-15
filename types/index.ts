@@ -40,6 +40,10 @@ export interface Task {
   images?: string[];
   comments?: Comment[];
   statusHistory?: StatusHistoryEntry[]; // Track status changes
+  isRecurring?: boolean; // Whether this task recurs
+  recurrenceInterval?: number; // Number of units between recurrences (e.g., 2 for "every 2 weeks")
+  recurrenceUnit?: 'days' | 'weeks' | 'months'; // Unit for recurrence
+  parentRecurringTaskId?: string; // If this was created from a recurring task, ID of the parent
 }
 
 export interface Project {

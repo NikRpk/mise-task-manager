@@ -178,7 +178,7 @@ export function CommentsSection({
           onClick={onAddComment}
           className="px-4 py-2 rounded-md transition-colors flex items-center gap-2"
           style={{
-            backgroundColor: '#009646',
+            backgroundColor: 'var(--color-primary)',
             color: '#ffffff',
           }}
           disabled={!newComment.trim()}

@@ -7,6 +7,7 @@ interface ConfirmDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  onCancel?: () => void; // Optional separate cancel handler
   title: string;
   message: string;
   confirmText?: string;
@@ -19,6 +20,7 @@ export default function ConfirmDialog({
   isOpen,
   onClose,
   onConfirm,
+  onCancel,
   title,
   message,
   confirmText = 'Confirm',
@@ -119,7 +121,13 @@ export default function ConfirmDialog({
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
             <button
-              onClick={onClose}
+              onClick={() => {
+                if (onCancel) {
+                  onCancel();
+                } else {
+                  onClose();
+                }
+              }}
               className="px-4 py-2 text-sm font-medium rounded-md transition-colors"
               style={{
                 backgroundColor: 'var(--color-surface)',

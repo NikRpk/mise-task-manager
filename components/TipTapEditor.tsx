@@ -19,7 +19,11 @@ import HorizontalRule from '@tiptap/extension-horizontal-rule';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Mention from '@tiptap/extension-mention';
-import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Link2, Undo, Redo, Image as ImageIcon, Heading1, Heading2, Type, Code, Minus, CheckSquare, Palette } from 'lucide-react';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Link2, Undo, Redo, Image as ImageIcon, Heading1, Heading2, Type, Code, Minus, CheckSquare, Palette, Table as TableIcon, Columns, Rows, Trash2, Plus, ArrowLeftToLine, ArrowRightToLine, ArrowUpToLine, ArrowDownToLine } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { Person } from '@/types';
 
@@ -45,6 +49,7 @@ const COLORS = [
 
 export default function TipTapEditor({ value, onChange, placeholder = 'Start typing...', disabled = false, people = [] }: TipTapEditorProps) {
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [isInTable, setIsInTable] = useState(false);
 
   // Mention suggestion configuration
   const mentionSuggestion = useCallback(() => ({
@@ -139,6 +144,27 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         },
         suggestion: mentionSuggestion(),
       }),
+      Table.configure({
+        resizable: true,
+        HTMLAttributes: {
+          class: 'tiptap-table',
+        },
+      }),
+      TableRow.configure({
+        HTMLAttributes: {
+          class: 'tiptap-table-row',
+        },
+      }),
+      TableHeader.configure({
+        HTMLAttributes: {
+          class: 'tiptap-table-header',
+        },
+      }),
+      TableCell.configure({
+        HTMLAttributes: {
+          class: 'tiptap-table-cell',
+        },
+      }),
     ],
     content: value,
     editable: !disabled,
@@ -150,6 +176,12 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         // Use setTimeout to avoid updating parent during render
         setTimeout(() => onChange(html), 0);
       }
+      // Update table state
+      setIsInTable(editor.isActive('table'));
+    },
+    onSelectionUpdate: ({ editor }) => {
+      // Update table state on selection change
+      setIsInTable(editor.isActive('table'));
     },
     editorProps: {
       handleKeyDown: (view, event) => {
@@ -222,27 +254,33 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           {/* Text Formatting */}
           <button
             onClick={() => editor.chain().focus().toggleBold().run()}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('bold') ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('bold') ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('bold') ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Bold"
             type="button"
+            tabIndex={-1}
           >
             <Bold size={16} />
           </button>
           
           <button
             onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('italic') ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('italic') ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('italic') ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Italic"
             type="button"
+            tabIndex={-1}
           >
             <Italic size={16} />
           </button>
           
           <button
             onClick={() => editor.chain().focus().toggleUnderline().run()}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('underline') ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('underline') ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('underline') ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Underline"
             type="button"
+            tabIndex={-1}
           >
             <UnderlineIcon size={16} />
           </button>
@@ -252,27 +290,33 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           {/* Text Styles */}
           <button
             onClick={() => editor.chain().focus().setParagraph().run()}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('paragraph') ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('paragraph') ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('paragraph') ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Normal Text"
             type="button"
+            tabIndex={-1}
           >
             <Type size={16} />
           </button>
           
           <button
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 1 }) ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 1 }) ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('heading', { level: 1 }) ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Heading 1"
             type="button"
+            tabIndex={-1}
           >
             <Heading1 size={16} />
           </button>
           
           <button
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 2 }) ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 2 }) ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('heading', { level: 2 }) ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Heading 2"
             type="button"
+            tabIndex={-1}
           >
             <Heading2 size={16} />
           </button>
@@ -282,27 +326,33 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           {/* Lists */}
           <button
             onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('bulletList') ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('bulletList') ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('bulletList') ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Bullet List"
             type="button"
+            tabIndex={-1}
           >
             <List size={16} />
           </button>
           
           <button
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('orderedList') ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('orderedList') ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('orderedList') ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Numbered List"
             type="button"
+            tabIndex={-1}
           >
             <ListOrdered size={16} />
           </button>
           
           <button
             onClick={() => editor.chain().focus().toggleTaskList().run()}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('taskList') ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('taskList') ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('taskList') ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Task List"
             type="button"
+            tabIndex={-1}
           >
             <CheckSquare size={16} />
           </button>
@@ -312,9 +362,11 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           {/* Code & Blocks */}
           <button
             onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('codeBlock') ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('codeBlock') ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('codeBlock') ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Code Block"
             type="button"
+            tabIndex={-1}
           >
             <Code size={16} />
           </button>
@@ -324,6 +376,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
             className="p-1.5 rounded hover:bg-gray-200 transition-colors"
             title="Horizontal Line"
             type="button"
+            tabIndex={-1}
           >
             <Minus size={16} />
           </button>
@@ -338,9 +391,11 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
                 editor.chain().focus().setLink({ href: url }).run();
               }
             }}
-            className={`p-1.5 rounded transition-colors ${editor.isActive('link') ? 'bg-green-600 text-white' : 'hover:bg-gray-200'}`}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('link') ? 'text-white' : 'hover:bg-gray-200'}`}
+            style={editor.isActive('link') ? { backgroundColor: 'var(--color-primary)' } : {}}
             title="Add Link"
             type="button"
+            tabIndex={-1}
           >
             <Link2 size={16} />
           </button>
@@ -356,9 +411,108 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
             className="p-1.5 rounded hover:bg-gray-200 transition-colors"
             title="Insert Image"
             type="button"
+            tabIndex={-1}
           >
             <ImageIcon size={16} />
           </button>
+          
+          <div className="w-px h-6 bg-gray-300 mx-1" />
+          
+          {/* Table - Only show insert button when NOT in a table */}
+          {!isInTable && (
+            <button
+              onClick={() => {
+                editor.commands.insertTable({ rows: 3, cols: 3, withHeaderRow: true });
+              }}
+              className="p-1.5 rounded hover:bg-gray-200 transition-colors"
+              title="Insert Table"
+              type="button"
+              tabIndex={-1}
+            >
+              <TableIcon size={16} />
+            </button>
+          )}
+          
+          {/* Table Controls - Show when cursor is in a table */}
+          {isInTable && (
+            <>
+              <button
+                onClick={() => editor.chain().focus().addColumnBefore().run()}
+                className="p-1.5 rounded hover:bg-gray-200 transition-colors text-xs"
+                title="Add Column Before"
+                type="button"
+                tabIndex={-1}
+              >
+                <ArrowLeftToLine size={16} />
+              </button>
+              
+              <button
+                onClick={() => editor.chain().focus().addColumnAfter().run()}
+                className="p-1.5 rounded hover:bg-gray-200 transition-colors text-xs"
+                title="Add Column After"
+                type="button"
+                tabIndex={-1}
+              >
+                <ArrowRightToLine size={16} />
+              </button>
+              
+              <button
+                onClick={() => editor.chain().focus().deleteColumn().run()}
+                className="p-1.5 rounded hover:bg-red-100 transition-colors text-red-600"
+                title="Delete Column"
+                type="button"
+                tabIndex={-1}
+              >
+                <Columns size={16} />
+              </button>
+              
+              <div className="w-px h-6 bg-gray-300 mx-1" />
+              
+              <button
+                onClick={() => editor.chain().focus().addRowBefore().run()}
+                className="p-1.5 rounded hover:bg-gray-200 transition-colors text-xs"
+                title="Add Row Before"
+                type="button"
+                tabIndex={-1}
+              >
+                <ArrowUpToLine size={16} />
+              </button>
+              
+              <button
+                onClick={() => editor.chain().focus().addRowAfter().run()}
+                className="p-1.5 rounded hover:bg-gray-200 transition-colors text-xs"
+                title="Add Row After"
+                type="button"
+                tabIndex={-1}
+              >
+                <ArrowDownToLine size={16} />
+              </button>
+              
+              <button
+                onClick={() => editor.chain().focus().deleteRow().run()}
+                className="p-1.5 rounded hover:bg-red-100 transition-colors text-red-600"
+                title="Delete Row"
+                type="button"
+                tabIndex={-1}
+              >
+                <Rows size={16} />
+              </button>
+              
+              <div className="w-px h-6 bg-gray-300 mx-1" />
+              
+              <button
+                onClick={() => editor.chain().focus().deleteTable().run()}
+                className="p-1.5 rounded hover:bg-red-100 transition-colors text-red-600"
+                title="Delete Table"
+                type="button"
+                tabIndex={-1}
+              >
+                <Trash2 size={16} />
+              </button>
+              
+              <div className="w-px h-6 bg-gray-300 mx-1" />
+            </>
+          )}
           
           {/* Color Picker */}
           <div className="relative">
@@ -367,6 +521,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               className="p-1.5 rounded hover:bg-gray-200 transition-colors"
               title="Text Color"
               type="button"
+              tabIndex={-1}
             >
               <Palette size={16} />
             </button>
@@ -419,6 +574,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
             className="p-1.5 rounded hover:bg-gray-200 transition-colors disabled:opacity-50"
             title="Undo"
             type="button"
+            tabIndex={-1}
           >
             <Undo size={16} />
           </button>
@@ -429,6 +585,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
             className="p-1.5 rounded hover:bg-gray-200 transition-colors disabled:opacity-50"
             title="Redo"
             type="button"
+            tabIndex={-1}
           >
             <Redo size={16} />
           </button>
@@ -570,7 +727,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           cursor: pointer;
         }
         .ProseMirror img.ProseMirror-selectednode {
-          outline: 2px solid #009646;
+          outline: 2px solid var(--color-primary);
           outline-offset: 2px;
         }
         .ProseMirror .resize-cursor {
@@ -635,6 +792,46 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           padding: 0.1rem 0.3rem;
           border-radius: 0.25rem;
           font-weight: 500;
+        }
+        /* Table styles */
+        .ProseMirror table {
+          border-collapse: collapse;
+          table-layout: fixed;
+          width: 100%;
+          margin: 1rem 0;
+          overflow: hidden;
+          border: 1px solid #e2e8f0;
+          border-radius: 0.375rem;
+        }
+        .ProseMirror table td,
+        .ProseMirror table th {
+          min-width: 1em;
+          border: 1px solid #e2e8f0;
+          padding: 0.5rem 0.75rem;
+          vertical-align: top;
+          box-sizing: border-box;
+          position: relative;
+          background: white;
+        }
+        .ProseMirror table th {
+          font-weight: 600;
+          text-align: left;
+          background-color: #f8fafc;
+        }
+        .ProseMirror table .selectedCell {
+          background: #e0f2fe;
+        }
+        .ProseMirror table .column-resize-handle {
+          position: absolute;
+          right: -2px;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+          background-color: var(--color-primary);
+          pointer-events: none;
+        }
+        .ProseMirror table p {
+          margin: 0;
         }
       `}</style>
     </div>

@@ -211,7 +211,7 @@ export function TaskDetails({
                 type="button"
                 onClick={onAddLink}
                 className="text-xs flex items-center gap-1 transition-colors"
-                style={{ color: '#009646' }}
+                style={{ color: 'var(--color-primary)' }}
               >
                 <Plus size={14} />
                 Add
@@ -226,7 +226,7 @@ export function TaskDetails({
                     rel="noopener noreferrer"
                     className="flex-1 truncate transition-colors text-xs"
                     style={{
-                      color: '#009646',
+                      color: 'var(--color-primary)',
                     }}
                   >
                     {link}
@@ -254,7 +254,7 @@ export function TaskDetails({
                 type="button"
                 onClick={onAddTag}
                 className="text-xs flex items-center gap-1 transition-colors"
-                style={{ color: '#009646' }}
+                style={{ color: 'var(--color-primary)' }}
               >
                 <Plus size={14} />
                 Add
