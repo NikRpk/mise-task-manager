@@ -11,7 +11,7 @@ interface KanbanColumnProps {
   title: string;
   tasks: Task[];
   onTaskClick: (task: Task) => void;
-  onQuickComplete?: (taskId: string) => void;
+  onQuickComplete?: (taskId: string) => Promise<boolean> | boolean;
   color?: string;
   viewMode?: 'normal' | 'compact';
   canEdit?: boolean;
