@@ -52,12 +52,11 @@ const KanbanColumn = memo(function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-surface rounded-xl border shadow-sm transition-all duration-200 flex-shrink-0 flex flex-col ${
+      className={`bg-surface rounded-xl border shadow-sm transition-all duration-200 md:flex-shrink-0 flex flex-col w-full md:w-[280px] ${
         isOver ? 'ring-2 ring-offset-2 scale-[1.02]' : ''
       }`}
       style={{ 
         height: '100%',
-        width: '280px',
         borderColor: isOver ? columnColor : '#e2e8f0',
         backgroundColor: isOver ? '#fafbfc' : 'white',
       }}
@@ -82,7 +81,7 @@ const KanbanColumn = memo(function KanbanColumn({
           {tasks.length}
         </span>
       </div>
-      <div className={`flex-1 ${viewMode === 'compact' ? 'p-2 space-y-1.5' : 'p-3.5 space-y-3'} overflow-y-auto`}>
+      <div className={`md:flex-1 ${viewMode === 'compact' ? 'p-2 space-y-1.5' : 'p-3.5 space-y-3'} md:overflow-y-auto`}>
         {tasks.map(task => (
           <TaskCard
             key={task.id}

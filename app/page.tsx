@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DndContext, DragEndEvent, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { Plus, Settings, LayoutGrid, List, X, Search, FileText, Trash2, Edit, Calendar } from 'lucide-react';
+import { Plus, Settings, LayoutGrid, List, X, Search, FileText, Trash2, Edit, Calendar, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { Task, TaskStatus, Note } from '@/types';
 import TaskCard from '@/components/TaskCard';
@@ -114,6 +114,7 @@ function HomePage() {
   const [showSearchFilters, setShowSearchFilters] = useState(false);
   const [showLeftFade, setShowLeftFade] = useState(false);
   const [showRightFade, setShowRightFade] = useState(true);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; message: string; onConfirm: () => void }>({
     isOpen: false,
     message: '',
@@ -552,8 +553,8 @@ function HomePage() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--color-bg)' }}>
-      <main className="px-5 py-4 flex-1 flex flex-col min-h-0 overflow-hidden">{/* Error Alert Banner */}
+    <div className="h-screen flex flex-col md:overflow-hidden" style={{ backgroundColor: 'var(--color-bg)' }}>
+      <main className="px-5 py-4 flex-1 flex flex-col min-h-0 md:overflow-hidden overflow-y-auto">{/* Error Alert Banner */}
         {error && (
           <div 
             className="rounded-xl border mb-4 shadow-sm p-3 flex items-start gap-3"
@@ -602,7 +603,8 @@ function HomePage() {
         <div className="rounded-xl border mb-4 shadow-sm flex-shrink-0" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
           {/* Top Bar */}
           <div className="flex justify-between items-center px-5 py-3" style={{ borderBottom: '3px solid var(--color-primary)' }}>
-            <div className="flex items-center gap-3">
+            {/* Desktop View */}
+            <div className="hidden md:flex items-center gap-3 flex-1">
               <div className="inline-flex items-center bg-gray-100 rounded-full p-1">
                 <button
                   onClick={() => setCurrentView('tasks')}
@@ -642,7 +644,35 @@ function HomePage() {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            
+            {/* Mobile View - New Task/Note Button */}
+            <div className="flex md:hidden items-center gap-2 flex-1">
+              {/* New Task/Note Button */}
+              {currentView === 'tasks' ? (
+                <button
+                  onClick={handleNewTask}
+                  disabled={!permissions.canEdit}
+                  className="px-3 py-1.5 text-sm rounded-md transition-all duration-200 flex items-center gap-1.5 font-medium text-white disabled:opacity-50"
+                  style={{ backgroundColor: permissions.canEdit ? 'var(--color-primary)' : '#94a3b8' }}
+                  title={!permissions.canEdit ? 'You need EDIT permission' : 'Create task'}
+                >
+                  <Plus size={16} />
+                  <span>New Task</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleNewNote}
+                  className="px-3 py-1.5 text-sm rounded-md transition-all duration-200 flex items-center gap-1.5 font-medium text-white"
+                  style={{ backgroundColor: 'var(--color-primary)' }}
+                >
+                  <Plus size={16} />
+                  <span>New Note</span>
+                </button>
+              )}
+            </div>
+            
+            {/* Desktop Right Side */}
+            <div className="hidden md:flex items-center gap-3">
               {currentView === 'tasks' && (
                 <>
                   <DailyStatsCard 
@@ -702,7 +732,162 @@ function HomePage() {
               )}
               <UserProfile />
             </div>
+            
+            {/* Mobile Right Side - Hamburger Menu */}
+            <div className="flex md:hidden items-center gap-2">
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="p-2 rounded-md transition-colors"
+                style={{ color: 'var(--color-primary)' }}
+              >
+                <Menu size={24} />
+              </button>
+            </div>
           </div>
+          
+          {/* Mobile Menu Overlay */}
+          {showMobileMenu && (
+            <div 
+              className="md:hidden fixed inset-0 z-50 backdrop-blur-sm animate-fadeIn"
+              style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
+              onClick={() => setShowMobileMenu(false)}
+            >
+              <div 
+                className="absolute right-0 top-0 h-full w-80 shadow-xl p-6 overflow-y-auto animate-slideInRight"
+                style={{ backgroundColor: 'var(--color-surface)' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Close Button */}
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>Menu</h2>
+                  <button
+                    onClick={() => setShowMobileMenu(false)}
+                    className="p-2 rounded-md transition-colors"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                
+                {/* View Toggle - Tasks/Notes */}
+                <div className="mb-6">
+                  <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                    View
+                  </label>
+                  <div className="inline-flex items-center bg-gray-100 rounded-full p-1 w-full">
+                    <button
+                      onClick={() => setCurrentView('tasks')}
+                      className="flex-1 px-3 py-2 text-sm rounded-full transition-all duration-200"
+                      style={{ 
+                        backgroundColor: currentView === 'tasks' ? 'var(--color-primary)' : 'transparent',
+                        color: currentView === 'tasks' ? 'white' : 'var(--color-text-secondary)',
+                        fontWeight: currentView === 'tasks' ? 600 : 400,
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Tasks
+                    </button>
+                    <button
+                      onClick={() => setCurrentView('notes')}
+                      className="flex-1 px-3 py-2 text-sm rounded-full transition-all duration-200"
+                      style={{ 
+                        backgroundColor: currentView === 'notes' ? 'var(--color-primary)' : 'transparent',
+                        color: currentView === 'notes' ? 'white' : 'var(--color-text-secondary)',
+                        fontWeight: currentView === 'notes' ? 600 : 400,
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Notes
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Project Selector */}
+                {currentView === 'tasks' && (
+                  <div className="mb-6">
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      Project
+                    </label>
+                    <ProjectSelector
+                      projects={projects}
+                      selectedProjectId={selectedProjectId}
+                      onChange={(id) => {
+                        setSelectedProjectId(id);
+                        setShowMobileMenu(false);
+                      }}
+                      onCreateProject={handleCreateProject}
+                    />
+                  </div>
+                )}
+                
+                {/* Daily Stats */}
+                {currentView === 'tasks' && (
+                  <div className="mb-6">
+                    <DailyStatsCard 
+                      completedToday={dailyStats.completedToday}
+                      totalTasks={dailyStats.totalTasks}
+                      percentComplete={dailyStats.percentComplete}
+                    />
+                  </div>
+                )}
+                
+                {/* Action Buttons */}
+                <div className="space-y-3 mb-6">
+                  {currentView === 'tasks' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setShowSearchFilters(!showSearchFilters);
+                          setShowMobileMenu(false);
+                        }}
+                        className="w-full px-4 py-3 text-sm border rounded-md transition-all duration-200 flex items-center gap-2 font-medium"
+                        style={{ 
+                          borderColor: 'var(--color-border)',
+                          color: 'var(--color-text)',
+                          backgroundColor: 'var(--color-surface)'
+                        }}
+                      >
+                        <Search size={16} />
+                        Search & Filters
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleNewTask();
+                          setShowMobileMenu(false);
+                        }}
+                        disabled={!permissions.canEdit}
+                        className="w-full px-4 py-3 text-sm rounded-md transition-all duration-200 flex items-center gap-2 font-medium text-white disabled:opacity-50"
+                        style={{ backgroundColor: permissions.canEdit ? 'var(--color-primary)' : '#94a3b8' }}
+                      >
+                        <Plus size={16} />
+                        New Task
+                      </button>
+                    </>
+                  )}
+                  {currentView === 'notes' && (
+                    <button
+                      onClick={() => {
+                        handleNewNote();
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-sm rounded-md transition-all duration-200 flex items-center gap-2 font-medium text-white"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    >
+                      <Plus size={16} />
+                      New Note
+                    </button>
+                  )}
+                </div>
+                
+                {/* User Profile */}
+                <div className="pt-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                  <UserProfile />
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Collapsible Filters Bar with Slide Animation */}
           <div 
@@ -799,9 +984,9 @@ function HomePage() {
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
           >
-            <div className="relative flex-1 min-h-0">
+            <div className="md:relative flex-1 md:min-h-0">
               <div 
-                className="kanban-scroll-container flex gap-5 overflow-x-auto pb-4 px-2 -mx-2 h-full"
+                className="kanban-scroll-container flex md:flex-row flex-col gap-5 md:overflow-x-auto pb-4 px-2 -mx-2 md:h-full"
                 onScroll={handleKanbanScroll}
               >
                 {statusColumns.map(column => (
@@ -822,9 +1007,9 @@ function HomePage() {
                 ))}
               </div>
               
-              {/* Left fade overlay - shows when scrolled */}
+              {/* Left fade overlay - shows when scrolled - Desktop only */}
               <div 
-                className="absolute top-0 bottom-0 pointer-events-none transition-opacity duration-300"
+                className="hidden md:block absolute top-0 bottom-0 pointer-events-none transition-opacity duration-300"
                 style={{
                   left: '-28px', // Extend beyond container padding
                   width: '128px', // Reduced to ~50% (100px + 28px)
@@ -833,9 +1018,9 @@ function HomePage() {
                 }}
               />
               
-              {/* Right fade overlay - shows when there's more content to the right */}
+              {/* Right fade overlay - shows when there's more content to the right - Desktop only */}
               <div 
-                className="absolute top-0 bottom-0 pointer-events-none transition-opacity duration-300"
+                className="hidden md:block absolute top-0 bottom-0 pointer-events-none transition-opacity duration-300"
                 style={{
                   right: '-28px', // Extend beyond container padding
                   width: '128px', // Reduced to ~50% (100px + 28px)

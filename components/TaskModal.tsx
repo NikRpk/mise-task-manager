@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Plus, Trash2, Send, Edit2, Check, Share2 } from 'lucide-react';
+import { X, Plus, Trash2, Send, Edit2, Check, Share2, MoreVertical } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { Task, SubTask, TaskStatus, Priority, Comment, CustomField, StatusOption, PriorityOption } from '@/types';
 import TipTapEditor from './TipTapEditor';
@@ -67,6 +67,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'warning' | 'info' | 'success' }>({ isOpen: false, title: '', message: '', type: 'info' });
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState(false);
   const [unsavedTaskConfirmDialog, setUnsavedTaskConfirmDialog] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showRecurrenceUnitDropdown, setShowRecurrenceUnitDropdown] = useState(false);
   
   // Input dialog states
   const [inputDialog, setInputDialog] = useState<{ isOpen: boolean; title: string; placeholder: string; defaultValue: string; onConfirm: (value: string) => void }>({
@@ -250,20 +252,37 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
+        // Close mobile menu first if open
+        if (showMobileMenu) {
+          setShowMobileMenu(false);
+          return;
+        }
         // Don't close if we're in edit mode for title or if dialogs are open
         if (!isEditingTitle && !alertDialog.isOpen && !inputDialog.isOpen && !deleteConfirmDialog && !unsavedTaskConfirmDialog) {
           handleClose();
         }
       }
     };
+    
+    // Close mobile menu when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMobileMenu) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('[data-mobile-menu]') && !target.closest('button[title="More options"]')) {
+          setShowMobileMenu(false);
+        }
+      }
+    };
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscKey);
+      document.addEventListener('mousedown', handleClickOutside);
       return () => {
         document.removeEventListener('keydown', handleEscKey);
+        document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [isOpen, isEditingTitle, alertDialog.isOpen, inputDialog.isOpen, deleteConfirmDialog, unsavedTaskConfirmDialog]);
+  }, [isOpen, isEditingTitle, alertDialog.isOpen, inputDialog.isOpen, deleteConfirmDialog, unsavedTaskConfirmDialog, showMobileMenu]);
 
   // Update formData and trigger auto-save
   const updateFormData = (updates: Partial<Task>) => {
@@ -682,32 +701,32 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
       
       {/* Scrollable modal container */}
       <div
-        className="fixed inset-0 z-[101] flex items-center justify-center p-4 overflow-y-auto"
+        className="fixed inset-0 z-[101] md:flex md:items-center md:justify-center md:p-4 overflow-y-auto"
         onClick={handleClose}
       >
         <div
-          className="bg-surface rounded-lg w-full max-w-7xl max-h-[90vh] overflow-y-auto my-auto"
+          className="bg-surface md:rounded-lg w-full max-w-7xl md:max-h-[90vh] min-h-screen md:min-h-0 overflow-y-auto md:my-auto"
           onClick={(e) => e.stopPropagation()}
           style={{ 
             border: '1px solid #e2e8f0',
           }}
         >
         <div
-          className="sticky top-0 bg-surface px-8 py-2 z-10"
+          className="sticky top-0 bg-surface md:px-8 px-4 py-3 md:py-2 z-10"
           style={{ borderBottom: '2px solid #e2e8f0' }}
         >
           {/* Close button - absolutely positioned in top right */}
           <button
             onClick={handleClose}
             type="button"
-            className="absolute top-2 right-2 p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 hover:shadow-md transition-all cursor-pointer z-20"
+            className="absolute top-3 md:top-2 right-3 md:right-2 p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 hover:shadow-md transition-all cursor-pointer z-20"
             style={{ color: 'var(--color-text-secondary)' }}
             title="Close"
           >
             <X size={20} />
           </button>
 
-          <div className="flex justify-between items-center pr-12">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center pr-12 gap-3 md:gap-0">
             <div className="flex-1">
               {task ? (
                 isEditingTitle ? (
@@ -738,7 +757,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                   />
                 ) : (
                   <h2 
-                    className="text-base font-semibold mb-1 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded inline-block" 
+                    className="text-base font-semibold mb-1 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded inline-block break-words max-w-full" 
                     style={{ color: 'var(--color-text)' }}
                     onClick={() => {
                       setEditingTitle(formData.title || '');
@@ -755,13 +774,15 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                 </h2>
               )}
               {task && (
-                <div className="flex gap-3 text-xs px-2" style={{ color: 'var(--color-text-secondary)' }}>
-                  <span>Created {task.createdAt ? new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}</span>
-                  <span>•</span>
-                  <span>Last updated {task.updatedAt ? new Date(task.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' }) : 'N/A'}</span>
+                <div className="md:flex md:flex-row md:gap-3 hidden text-xs px-2" style={{ color: 'var(--color-text-secondary)' }}>
+                  <div className="flex gap-3">
+                    <span>Created {task.createdAt ? new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}</span>
+                    <span>•</span>
+                    <span>Last updated {task.updatedAt ? new Date(task.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' }) : 'N/A'}</span>
+                  </div>
                   {/* Save Status Indicator */}
                   {isSaving && (
-                    <>
+                    <div className="flex items-center gap-1">
                       <span>•</span>
                       <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-primary)' }}>
                         <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -770,57 +791,60 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                         </svg>
                         Saving...
                       </span>
-                    </>
+                    </div>
                   )}
                   {saveError && (
-                    <>
+                    <div className="flex items-center gap-1">
                       <span>•</span>
                       <span className="text-xs" style={{ color: '#f30047' }} title={saveError}>
                         ⚠️ Save failed
                       </span>
-                    </>
+                    </div>
                   )}
                 </div>
               )}
             </div>
             {task ? (
-              <div className="flex items-center gap-6">
-                <button
-                  onClick={handleShare}
-                  type="button"
-                  className="flex items-center gap-2 px-3 py-1 rounded-md transition-colors hover:bg-gray-100"
-                  style={{ color: 'var(--color-primary)' }}
-                  title="Share task"
-                >
-                  <Share2 size={16} />
-                  <span className="text-sm font-medium">Share</span>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDeleteConfirmDialog(true);
-                  }}
-                  type="button"
-                  disabled={isDeleting}
-                  className="flex items-center gap-2 px-3 py-1 rounded-md transition-colors hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ color: '#f30047' }}
-                  title="Delete task"
-                >
-                  <Trash2 size={16} />
-                  <span className="text-sm font-medium">
-                    {isDeleting ? 'Deleting...' : 'Delete'}
-                  </span>
-                </button>
-                <div className="flex gap-4">
-                  {/* Days Left/Overdue - Only show if there's a deadline */}
+              <>
+                {/* Desktop Actions */}
+                <div className="hidden md:flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleShare}
+                      type="button"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors hover:bg-gray-100 text-sm"
+                      style={{ color: 'var(--color-primary)' }}
+                      title="Share task"
+                    >
+                      <Share2 size={16} />
+                      <span className="font-medium">Share</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeleteConfirmDialog(true);
+                      }}
+                      type="button"
+                      disabled={isDeleting}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      style={{ color: '#f30047' }}
+                      title="Delete task"
+                    >
+                      <Trash2 size={16} />
+                      <span className="font-medium">
+                        {isDeleting ? 'Deleting...' : 'Delete'}
+                      </span>
+                    </button>
+                  </div>
+                  {/* Days Left/Overdue - Only show on desktop if there's a deadline */}
                   {formData.deadline && (() => {
                     const daysRemaining = Math.ceil((new Date(formData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                     const isOverdue = daysRemaining < 0;
                     const daysCount = Math.abs(daysRemaining);
                     
                     return (
-                      <div className="text-center px-4 py-2 bg-surface border rounded-lg" style={{ borderColor: isOverdue ? '#fecaca' : 'var(--color-border)', backgroundColor: isOverdue ? '#fef2f2' : undefined }}>
+                      <div className="text-center px-4 py-2 bg-surface border rounded-lg w-fit" style={{ borderColor: isOverdue ? '#fecaca' : 'var(--color-border)', backgroundColor: isOverdue ? '#fef2f2' : undefined }}>
                         {isOverdue ? (
                           <>
                             <div className="text-[10px] uppercase tracking-wide font-semibold mb-0.5" style={{ color: '#f30047' }}>Overdue</div>
@@ -840,13 +864,60 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                     );
                   })()}
                 </div>
-              </div>
+                
+                {/* Mobile Menu Button */}
+                <button
+                  onClick={() => setShowMobileMenu(!showMobileMenu)}
+                  type="button"
+                  className="md:hidden absolute top-3 right-14 p-2 rounded-lg transition-colors"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                  title="More options"
+                >
+                  <MoreVertical size={20} />
+                </button>
+                
+                {/* Mobile Dropdown Menu */}
+                {showMobileMenu && (
+                  <div 
+                    data-mobile-menu
+                    className="md:hidden absolute top-14 right-4 bg-white rounded-lg shadow-xl border z-30 overflow-hidden"
+                    style={{ borderColor: 'var(--color-border)', minWidth: '160px' }}
+                  >
+                    <button
+                      onClick={() => {
+                        handleShare();
+                        setShowMobileMenu(false);
+                      }}
+                      type="button"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-gray-50"
+                      style={{ color: 'var(--color-text)' }}
+                    >
+                      <Share2 size={16} style={{ color: 'var(--color-primary)' }} />
+                      <span>Share</span>
+                    </button>
+                    <div style={{ borderTop: '1px solid #e2e8f0' }} />
+                    <button
+                      onClick={() => {
+                        setDeleteConfirmDialog(true);
+                        setShowMobileMenu(false);
+                      }}
+                      type="button"
+                      disabled={isDeleting}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-red-50 disabled:opacity-50"
+                      style={{ color: '#f30047' }}
+                    >
+                      <Trash2 size={16} />
+                      <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-md transition-colors text-sm font-medium"
+                  className="flex-1 md:flex-none px-4 py-2 rounded-md transition-colors text-sm font-medium"
                   style={{
                     backgroundColor: 'var(--color-surface)',
                     borderColor: 'var(--color-border)',
@@ -860,7 +931,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                 <button
                   type="submit"
                   onClick={handleSubmit}
-                  className="px-4 py-2 text-white rounded-md transition-opacity hover:opacity-90 text-sm font-medium"
+                  className="flex-1 md:flex-none px-4 py-2 text-white rounded-md transition-opacity hover:opacity-90 text-sm font-medium"
                   style={{ backgroundColor: 'var(--color-primary)' }}
                 >
                   Create Task
@@ -870,10 +941,10 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={handleSubmit} className="md:p-6 p-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Main Content (2/3 width) */}
-            <div className="lg:col-span-2 space-y-4">
+            {/* Left Column - Main Content (2/3 width on desktop, full width on mobile) */}
+            <div className="lg:col-span-2 space-y-4 lg:order-1 order-2">
               {/* Title - Only show for new tasks */}
               {!task && (
                 <div>
@@ -908,16 +979,63 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                 <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text)' }}>
                   Description
                 </label>
+                {/* Desktop: Rich text editor */}
                 {isOpen && (
-                  <TipTapEditor
-                    key={task?.id || 'new-task'}
-                    value={formData.description || ''}
-                    onChange={(value) => updateFormData({ description: value })}
-                    placeholder="Task description (supports rich text formatting and @mentions)"
-                    people={people}
-                    disabled={false}
-                  />
+                  <div className="hidden md:block">
+                    <TipTapEditor
+                      key={task?.id || 'new-task'}
+                      value={formData.description || ''}
+                      onChange={(value) => updateFormData({ description: value })}
+                      placeholder="Task description (supports rich text formatting and @mentions)"
+                      people={people}
+                      disabled={false}
+                    />
+                  </div>
                 )}
+                {/* Mobile: Simple textarea with HTML conversion */}
+                <textarea
+                  className="md:hidden w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-all resize-none overflow-hidden"
+                  style={{
+                    borderColor: 'var(--color-border)',
+                    minHeight: '120px',
+                  }}
+                  value={
+                    // Convert HTML to plain text for display
+                    formData.description 
+                      ? formData.description
+                          .replace(/<p>/g, '')
+                          .replace(/<\/p>/g, '\n')
+                          .replace(/<br\s*\/?>/g, '\n')
+                          .replace(/<[^>]+>/g, '') // Remove all other HTML tags
+                          .replace(/\n\n+/g, '\n\n') // Normalize multiple newlines
+                          .trim()
+                      : ''
+                  }
+                  onChange={(e) => {
+                    const plainText = e.target.value;
+                    // Convert plain text to HTML with paragraphs
+                    const htmlContent = plainText
+                      .split('\n')
+                      .filter(line => line.trim() !== '')
+                      .map(line => `<p>${line}</p>`)
+                      .join('');
+                    
+                    updateFormData({ description: htmlContent || '' });
+                    
+                    // Auto-resize
+                    e.target.style.height = 'auto';
+                    e.target.style.height = e.target.scrollHeight + 'px';
+                  }}
+                  onInput={(e) => {
+                    // Also handle on input for better responsiveness
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = target.scrollHeight + 'px';
+                  }}
+                  placeholder="Task description..."
+                  onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px var(--color-primary)'}
+                  onBlur={(e) => e.target.style.boxShadow = ''}
+                />
               </div>
 
               {/* Sub-tasks - Table Format */}
@@ -1029,8 +1147,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                 </div>
               </div>
 
-              {/* Comments Section */}
-              <div>
+              {/* Comments Section - Desktop only */}
+              <div className="hidden md:block">
                 <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                   Comments
                 </label>
@@ -1169,18 +1287,18 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
               </div>
             </div>
 
-            {/* Right Column - Metadata Sidebar */}
-            <div>
+            {/* Right Column - Metadata Sidebar - Shows first on mobile */}
+            <div className="lg:order-2 order-1">
               <div className="mb-3 pb-3" style={{ borderBottom: '2px solid #f1f5f9' }}>
                 <span className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text)', letterSpacing: '0.5px' }}>
                   Details
                 </span>
               </div>
               
-              <div className="rounded-lg p-5" style={{ background: '#fafbfc', border: '1px solid #e2e8f0' }}>
-                <div className="space-y-4">
-                  {/* Project */}
-                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+              <div className="rounded-lg md:p-5 p-4" style={{ background: '#fafbfc', border: '1px solid #e2e8f0' }}>
+                <div className="md:space-y-4 space-y-3">
+                  {/* Project - Desktop only */}
+                  <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
                       Project
                     </label>
@@ -1266,8 +1384,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                     </select>
                   </div>
 
-                  {/* Status */}
-                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  {/* Status - Desktop only */}
+                  <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
                       Status
                     </label>
@@ -1338,9 +1456,9 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                   </div>
 
                   {/* Deadline */}
-                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <div className="pb-4">
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                      Due Date
+                      Due Date {formData.isRecurring && <span style={{ color: '#f30047' }}>*</span>}
                     </label>
                     <input
                       type="date"
@@ -1350,69 +1468,177 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                       style={{
                         background: '#ffffff',
                         color: 'var(--color-text)',
+                        border: formData.isRecurring && !formData.deadline ? '2px solid #f30047' : 'none',
                       }}
                     />
+                    {formData.isRecurring && !formData.deadline && (
+                      <p className="text-xs mt-1" style={{ color: '#f30047' }}>
+                        Due date is required for recurring tasks
+                      </p>
+                    )}
                   </div>
 
                   {/* Recurring Task */}
-                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <label className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.isRecurring || false}
-                        onChange={(e) => updateFormData({ 
-                          isRecurring: e.target.checked,
-                          recurrenceInterval: e.target.checked ? (formData.recurrenceInterval || 1) : undefined,
-                          recurrenceUnit: e.target.checked ? (formData.recurrenceUnit || 'weeks') : undefined
-                        })}
-                        className="rounded"
-                      />
-                      <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                  <div className="pb-0">
+                    <label className="flex items-center justify-between mb-2 cursor-pointer">
+                      <span className="text-xs font-semibold uppercase tracking-wide select-none" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
                         Recurring Task
                       </span>
+                      {/* Custom Toggle Switch */}
+                      <div 
+                        onClick={() => {
+                          const newIsRecurring = !formData.isRecurring;
+                          
+                          // Check if enabling recurring but no due date set
+                          if (newIsRecurring && !formData.deadline) {
+                            setAlertDialog({
+                              isOpen: true,
+                              title: 'Due Date Required',
+                              message: 'Please set a due date before enabling recurring tasks. The due date is needed to calculate when the next task should be created.',
+                              type: 'warning',
+                            });
+                            return;
+                          }
+                          
+                          updateFormData({ 
+                            isRecurring: newIsRecurring,
+                            recurrenceInterval: newIsRecurring ? (formData.recurrenceInterval || 1) : undefined,
+                            recurrenceUnit: newIsRecurring ? (formData.recurrenceUnit || 'weeks') : undefined
+                          });
+                        }}
+                        className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out cursor-pointer"
+                        style={{
+                          backgroundColor: formData.isRecurring ? 'var(--color-primary)' : '#e2e8f0',
+                        }}
+                      >
+                        <span
+                          className="inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out"
+                          style={{
+                            transform: formData.isRecurring ? 'translateX(22px)' : 'translateX(2px)',
+                          }}
+                        />
+                      </div>
                     </label>
                     
                     {formData.isRecurring && (
                       <div className="flex gap-2 items-center mt-2">
-                        <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Every</span>
+                        <span className="text-sm whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>Every</span>
                         <input
                           type="number"
                           min="1"
-                          value={formData.recurrenceInterval || 1}
-                          onChange={(e) => updateFormData({ recurrenceInterval: parseInt(e.target.value) || 1 })}
-                          className="w-16 px-2 py-1 border rounded-md text-sm text-center"
+                          step="1"
+                          value={formData.recurrenceInterval ?? ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Allow empty string while typing
+                            if (value === '') {
+                              setFormData({ ...formData, recurrenceInterval: undefined });
+                            } else {
+                              const numValue = parseInt(value);
+                              // Only update if it's a valid positive integer
+                              if (!isNaN(numValue) && numValue > 0) {
+                                updateFormData({ recurrenceInterval: numValue });
+                              }
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Set to 1 if empty on blur
+                            if (!e.target.value || parseInt(e.target.value) < 1) {
+                              updateFormData({ recurrenceInterval: 1 });
+                            }
+                          }}
+                          className="w-16 px-3 py-2 border rounded-md text-base text-center"
                           style={{
                             borderColor: 'var(--color-border)',
                             background: '#ffffff',
                             color: 'var(--color-text)',
                           }}
+                          placeholder="1"
                         />
-                        <select
-                          value={formData.recurrenceUnit || 'weeks'}
-                          onChange={(e) => updateFormData({ recurrenceUnit: e.target.value as 'days' | 'weeks' | 'months' })}
-                          className="flex-1 px-2 py-1 border rounded-md text-sm"
-                          style={{
-                            borderColor: 'var(--color-border)',
-                            background: '#ffffff',
-                            color: 'var(--color-text)',
-                          }}
-                        >
-                          <option value="days">Day(s)</option>
-                          <option value="weeks">Week(s)</option>
-                          <option value="months">Month(s)</option>
-                        </select>
+                        {/* Custom Mobile-Friendly Dropdown */}
+                        <div className="flex-1 relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowRecurrenceUnitDropdown(!showRecurrenceUnitDropdown)}
+                            className="w-full px-3 py-2 border rounded-md text-base text-left flex items-center justify-between"
+                            style={{
+                              borderColor: 'var(--color-border)',
+                              backgroundColor: '#ffffff',
+                              color: 'var(--color-text)',
+                            }}
+                          >
+                            <span>
+                              {formData.recurrenceUnit === 'days' ? 'Day(s)' : 
+                               formData.recurrenceUnit === 'weeks' ? 'Week(s)' : 
+                               'Month(s)'}
+                            </span>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          
+                          {/* Dropdown Menu */}
+                          {showRecurrenceUnitDropdown && (
+                            <>
+                              {/* Backdrop */}
+                              <div 
+                                className="fixed inset-0 z-[200]"
+                                onClick={() => setShowRecurrenceUnitDropdown(false)}
+                              />
+                              {/* Options */}
+                              <div 
+                                className="absolute z-[201] w-full mt-1 bg-white border rounded-md shadow-lg overflow-hidden"
+                                style={{ borderColor: 'var(--color-border)' }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateFormData({ recurrenceUnit: 'days' });
+                                    setShowRecurrenceUnitDropdown(false);
+                                  }}
+                                  className="w-full px-3 py-3 text-base text-left hover:bg-gray-50 transition-colors"
+                                  style={{ color: 'var(--color-text)' }}
+                                >
+                                  Day(s)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateFormData({ recurrenceUnit: 'weeks' });
+                                    setShowRecurrenceUnitDropdown(false);
+                                  }}
+                                  className="w-full px-3 py-3 text-base text-left hover:bg-gray-50 transition-colors border-t"
+                                  style={{ color: 'var(--color-text)', borderColor: '#f1f5f9' }}
+                                >
+                                  Week(s)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateFormData({ recurrenceUnit: 'months' });
+                                    setShowRecurrenceUnitDropdown(false);
+                                  }}
+                                  className="w-full px-3 py-3 text-base text-left hover:bg-gray-50 transition-colors border-t"
+                                  style={{ color: 'var(--color-text)', borderColor: '#f1f5f9' }}
+                                >
+                                  Month(s)
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     )}
                     
                     {formData.isRecurring && formData.recurrenceInterval && formData.recurrenceUnit && (
-                      <p className="text-xs mt-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-secondary)' }}>
                         This task will recur every {formData.recurrenceInterval} {formData.recurrenceUnit === 'days' ? 'day' : formData.recurrenceUnit === 'weeks' ? 'week' : 'month'}{formData.recurrenceInterval > 1 ? 's' : ''} when completed.
                       </p>
                     )}
                   </div>
 
-                  {/* Owner */}
-                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  {/* Owner - Desktop only */}
+                  <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
                       Owner
                     </label>
@@ -1427,8 +1653,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                     )}
                   </div>
 
-                  {/* Links */}
-                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  {/* Links - Desktop only */}
+                  <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <div className="flex items-center justify-between mb-2">
                       <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
                         Links
@@ -1480,8 +1706,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                     </div>
                   </div>
 
-                  {/* Tags */}
-                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  {/* Tags - Desktop only */}
+                  <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <div className="flex items-center justify-between mb-2">
                       <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
                         Tags
