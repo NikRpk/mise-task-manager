@@ -3,9 +3,9 @@
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DndContext, DragEndEvent, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { Plus, Settings, LayoutGrid, List, X, Search, FileText, Trash2, Edit, Calendar, Menu } from 'lucide-react';
+import { Plus, Settings, LayoutGrid, List, X, Search, FileText, Trash2, Edit, Calendar, Menu, MessageSquare, LogOut } from 'lucide-react';
 import Link from 'next/link';
-import { Task, TaskStatus, Note } from '@/types';
+import { Task, TaskStatus, Note, Priority } from '@/types';
 import TaskCard from '@/components/TaskCard';
 import TaskModal from '@/components/TaskModal';
 import ProjectSelector from '@/components/ProjectSelector';
@@ -19,6 +19,7 @@ import EmptyProjectState from '@/components/EmptyProjectState';
 import InputDialog from '@/components/InputDialog';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import AlertDialog from '@/components/AlertDialog';
+import FeedbackModal from '@/components/FeedbackModal';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
@@ -52,7 +53,7 @@ type ViewMode = 'tasks' | 'notes';
 function HomePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { settings } = useUserSettings();
   const [currentView, setCurrentView] = useState<ViewMode>('tasks');
   
@@ -115,6 +116,7 @@ function HomePage() {
   const [showLeftFade, setShowLeftFade] = useState(false);
   const [showRightFade, setShowRightFade] = useState(true);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; message: string; onConfirm: () => void }>({
     isOpen: false,
     message: '',
@@ -833,57 +835,327 @@ function HomePage() {
                   </div>
                 )}
                 
-                {/* Action Buttons */}
-                <div className="space-y-3 mb-6">
-                  {currentView === 'tasks' && (
-                    <>
+                {/* Filters Section */}
+                {currentView === 'tasks' && (
+                  <div className="mb-6">
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--color-text-secondary)' }}>
+                      Search & Filters
+                    </label>
+                    
+                    {/* Toggle Search Visibility */}
+                    <div className="mb-4">
                       <button
                         onClick={() => {
                           setShowSearchFilters(!showSearchFilters);
                           setShowMobileMenu(false);
                         }}
-                        className="w-full px-4 py-3 text-sm border rounded-md transition-all duration-200 flex items-center gap-2 font-medium"
+                        className="w-full px-4 py-3 text-sm border rounded-md transition-all duration-200 flex items-center justify-between font-medium"
                         style={{ 
-                          borderColor: 'var(--color-border)',
-                          color: 'var(--color-text)',
-                          backgroundColor: 'var(--color-surface)'
+                          borderColor: showSearchFilters ? 'var(--color-primary)' : 'var(--color-border)',
+                          color: showSearchFilters ? 'var(--color-primary)' : 'var(--color-text)',
+                          backgroundColor: showSearchFilters ? 'var(--color-surface-muted)' : 'var(--color-surface)'
                         }}
                       >
-                        <Search size={16} />
-                        Search & Filters
+                        <div className="flex items-center gap-2">
+                          <Search size={16} />
+                          <span>Show Search Bar</span>
+                        </div>
+                        <div 
+                          className="w-10 h-6 rounded-full transition-all duration-200 flex items-center px-1"
+                          style={{ 
+                            backgroundColor: showSearchFilters ? 'var(--color-primary)' : '#cbd5e1'
+                          }}
+                        >
+                          <div 
+                            className="w-4 h-4 bg-white rounded-full transition-all duration-200"
+                            style={{ 
+                              transform: showSearchFilters ? 'translateX(16px)' : 'translateX(0)'
+                            }}
+                          />
+                        </div>
+                      </button>
+                    </div>
+                    
+                    {/* Filter Controls */}
+                    <div className="space-y-3">
+                      {/* Deadline Filter */}
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                          Deadline
+                        </label>
+                        <select
+                          value={filters.deadline || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setFilters({ 
+                              ...filters, 
+                              deadline: value ? (value as 'overdue' | 'today' | 'this-week' | 'this-month' | 'future') : undefined 
+                            });
+                          }}
+                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
+                          style={{
+                            borderColor: 'var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                          }}
+                        >
+                          <option value="">All</option>
+                          <option value="overdue">Overdue</option>
+                          <option value="today">Today</option>
+                          <option value="this-week">This Week</option>
+                          <option value="this-month">This Month</option>
+                          <option value="future">Future</option>
+                        </select>
+                      </div>
+                      
+                      {/* Status Filter */}
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                          Status
+                        </label>
+                        <select
+                          value={filters.status?.[0] || ''}
+                          onChange={(e) => setFilters({ 
+                            ...filters, 
+                            status: e.target.value ? [e.target.value as TaskStatus] : undefined 
+                          })}
+                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
+                          style={{
+                            borderColor: 'var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                          }}
+                        >
+                          <option value="">All</option>
+                          {statusColumns.map(option => (
+                            <option key={option.id} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {/* Priority Filter */}
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                          Priority
+                        </label>
+                        <select
+                          value={filters.priority?.[0] || ''}
+                          onChange={(e) => setFilters({ 
+                            ...filters, 
+                            priority: e.target.value ? [e.target.value as Priority] : undefined 
+                          })}
+                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
+                          style={{
+                            borderColor: 'var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                          }}
+                        >
+                          <option value="">All</option>
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
+                        </select>
+                      </div>
+                      
+                      {/* Owner Filter */}
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                          Owner
+                        </label>
+                        <select
+                          value={filters.owner?.[0] || ''}
+                          onChange={(e) => setFilters({ 
+                            ...filters, 
+                            owner: e.target.value ? [e.target.value] : undefined 
+                          })}
+                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
+                          style={{
+                            borderColor: 'var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                          }}
+                        >
+                          <option value="">All</option>
+                          {owners.map(owner => (
+                            <option key={owner} value={owner}>{owner}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {/* Clear Filters Button */}
+                      {(filters.deadline || filters.status || filters.priority || filters.owner) && (
+                        <button
+                          onClick={() => setFilters({})}
+                          className="w-full px-4 py-2 text-sm border rounded-md transition-all duration-200 font-medium"
+                          style={{ 
+                            borderColor: 'var(--color-border)',
+                            color: 'var(--color-text-secondary)',
+                            backgroundColor: 'var(--color-surface)'
+                          }}
+                        >
+                          Clear All Filters
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* View Mode Section */}
+                {currentView === 'tasks' && (
+                  <div className="mb-6">
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--color-text-secondary)' }}>
+                      View Mode
+                    </label>
+                    <div className="flex gap-2 p-1 border rounded-md" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
+                      <button
+                        onClick={() => setViewModeCompact('normal')}
+                        className="flex-1 px-4 py-2 rounded text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
+                        style={{
+                          backgroundColor: viewModeCompact === 'normal' ? 'var(--color-primary)' : 'transparent',
+                          color: viewModeCompact === 'normal' ? 'white' : 'var(--color-text-secondary)',
+                        }}
+                      >
+                        <LayoutGrid size={16} />
+                        <span>Normal</span>
                       </button>
                       <button
-                        onClick={() => {
-                          handleNewTask();
-                          setShowMobileMenu(false);
+                        onClick={() => setViewModeCompact('compact')}
+                        className="flex-1 px-4 py-2 rounded text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
+                        style={{
+                          backgroundColor: viewModeCompact === 'compact' ? 'var(--color-primary)' : 'transparent',
+                          color: viewModeCompact === 'compact' ? 'white' : 'var(--color-text-secondary)',
                         }}
-                        disabled={!permissions.canEdit}
-                        className="w-full px-4 py-3 text-sm rounded-md transition-all duration-200 flex items-center gap-2 font-medium text-white disabled:opacity-50"
-                        style={{ backgroundColor: permissions.canEdit ? 'var(--color-primary)' : '#94a3b8' }}
                       >
-                        <Plus size={16} />
-                        New Task
+                        <List size={16} />
+                        <span>Compact</span>
                       </button>
-                    </>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Display Options Section */}
+                {currentView === 'tasks' && (
+                  <div className="mb-6">
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--color-text-secondary)' }}>
+                      Display Options
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center justify-between p-3 rounded-md cursor-pointer hover:bg-gray-50 transition-colors" style={{ backgroundColor: 'var(--color-surface)' }}>
+                        <span className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>Show Owner</span>
+                        <div 
+                          className="w-10 h-6 rounded-full transition-all duration-200 flex items-center px-1"
+                          style={{ 
+                            backgroundColor: showOwner ? 'var(--color-primary)' : '#cbd5e1'
+                          }}
+                          onClick={() => setShowOwner(!showOwner)}
+                        >
+                          <div 
+                            className="w-4 h-4 bg-white rounded-full transition-all duration-200"
+                            style={{ 
+                              transform: showOwner ? 'translateX(16px)' : 'translateX(0)'
+                            }}
+                          />
+                        </div>
+                      </label>
+                      
+                      <label className="flex items-center justify-between p-3 rounded-md cursor-pointer hover:bg-gray-50 transition-colors" style={{ backgroundColor: 'var(--color-surface)' }}>
+                        <span className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>Show Priority</span>
+                        <div 
+                          className="w-10 h-6 rounded-full transition-all duration-200 flex items-center px-1"
+                          style={{ 
+                            backgroundColor: showPriority ? 'var(--color-primary)' : '#cbd5e1'
+                          }}
+                          onClick={() => setShowPriority(!showPriority)}
+                        >
+                          <div 
+                            className="w-4 h-4 bg-white rounded-full transition-all duration-200"
+                            style={{ 
+                              transform: showPriority ? 'translateX(16px)' : 'translateX(0)'
+                            }}
+                          />
+                        </div>
+                      </label>
+                      
+                      <label className="flex items-center justify-between p-3 rounded-md cursor-pointer hover:bg-gray-50 transition-colors" style={{ backgroundColor: 'var(--color-surface)' }}>
+                        <span className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>Show Due Date</span>
+                        <div 
+                          className="w-10 h-6 rounded-full transition-all duration-200 flex items-center px-1"
+                          style={{ 
+                            backgroundColor: showDueDate ? 'var(--color-primary)' : '#cbd5e1'
+                          }}
+                          onClick={() => setShowDueDate(!showDueDate)}
+                        >
+                          <div 
+                            className="w-4 h-4 bg-white rounded-full transition-all duration-200"
+                            style={{ 
+                              transform: showDueDate ? 'translateX(16px)' : 'translateX(0)'
+                            }}
+                          />
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
+                
+                {/* User Profile Section */}
+                <div className="pt-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                  {/* User Info */}
+                  {user && (
+                    <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm" style={{ background: 'var(--color-primary)' }}>
+                          {(user.displayName || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>
+                            {user.displayName}
+                          </p>
+                          <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                            {user.email}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
-                  {currentView === 'notes' && (
+                  
+                  {/* Profile Actions */}
+                  <div className="space-y-2">
+                    <Link
+                      href="/settings"
+                      onClick={() => setShowMobileMenu(false)}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-md hover:bg-gray-50 transition-colors"
+                      style={{ color: 'var(--color-text)' }}
+                    >
+                      <Settings size={18} />
+                      <span className="text-sm font-medium">Settings</span>
+                    </Link>
+                    
                     <button
                       onClick={() => {
-                        handleNewNote();
                         setShowMobileMenu(false);
+                        setShowFeedbackModal(true);
                       }}
-                      className="w-full px-4 py-3 text-sm rounded-md transition-all duration-200 flex items-center gap-2 font-medium text-white"
-                      style={{ backgroundColor: 'var(--color-primary)' }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-md hover:bg-gray-50 transition-colors"
+                      style={{ color: 'var(--color-text)' }}
                     >
-                      <Plus size={16} />
-                      New Note
+                      <MessageSquare size={18} />
+                      <span className="text-sm font-medium">Share Feedback</span>
                     </button>
-                  )}
-                </div>
-                
-                {/* User Profile */}
-                <div className="pt-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
-                  <UserProfile />
+                    
+                    <button
+                      onClick={async () => {
+                        try {
+                          await signOut();
+                          router.push('/login');
+                        } catch (error) {
+                          logger.error('Error signing out', error as Error, { uid: user?.uid });
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-md hover:bg-red-50 transition-colors text-red-600"
+                    >
+                      <LogOut size={18} />
+                      <span className="text-sm font-medium">Sign Out</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -900,78 +1172,30 @@ function HomePage() {
             }}
           >
             <div className="px-5 py-3" style={{ backgroundColor: 'var(--color-bg)' }}>
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="flex-1 min-w-[300px]">
-                  <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                    Search
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Search tasks..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
-                    style={{ 
-                      borderColor: 'var(--color-border)',
-                      backgroundColor: 'var(--color-surface)',
-                      color: 'var(--color-text)',
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.boxShadow = '0 0 0 2px var(--color-primary)';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.boxShadow = '';
-                    }}
-                  />
-                </div>
-                <Filters filters={filters} onChange={setFilters} owners={owners} />
-                
-                {/* Display Options */}
-                <div className="flex items-end">
-                  <DisplayOptionsMenu
-                    showOwner={showOwner}
-                    showPriority={showPriority}
-                    showDueDate={showDueDate}
-                    onToggleOwner={() => setShowOwner(!showOwner)}
-                    onTogglePriority={() => setShowPriority(!showPriority)}
-                    onToggleDueDate={() => setShowDueDate(!showDueDate)}
-                  />
-                </div>
-                
-                {/* View Mode Toggle */}
-                <div className="min-w-[100px]">
-                  <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                    View
-                  </label>
-                  <div className="flex gap-1 border rounded-md p-1" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
-                    <button
-                    onClick={() => setViewModeCompact('normal')}
-                      className="flex-1 px-3 py-1 rounded text-xs font-medium transition-all flex items-center justify-center gap-1"
-                      style={{
-                      backgroundColor: viewModeCompact === 'normal' ? 'var(--color-primary)' : 'transparent',
-                        color: viewModeCompact === 'normal' ? 'white' : 'var(--color-text-secondary)',
-                      }}
-                      title="Normal view"
-                    >
-                    <LayoutGrid size={14} />
-                    <span>Normal</span>
-                  </button>
-                  <button
-                    onClick={() => setViewModeCompact('compact')}
-                    className="flex-1 px-3 py-1 rounded text-xs font-medium transition-all flex items-center justify-center gap-1"
-                    style={{
-                      backgroundColor: viewModeCompact === 'compact' ? 'var(--color-primary)' : 'transparent',
-                      color: viewModeCompact === 'compact' ? 'white' : 'var(--color-text-secondary)',
-                    }}
-                    title="Compact view"
-                  >
-                    <List size={14} />
-                    <span>Compact</span>
-                  </button>
-                </div>
+              <div className="w-full">
+                <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                  Search
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search tasks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
+                  style={{ 
+                    borderColor: 'var(--color-border)',
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-text)',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.boxShadow = '0 0 0 2px var(--color-primary)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.boxShadow = '';
+                  }}
+                />
               </div>
             </div>
-          </div>
           </div>
         </div>
 
@@ -1220,6 +1444,11 @@ function HomePage() {
         title="Choose Project Icon"
         placeholder="Enter emoji (e.g., 📋, 🚀, 💡)"
         defaultValue="📋"
+      />
+      
+      <FeedbackModal 
+        isOpen={showFeedbackModal} 
+        onClose={() => setShowFeedbackModal(false)} 
       />
     </div>
   );

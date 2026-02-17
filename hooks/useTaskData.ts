@@ -119,12 +119,26 @@ export function useTaskData(
       });
       
       // Handle recurring tasks - create new instance when marked as done
-      if (newStatus === 'done' && task.isRecurring && task.recurrenceInterval && task.recurrenceUnit) {
+      console.log('[Recurring Task Check]', {
+        newStatus,
+        isDone: newStatus === 'done',
+        isRecurring: task.isRecurring,
+        recurrenceInterval: task.recurrenceInterval,
+        recurrenceUnit: task.recurrenceUnit,
+        deadline: task.deadline,
+        taskTitle: task.title,
+        hasDeadline: !!task.deadline,
+      });
+      
+      if (newStatus === 'done' && task.isRecurring && task.recurrenceInterval && task.recurrenceUnit && task.deadline) {
+        console.log('[Recurring Task] Creating new instance for task:', task.title || task.description);
         const newDeadline = calculateNextDeadline(
           task.deadline,
           task.recurrenceInterval,
           task.recurrenceUnit
         );
+        
+        console.log('[Recurring Task] Calculated new deadline:', newDeadline);
         
         // Create new recurring task instance
         const newRecurringTask: Partial<Task> = {
@@ -140,11 +154,33 @@ export function useTaskData(
           subTasks: task.subTasks?.map(st => ({ ...st, completed: false })) || [], // Reset subtasks
         };
         
+        console.log('[Recurring Task] New task payload:', {
+          title: newRecurringTask.title,
+          isRecurring: newRecurringTask.isRecurring,
+          recurrenceInterval: newRecurringTask.recurrenceInterval,
+          recurrenceUnit: newRecurringTask.recurrenceUnit,
+          deadline: newRecurringTask.deadline,
+          parentRecurringTaskId: newRecurringTask.parentRecurringTaskId,
+        });
+        
         // Create the new task
-        await authenticatedFetch('/api/tasks', {
+        const response = await authenticatedFetch('/api/tasks', {
           method: 'POST',
           body: JSON.stringify(newRecurringTask),
         });
+        
+        console.log('[Recurring Task] API response:', response.status, response.ok);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[Recurring Task] Failed to create new instance:', errorText);
+          logger.error('Failed to create recurring task instance', new Error(errorText), {
+            taskId: task.id,
+            taskTitle: task.title,
+          });
+        } else {
+          console.log('[Recurring Task] Successfully created new instance');
+        }
         
         // Refresh tasks to show the new recurring instance
         await fetchTasks();
@@ -170,23 +206,41 @@ export function useTaskData(
 
   const saveTask = useCallback(async (taskData: Partial<Task>) => {
     try {
+      console.log('[useTaskData] saveTask called:', {
+        isNew: !taskData.id,
+        taskId: taskData.id,
+        title: taskData.title,
+        projectId: taskData.projectId,
+      });
+      
       // Determine if update or create based on presence of id
       if (taskData.id) {
         // Update existing task
+        console.log('[useTaskData] Updating existing task');
         await authenticatedFetch(`/api/tasks/${taskData.id}`, {
           method: 'PUT',
           body: JSON.stringify(taskData),
         });
       } else {
         // Create new task
-        await authenticatedFetch('/api/tasks', {
+        console.log('[useTaskData] Creating new task');
+        const response = await authenticatedFetch('/api/tasks', {
           method: 'POST',
           body: JSON.stringify(taskData),
         });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[useTaskData] Failed to create task:', errorText);
+          throw new Error(`Failed to create task: ${errorText}`);
+        }
+        
+        console.log('[useTaskData] Task created successfully, refreshing list...');
       }
       
       // Refresh tasks after save
       await fetchTasks();
+      console.log('[useTaskData] Tasks refreshed');
     } catch (error) {
       logger.error('Failed to save task', error as Error, {
         isUpdate: !!taskData.id,

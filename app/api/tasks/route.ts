@@ -119,12 +119,20 @@ export async function POST(request: NextRequest) {
     try {
       const body = await request.json();
 
+      console.log('[API POST /api/tasks] Received request:', {
+        projectId: body.projectId,
+        title: body.title,
+        description: body.description?.substring(0, 50),
+        hasRecurringFields: !!body.isRecurring,
+      });
+
       if (!body.projectId) {
         throw new ValidationError('Project ID is required');
       }
 
-      if (!body.title || body.title.trim().length === 0) {
-        throw new ValidationError('Task title is required');
+      // Title OR description is required (not both)
+      if ((!body.title || body.title.trim().length === 0) && (!body.description || body.description.trim().length === 0)) {
+        throw new ValidationError('Task title or description is required');
       }
 
       // Check if user has EDIT permission
@@ -189,9 +197,29 @@ export async function POST(request: NextRequest) {
         statusHistory: body.statusHistory || initialStatusHistory,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        // Recurring task fields - only include if they have values (Firestore doesn't like undefined)
+        ...(body.isRecurring !== undefined && { isRecurring: body.isRecurring }),
+        ...(body.recurrenceInterval !== undefined && { recurrenceInterval: body.recurrenceInterval }),
+        ...(body.recurrenceUnit !== undefined && { recurrenceUnit: body.recurrenceUnit }),
+        ...(body.parentRecurringTaskId !== undefined && { parentRecurringTaskId: body.parentRecurringTaskId }),
       };
 
+      console.log('[API] Creating new task with recurring fields:', {
+        id: newTask.id,
+        title: newTask.title,
+        isRecurring: newTask.isRecurring,
+        recurrenceInterval: newTask.recurrenceInterval,
+        recurrenceUnit: newTask.recurrenceUnit,
+        parentRecurringTaskId: newTask.parentRecurringTaskId,
+      });
+
       await newTaskRef.set(newTask);
+
+      console.log('[API POST /api/tasks] Task created successfully:', {
+        id: newTask.id,
+        title: newTask.title,
+        projectId: newTask.projectId,
+      });
 
       logger.apiResponse('POST', '/api/tasks', 201, undefined, {
         userId: user.uid,

@@ -15,6 +15,7 @@ import { AUTO_SAVE_DELAY_MS, TOAST_DURATION_MS, DEFAULT_PROJECT_ICON } from '@/l
 import { logger } from '@/lib/logger';
 import OwnerSelector from './OwnerSelector';
 import { usePeopleData } from '@/hooks/usePeopleData';
+import { Select, Toggle } from './ui';
 
 interface TaskModalProps {
   task: Task | null;
@@ -49,9 +50,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
     tags: [],
     images: [],
     comments: [],
-    isRecurring: false,
-    recurrenceInterval: undefined,
-    recurrenceUnit: undefined,
+    // Don't include recurring fields in initial state - they'll be added when toggled ON
   });
 
   const [newComment, setNewComment] = useState('');
@@ -68,7 +67,6 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState(false);
   const [unsavedTaskConfirmDialog, setUnsavedTaskConfirmDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [showRecurrenceUnitDropdown, setShowRecurrenceUnitDropdown] = useState(false);
   
   // Input dialog states
   const [inputDialog, setInputDialog] = useState<{ isOpen: boolean; title: string; placeholder: string; defaultValue: string; onConfirm: (value: string) => void }>({
@@ -158,6 +156,14 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
   const debouncedSave = useRef(
     debounce((...args: unknown[]) => {
       const data = args[0] as Partial<Task>;
+      console.log('[TaskModal] Auto-saving task:', {
+        id: data.id,
+        title: data.title,
+        isRecurring: data.isRecurring,
+        recurrenceInterval: data.recurrenceInterval,
+        recurrenceUnit: data.recurrenceUnit,
+        deadline: data.deadline,
+      });
       saveTaskToServer(data);
     }, AUTO_SAVE_DELAY_MS)
   ).current;
@@ -216,6 +222,14 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
     }
 
     if (task) {
+      console.log('[TaskModal] Loading task into form:', {
+        id: task.id,
+        title: task.title,
+        isRecurring: task.isRecurring,
+        recurrenceInterval: task.recurrenceInterval,
+        recurrenceUnit: task.recurrenceUnit,
+        deadline: task.deadline,
+      });
       setFormData(task);
     } else {
       // For new tasks, use the default project ID
@@ -385,7 +399,12 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
       subTasks: formData.subTasks?.filter(st => st.description.trim() !== '') || [],
     };
     
-    onSave(cleanedFormData);
+    // Remove undefined values for Firestore
+    const cleanedData = Object.fromEntries(
+      Object.entries(cleanedFormData).filter(([_, value]) => value !== undefined)
+    ) as Partial<Task>;
+    
+    onSave(cleanedData);
     setUnsavedTaskConfirmDialog(false);
     onClose();
   };
@@ -471,8 +490,14 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
         // Auto-assign owner to current user if not set
         owner: formData.owner || user?.email || '',
       };
+      
+      // Remove undefined values for Firestore (it doesn't accept them)
+      const cleanedData = Object.fromEntries(
+        Object.entries(cleanedFormData).filter(([_, value]) => value !== undefined)
+      ) as Partial<Task>;
+      
       // Only save on submit for new tasks
-      onSave(cleanedFormData);
+      onSave(cleanedData);
       onClose();
     }
   };
@@ -1299,14 +1324,10 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                 <div className="md:space-y-4 space-y-3">
                   {/* Project - Desktop only */}
                   <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                      Project
-                    </label>
-                    <select
+                    <Select
+                      label="Project"
                       value={formData.projectId || ''}
-                      onChange={(e) => {
-                        const newProjectId = e.target.value;
-                        
+                      onChange={(newProjectId) => {
                         // Reload project settings when project changes
                         if (newProjectId) {
                           authenticatedFetch(`/api/projects/${newProjectId}/settings`)
@@ -1369,30 +1390,33 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                             });
                         }
                       }}
-                      className="w-full px-3 py-2 rounded-md focus:outline-none text-sm font-medium"
+                      options={projects.map(project => ({
+                        value: project.id,
+                        label: project.name,
+                      }))}
                       style={{
                         background: '#ffffff',
                         color: '#0f172a',
                         border: '2px solid var(--color-primary)',
                       }}
-                    >
-                      {projects.map(project => (
-                        <option key={project.id} value={project.id}>
-                          {project.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   {/* Status - Desktop only */}
                   <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                      Status
-                    </label>
-                    <select
+                    <Select
+                      label="Status"
                       value={formData.status || (statusOptions[0]?.id || 'todo')}
-                      onChange={(e) => updateFormData({ status: e.target.value as TaskStatus })}
-                      className="w-full px-3 py-2 rounded-md focus:outline-none text-sm font-medium"
+                      onChange={(value) => updateFormData({ status: value as TaskStatus })}
+                      options={statusOptions.length > 0 ? statusOptions.map(opt => ({
+                        value: opt.id,
+                        label: opt.label,
+                      })) : [
+                        { value: 'todo', label: 'To Do' },
+                        { value: 'in-progress', label: 'In Progress' },
+                        { value: 'review', label: 'Review' },
+                        { value: 'done', label: 'Done' },
+                      ]}
                       style={{
                         background: formData.status && statusOptions.find(s => s.id === formData.status)?.color 
                           ? `${statusOptions.find(s => s.id === formData.status)?.color}20` 
@@ -1402,33 +1426,23 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                           : '#0f172a',
                         border: `2px solid ${formData.status && statusOptions.find(s => s.id === formData.status)?.color ? statusOptions.find(s => s.id === formData.status)?.color : '#e2e8f0'}`,
                       }}
-                    >
-                      {statusOptions.length > 0 ? (
-                        statusOptions.map(option => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="todo">To Do</option>
-                          <option value="in-progress">In Progress</option>
-                          <option value="review">Review</option>
-                          <option value="done">Done</option>
-                        </>
-                      )}
-                    </select>
+                    />
                   </div>
 
                   {/* Priority */}
                   <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                      Priority
-                    </label>
-                    <select
+                    <Select
+                      label="Priority"
                       value={formData.priority || (priorityOptions[0]?.id || 'medium')}
-                      onChange={(e) => updateFormData({ priority: e.target.value as Priority })}
-                      className="w-full px-3 py-2 rounded-md focus:outline-none text-sm font-medium"
+                      onChange={(value) => updateFormData({ priority: value as Priority })}
+                      options={priorityOptions.length > 0 ? priorityOptions.map(opt => ({
+                        value: opt.id,
+                        label: opt.label,
+                      })) : [
+                        { value: 'low', label: 'Low' },
+                        { value: 'medium', label: 'Medium' },
+                        { value: 'high', label: 'High' },
+                      ]}
                       style={{
                         background: formData.priority && priorityOptions.find(p => p.id === formData.priority)?.color 
                           ? `${priorityOptions.find(p => p.id === formData.priority)?.color}20` 
@@ -1438,21 +1452,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                           : '#0f172a',
                         border: `2px solid ${formData.priority && priorityOptions.find(p => p.id === formData.priority)?.color ? priorityOptions.find(p => p.id === formData.priority)?.color : '#e2e8f0'}`,
                       }}
-                    >
-                      {priorityOptions.length > 0 ? (
-                        priorityOptions.map(option => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="low">Low</option>
-                          <option value="medium">Medium</option>
-                          <option value="high">High</option>
-                        </>
-                      )}
-                    </select>
+                    />
                   </div>
 
                   {/* Deadline */}
@@ -1480,45 +1480,29 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
 
                   {/* Recurring Task */}
                   <div className="pb-0">
-                    <label className="flex items-center justify-between mb-2 cursor-pointer">
-                      <span className="text-xs font-semibold uppercase tracking-wide select-none" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                        Recurring Task
-                      </span>
-                      {/* Custom Toggle Switch */}
-                      <div 
-                        onClick={() => {
-                          const newIsRecurring = !formData.isRecurring;
-                          
-                          // Check if enabling recurring but no due date set
-                          if (newIsRecurring && !formData.deadline) {
-                            setAlertDialog({
-                              isOpen: true,
-                              title: 'Due Date Required',
-                              message: 'Please set a due date before enabling recurring tasks. The due date is needed to calculate when the next task should be created.',
-                              type: 'warning',
-                            });
-                            return;
-                          }
-                          
-                          updateFormData({ 
-                            isRecurring: newIsRecurring,
-                            recurrenceInterval: newIsRecurring ? (formData.recurrenceInterval || 1) : undefined,
-                            recurrenceUnit: newIsRecurring ? (formData.recurrenceUnit || 'weeks') : undefined
+                    <Toggle
+                      label="Recurring Task"
+                      labelPosition="left"
+                      checked={formData.isRecurring || false}
+                      onChange={(checked) => {
+                        // Check if enabling recurring but no due date set
+                        if (checked && !formData.deadline) {
+                          setAlertDialog({
+                            isOpen: true,
+                            title: 'Due Date Required',
+                            message: 'Please set a due date before enabling recurring tasks. The due date is needed to calculate when the next task should be created.',
+                            type: 'warning',
                           });
-                        }}
-                        className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out cursor-pointer"
-                        style={{
-                          backgroundColor: formData.isRecurring ? 'var(--color-primary)' : '#e2e8f0',
-                        }}
-                      >
-                        <span
-                          className="inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out"
-                          style={{
-                            transform: formData.isRecurring ? 'translateX(22px)' : 'translateX(2px)',
-                          }}
-                        />
-                      </div>
-                    </label>
+                          return;
+                        }
+                        
+                        updateFormData({ 
+                          isRecurring: checked,
+                          recurrenceInterval: checked ? (formData.recurrenceInterval || 1) : undefined,
+                          recurrenceUnit: checked ? (formData.recurrenceUnit || 'weeks') : undefined
+                        });
+                      }}
+                    />
                     
                     {formData.isRecurring && (
                       <div className="flex gap-2 items-center mt-2">
@@ -1532,7 +1516,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                             const value = e.target.value;
                             // Allow empty string while typing
                             if (value === '') {
-                              setFormData({ ...formData, recurrenceInterval: undefined });
+                              updateFormData({ recurrenceInterval: undefined });
                             } else {
                               const numValue = parseInt(value);
                               // Only update if it's a valid positive integer
@@ -1555,77 +1539,17 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                           }}
                           placeholder="1"
                         />
-                        {/* Custom Mobile-Friendly Dropdown */}
-                        <div className="flex-1 relative">
-                          <button
-                            type="button"
-                            onClick={() => setShowRecurrenceUnitDropdown(!showRecurrenceUnitDropdown)}
-                            className="w-full px-3 py-2 border rounded-md text-base text-left flex items-center justify-between"
-                            style={{
-                              borderColor: 'var(--color-border)',
-                              backgroundColor: '#ffffff',
-                              color: 'var(--color-text)',
-                            }}
-                          >
-                            <span>
-                              {formData.recurrenceUnit === 'days' ? 'Day(s)' : 
-                               formData.recurrenceUnit === 'weeks' ? 'Week(s)' : 
-                               'Month(s)'}
-                            </span>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                          
-                          {/* Dropdown Menu */}
-                          {showRecurrenceUnitDropdown && (
-                            <>
-                              {/* Backdrop */}
-                              <div 
-                                className="fixed inset-0 z-[200]"
-                                onClick={() => setShowRecurrenceUnitDropdown(false)}
-                              />
-                              {/* Options */}
-                              <div 
-                                className="absolute z-[201] w-full mt-1 bg-white border rounded-md shadow-lg overflow-hidden"
-                                style={{ borderColor: 'var(--color-border)' }}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    updateFormData({ recurrenceUnit: 'days' });
-                                    setShowRecurrenceUnitDropdown(false);
-                                  }}
-                                  className="w-full px-3 py-3 text-base text-left hover:bg-gray-50 transition-colors"
-                                  style={{ color: 'var(--color-text)' }}
-                                >
-                                  Day(s)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    updateFormData({ recurrenceUnit: 'weeks' });
-                                    setShowRecurrenceUnitDropdown(false);
-                                  }}
-                                  className="w-full px-3 py-3 text-base text-left hover:bg-gray-50 transition-colors border-t"
-                                  style={{ color: 'var(--color-text)', borderColor: '#f1f5f9' }}
-                                >
-                                  Week(s)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    updateFormData({ recurrenceUnit: 'months' });
-                                    setShowRecurrenceUnitDropdown(false);
-                                  }}
-                                  className="w-full px-3 py-3 text-base text-left hover:bg-gray-50 transition-colors border-t"
-                                  style={{ color: 'var(--color-text)', borderColor: '#f1f5f9' }}
-                                >
-                                  Month(s)
-                                </button>
-                              </div>
-                            </>
-                          )}
+                        {/* Recurrence Unit Select */}
+                        <div className="flex-1">
+                          <Select
+                            value={formData.recurrenceUnit || 'weeks'}
+                            onChange={(value) => updateFormData({ recurrenceUnit: value as 'days' | 'weeks' | 'months' })}
+                            options={[
+                              { value: 'days', label: 'Day(s)' },
+                              { value: 'weeks', label: 'Week(s)' },
+                              { value: 'months', label: 'Month(s)' },
+                            ]}
+                          />
                         </div>
                       </div>
                     )}

@@ -120,6 +120,14 @@ export async function PUT(
         updatedAt: new Date().toISOString(),
       };
 
+      // Log what we're about to save to Firestore
+      console.log('[API] Updating task in Firestore:', {
+        taskId: id,
+        isRecurring: updatedTask.isRecurring,
+        recurrenceInterval: updatedTask.recurrenceInterval,
+        recurrenceUnit: updatedTask.recurrenceUnit,
+      });
+
       await taskRef.update(updatedTask);
 
       logger.apiResponse('PUT', `/api/tasks/${id}`, 200, undefined, {
