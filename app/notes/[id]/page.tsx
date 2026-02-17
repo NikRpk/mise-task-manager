@@ -124,7 +124,7 @@ function NoteEditPage() {
       }
     } catch (error) {
       logger.error('Error fetching note', error as Error, {
-        noteId: params.id,
+        noteId: Array.isArray(params.id) ? params.id[0] : params.id,
         userId: user?.uid,
       });
       setAlertDialog({
@@ -258,7 +258,7 @@ function NoteEditPage() {
             }
           } catch (error) {
             logger.error('Failed to create task from note', error as Error, {
-              noteId: params.id,
+              noteId: Array.isArray(params.id) ? params.id[0] : params.id,
               userId: user?.uid,
             });
           }
@@ -315,7 +315,7 @@ function NoteEditPage() {
           }
         } catch (error) {
           logger.error('Failed to delete note', error as Error, {
-            noteId: params.id,
+            noteId: Array.isArray(params.id) ? params.id[0] : params.id,
             userId: user?.uid,
           });
           setAlertDialog({
