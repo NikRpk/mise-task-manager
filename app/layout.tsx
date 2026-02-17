@@ -6,6 +6,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { CacheProvider } from "@/lib/cache-context";
 import { PeopleProvider } from "@/lib/people-context";
 import { ToastProvider } from "@/lib/toast-context";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -35,17 +36,19 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
-        <AuthProvider>
-          <CacheProvider>
-            <PeopleProvider>
-              <ThemeProvider>
-                <ToastProvider>
-                  {children}
-                </ToastProvider>
-              </ThemeProvider>
-            </PeopleProvider>
-          </CacheProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <CacheProvider>
+              <PeopleProvider>
+                <ThemeProvider>
+                  <ToastProvider>
+                    {children}
+                  </ToastProvider>
+                </ThemeProvider>
+              </PeopleProvider>
+            </CacheProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

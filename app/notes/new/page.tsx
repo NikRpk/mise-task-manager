@@ -101,7 +101,10 @@ function NewNotePage() {
   }, [searchParams]);
 
   const handleCalendarEventSelected = async (event: CalendarEvent | null) => {
-    console.log('[NEW NOTE] Calendar event selected:', event);
+    logger.debug('Calendar event selected for new note', { 
+      eventId: event?.id,
+      summary: event?.summary 
+    });
     setSelectedCalendarEvent(event);
     setShowCalendarSelector(false);
     if (event) {
@@ -111,39 +114,34 @@ function NewNotePage() {
       const recurringEventId = event.recurringEventId;
       const instanceDate = event.start;
       
-      console.log('[NEW NOTE] Checking for recurring event:', {
-        recurringEventId,
-        instanceDate,
-        hasRecurringId: !!recurringEventId,
-        hasInstanceDate: !!instanceDate
-      });
-      
       if (recurringEventId && instanceDate) {
         setIsLoadingPrevious(true);
-        console.log('[NEW NOTE] Fetching previous note...');
+        logger.debug('Fetching previous note for recurring event', {
+          recurringEventId,
+          instanceDate,
+        });
         try {
           const url = `/api/notes/previous?recurringEventId=${encodeURIComponent(recurringEventId)}&instanceDate=${encodeURIComponent(instanceDate)}`;
-          console.log('[NEW NOTE] Calling API:', url);
           
           const res = await authenticatedFetch(url);
           
-          console.log('[NEW NOTE] API response status:', res.status);
           if (res.ok) {
             const data = await res.json();
-            console.log('[NEW NOTE] Previous note data:', data);
+            logger.debug('Previous note data fetched', { hasPreviousNote: !!data.previousNote });
             setPreviousNote(data.previousNote);
-          } else {
-            console.error('[NEW NOTE] API error:', await res.text());
           }
         } catch (error) {
-          console.error('[NEW NOTE] Error fetching previous note:', error);
+          logger.error('Error fetching previous note for recurring event', error as Error, {
+            recurringEventId,
+            instanceDate,
+            userId: user?.uid,
+          });
           // Silently fail - not critical
         } finally {
           setIsLoadingPrevious(false);
         }
       } else {
         // Not a recurring event, clear previous note
-        console.log('[NEW NOTE] Not a recurring event or missing data');
         setPreviousNote(null);
       }
     }
@@ -237,7 +235,10 @@ function NewNotePage() {
               noteTask.createdTaskId = createdTask.id;
             }
           } catch (error) {
-            console.error('Failed to create task:', error);
+            logger.error('Failed to create task from new note', error as Error, {
+              userId: user?.uid,
+              calendarEventId: selectedCalendarEvent?.id,
+            });
           }
         });
         

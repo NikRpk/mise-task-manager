@@ -1,6 +1,7 @@
 /**
  * Structured logging utility
- * In production, this should integrate with a service like Sentry, DataDog, or LogRocket
+ * In production, only warnings and errors are logged
+ * Debug and info logs are silenced in production
  */
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -48,33 +49,34 @@ class Logger {
    * Debug level logging (development only)
    */
   debug(message: string, context?: LogContext) {
+    // In production, suppress debug logs
     if (this.isDevelopment) {
       console.debug(this.formatMessage('debug', message, context));
     }
   }
 
   /**
-   * Info level logging
+   * Info level logging (development only)
    */
   info(message: string, context?: LogContext) {
+    // In production, suppress info logs
     if (this.isDevelopment) {
       console.info(this.formatMessage('info', message, context));
     }
-    this.sendToService('info', message, context);
+    // Only send to external service in production if you need analytics
+    // this.sendToService('info', message, context);
   }
 
   /**
-   * Warning level logging
+   * Warning level logging (always logged)
    */
   warn(message: string, context?: LogContext) {
-    if (this.isDevelopment) {
-      console.warn(this.formatMessage('warn', message, context));
-    }
+    console.warn(this.formatMessage('warn', message, context));
     this.sendToService('warn', message, context);
   }
 
   /**
-   * Error level logging
+   * Error level logging (always logged)
    */
   error(message: string, error?: Error, context?: LogContext) {
     const errorContext = {
@@ -84,16 +86,14 @@ class Logger {
       name: error?.name,
     };
 
-    if (this.isDevelopment) {
-      console.error(this.formatMessage('error', message, errorContext));
-      if (error) console.error(error);
-    }
+    console.error(this.formatMessage('error', message, errorContext));
+    if (error && this.isDevelopment) console.error(error);
 
     this.sendToService('error', message, errorContext, error);
   }
 
   /**
-   * API request logging
+   * API request logging (development only)
    */
   apiRequest(method: string, endpoint: string, context?: LogContext) {
     this.info(`API Request: ${method} ${endpoint}`, {
@@ -104,7 +104,7 @@ class Logger {
   }
 
   /**
-   * API response logging (errors only in production)
+   * API response logging (errors always logged, success only in dev)
    */
   apiResponse(
     method: string,

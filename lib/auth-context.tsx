@@ -10,6 +10,7 @@ import {
 import { auth, googleProvider } from './firebase';
 import { User } from '@/types';
 import { logger } from './logger';
+import { isFirebaseError } from './firebase-errors';
 
 interface AuthContextType {
   user: User | null;
@@ -44,24 +45,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      console.log('[DEBUG] signInWithGoogle called');
-      console.log('[DEBUG] auth object:', auth);
-      console.log('[DEBUG] googleProvider object:', googleProvider);
-      console.log('[DEBUG] typeof window:', typeof window);
-      
       setLoading(true);
-      
-      console.log('[DEBUG] About to call signInWithPopup...');
-      const result = await signInWithPopup(auth, googleProvider);
-      console.log('[DEBUG] signInWithPopup succeeded:', result);
+      await signInWithPopup(auth, googleProvider);
+      logger.info('User signed in with Google successfully');
       
     } catch (error) {
-      console.error('[DEBUG] signInWithGoogle ERROR:', error);
-      console.error('[DEBUG] Error code:', (error as any).code);
-      console.error('[DEBUG] Error message:', (error as any).message);
-      console.error('[DEBUG] Full error object:', JSON.stringify(error, null, 2));
-      
-      logger.error('Error signing in with Google', error as Error);
+      if (isFirebaseError(error)) {
+        logger.error('Error signing in with Google', error, {
+          code: error.code,
+          message: error.message,
+        });
+      } else {
+        logger.error('Error signing in with Google', error as Error);
+      }
       throw error;
     } finally {
       setLoading(false);

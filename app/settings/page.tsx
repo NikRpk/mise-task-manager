@@ -314,10 +314,15 @@ function SettingsContent() {
           setCustomColors(data.customColorScheme);
         }
       } else {
-        console.error('Failed to fetch settings:', res.status, await res.text());
+        logger.warn('Failed to fetch settings', undefined, { 
+          status: res.status,
+          userId: user?.uid,
+        });
       }
     } catch (error) {
-      console.error('Failed to fetch settings:', error);
+      logger.error('Failed to fetch settings', error as Error, {
+        userId: user?.uid,
+      });
     }
   };
 

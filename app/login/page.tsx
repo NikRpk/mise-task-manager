@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { LogIn } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { getFirebaseErrorMessage, isFirebaseError } from '@/lib/firebase-errors';
 
 export default function LoginPage() {
   const { user, loading, signInWithGoogle } = useAuth();
@@ -20,24 +21,18 @@ export default function LoginPage() {
 
   const handleSignIn = async () => {
     try {
-      console.log('[DEBUG LOGIN] handleSignIn clicked');
       setSigningIn(true);
       setError(null);
-      
-      console.log('[DEBUG LOGIN] Calling signInWithGoogle...');
       await signInWithGoogle();
-      console.log('[DEBUG LOGIN] signInWithGoogle completed successfully');
-      
     } catch (err) {
-      console.error('[DEBUG LOGIN] Sign in failed:', err);
-      console.error('[DEBUG LOGIN] Error details:', {
-        message: (err as Error).message,
-        code: (err as any).code,
-        stack: (err as Error).stack
-      });
-      
       logger.error('Sign in error', err as Error);
-      setError('Failed to sign in. Please try again.');
+      
+      // Show user-friendly error message
+      const errorMessage = isFirebaseError(err) 
+        ? getFirebaseErrorMessage(err)
+        : 'Failed to sign in. Please try again.';
+      
+      setError(errorMessage);
     } finally {
       setSigningIn(false);
     }

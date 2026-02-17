@@ -122,11 +122,14 @@ function NoteEditPage() {
         setTimeout(() => router.push('/notes'), 2000);
       }
     } catch (error) {
-      console.error('Error fetching note:', error);
+      logger.error('Error fetching note', error as Error, {
+        noteId: params.id,
+        userId: user?.uid,
+      });
       setAlertDialog({
         isOpen: true,
         title: 'Error',
-        message: 'Failed to load note',
+        message: 'Failed to load note. Please try again.',
         type: 'error',
       });
     } finally {
@@ -253,7 +256,10 @@ function NoteEditPage() {
               noteTask.createdTaskId = createdTask.id;
             }
           } catch (error) {
-            console.error('Failed to create task:', error);
+            logger.error('Failed to create task from note', error as Error, {
+              noteId: params.id,
+              userId: user?.uid,
+            });
           }
         });
         
@@ -307,10 +313,14 @@ function NoteEditPage() {
             });
           }
         } catch (error) {
+          logger.error('Failed to delete note', error as Error, {
+            noteId: params.id,
+            userId: user?.uid,
+          });
           setAlertDialog({
             isOpen: true,
             title: 'Error',
-            message: 'Failed to delete note',
+            message: 'Failed to delete note. Please try again.',
             type: 'error',
           });
         }

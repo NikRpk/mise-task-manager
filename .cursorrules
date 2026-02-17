@@ -420,6 +420,15 @@ Use Conventional Commits:
 
 # 9. AI Assistant Behavior
 
+## Output Format
+
+**NEVER create .md summary files unless explicitly requested by the user.**
+
+* ❌ Do NOT create: `SUMMARY.md`, `CHANGES.md`, `CODE_REVIEW.md`, etc.
+* ✅ Present all summaries and information directly in chat responses
+* ✅ Chat markdown rendering works perfectly - use it instead of files
+* ✅ Only create documentation files when the user specifically asks for them
+
 ## Dialectic Approach
 
 If the user requests something that could harm UX, stability, or security, **PUSH BACK**:

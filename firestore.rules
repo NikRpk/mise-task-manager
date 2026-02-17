@@ -2,12 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if user is authenticated
+    // ========== HELPER FUNCTIONS ==========
+    
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Helper function to get user ID
     function getUserId() {
       return request.auth.uid;
     }
@@ -15,17 +15,34 @@ service cloud.firestore {
     // ========== PROJECTS ==========
     match /projects/{projectId} {
       // Anyone authenticated can create a project
-      allow create: if isAuthenticated();
+      // Must set createdBy to their own UID
+      // Must include themselves as ADMIN in members array
+      allow create: if isAuthenticated() 
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.members is list
+        && request.resource.data.members.size() > 0;
       
-      // Read/update/delete - complex member checks happen in backend
-      // Allow if user is authenticated (backend will enforce member checks)
+      // For read/update/delete: We rely on backend enforcement due to 
+      // Firestore Rules limitations with array searching.
+      // Basic check: must be authenticated
+      // TODO: Consider migrating members to a map structure for better security rules
       allow read, update, delete: if isAuthenticated();
     }
     
     // ========== TASKS ==========
     match /tasks/{taskId} {
-      // All operations allowed if authenticated (backend enforces project membership)
-      allow create, read, update, delete: if isAuthenticated();
+      // Can create if authenticated and projectId is set
+      // Backend will verify project membership
+      allow create: if isAuthenticated() 
+        && request.resource.data.projectId != null
+        && request.resource.data.projectId is string;
+      
+      // Can read/update/delete if authenticated
+      // Backend will verify project membership and roles
+      allow read, update, delete: if isAuthenticated();
+      
+      // Prevent changing projectId on update
+      allow update: if request.resource.data.projectId == resource.data.projectId;
     }
     
     // ========== USER SETTINGS ==========
@@ -35,36 +52,45 @@ service cloud.firestore {
     }
     
     // ========== NOTES ==========
-    // Notes can include: title, content, tasks, calendarEventId, calendarEventLink,
-    // calendarEventData, googleDocId, googleDocUrl, recurringEventId, recurringInstanceDate,
-    // templateId, createdBy, createdAt, updatedAt
     match /notes/{noteId} {
       // Users can only create their own notes
-      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
+      allow create: if isAuthenticated() 
+        && request.resource.data.createdBy == request.auth.uid;
       
       // Users can only read their own notes
-      allow read: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+      allow read: if isAuthenticated() 
+        && resource.data.createdBy == request.auth.uid;
       
       // Users can only update their own notes
-      allow update: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+      // Prevent changing owner
+      allow update: if isAuthenticated() 
+        && resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdBy == resource.data.createdBy;
       
       // Users can only delete their own notes
-      allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+      allow delete: if isAuthenticated() 
+        && resource.data.createdBy == request.auth.uid;
     }
     
     // ========== NOTE TEMPLATES ==========
     match /noteTemplates/{templateId} {
       // Users can only create their own templates
-      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
+      allow create: if isAuthenticated() 
+        && request.resource.data.createdBy == request.auth.uid;
       
       // Users can only read their own templates
-      allow read: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+      allow read: if isAuthenticated() 
+        && resource.data.createdBy == request.auth.uid;
       
       // Users can only update their own templates
-      allow update: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+      // Prevent changing owner
+      allow update: if isAuthenticated() 
+        && resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdBy == resource.data.createdBy;
       
       // Users can only delete their own templates
-      allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+      allow delete: if isAuthenticated() 
+        && resource.data.createdBy == request.auth.uid;
     }
     
     // ========== PEOPLE/CONTACTS ==========

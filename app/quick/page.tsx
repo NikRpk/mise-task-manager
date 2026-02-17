@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { CheckCircle, Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 export default function QuickTaskPage() {
   const router = useRouter();
@@ -38,7 +39,10 @@ export default function QuickTaskPage() {
         );
         setDefaultProjectId(personalProject?.id || projects[0]?.id || '');
       } catch (err) {
-        console.error('Failed to fetch projects', err);
+        logger.error('Failed to fetch projects for quick task', err as Error, {
+          userId: user?.uid,
+        });
+        setError('Unable to load projects. Please refresh the page.');
       }
     };
 
@@ -54,7 +58,7 @@ export default function QuickTaskPage() {
     setError('');
     
     try {
-      await authenticatedFetch('/api/tasks', {
+      const response = await authenticatedFetch('/api/tasks', {
         method: 'POST',
         body: JSON.stringify({
           title: title.trim(),
@@ -72,6 +76,11 @@ export default function QuickTaskPage() {
         }),
       });
       
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to create task');
+      }
+      
       setSuccess(true);
       setTitle('');
       setDeadline('');
@@ -82,8 +91,12 @@ export default function QuickTaskPage() {
       }, 1500);
       
     } catch (err) {
-      setError('Failed to create task. Please try again.');
-      console.error('Error creating task:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create task. Please try again.';
+      setError(errorMessage);
+      logger.error('Error creating quick task', err as Error, {
+        userId: user?.uid,
+        projectId: defaultProjectId,
+      });
     } finally {
       setCreating(false);
     }

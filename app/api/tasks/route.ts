@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
     try {
       const body = await request.json();
 
-      console.log('[API POST /api/tasks] Received request:', {
+      logger.debug('API POST /api/tasks: Received request', {
         projectId: body.projectId,
         title: body.title,
         description: body.description?.substring(0, 50),
@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
         ...(body.parentRecurringTaskId !== undefined && { parentRecurringTaskId: body.parentRecurringTaskId }),
       };
 
-      console.log('[API] Creating new task with recurring fields:', {
+      logger.debug('API: Creating new task with recurring fields', {
         id: newTask.id,
         title: newTask.title,
         isRecurring: newTask.isRecurring,
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
 
       await newTaskRef.set(newTask);
 
-      console.log('[API POST /api/tasks] Task created successfully:', {
+      logger.info('API POST /api/tasks: Task created successfully', {
         id: newTask.id,
         title: newTask.title,
         projectId: newTask.projectId,
