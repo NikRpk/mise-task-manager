@@ -1,6 +1,6 @@
 # Project Context
 
-* **Goal:** Build internal tools for HelloFresh that are stable, functional, and clean.
+* **Goal:** Build production-ready internal tools for HelloFresh that are secure, maintainable, and professional.
 
 * **Aesthetic:** "Clean Admin" (Stripe/Shopify inspired). High clarity, clean typography, generous whitespace.
 
@@ -8,163 +8,492 @@
 
 # 1. Project Setup & Architecture
 
-**CRITICAL:** At the start of a new chat/project, ASK THE USER:
+## Stack (Current Project)
 
-> "Is this a standalone **Google Apps Script** project or a **Full Web App** (React/Firebase)?"
+* **Framework:** Next.js 14+ (App Router)
+* **Language:** TypeScript (Strict mode enabled)
+* **Styling:** Tailwind CSS + CSS Variables
+* **Backend:** Firebase (Firestore, Auth, Hosting)
+* **Deployment:** Docker → Cloud Run + Firebase Hosting
+* **State:** React Context + Custom Hooks (NO Redux unless absolutely necessary)
 
-## If Google Apps Script:
+## Project Structure
 
-* **Language:** Google Apps Script (.gs)
+```
+├── app/                  # Next.js App Router pages & API routes
+├── components/           # Reusable UI components (max 150 lines each)
+├── hooks/                # Custom React hooks
+├── lib/                  # Utilities, Firebase, constants
+├── types/                # TypeScript type definitions
+├── __tests__/            # Jest tests (maintain >90% coverage)
+└── public/               # Static assets
+```
 
-* **Deployment:** Clasp or Inline Editor.
+## Mandatory Setup
 
-* **Frontend:** HTML Service (if UI is needed).
-
-## If Full Web App:
-
-* **Initialization:** **IMMEDIATELY create a `.gitignore` file.** Exclude `node_modules`, `.env`, `dist/`, `.DS_Store`, and coverage reports.
-
-* **Frontend Framework:** React + Vite (Strictly enforced).
-
-* **Styling:** Tailwind CSS.
-
-* **Backend/Cloud:**
-
-  * **Firebase** (Hosting, Firestore, Auth).
-
-  * **Logic:** Use **Python** (Firebase Functions Gen 2) for heavy data processing or complex backend logic. Use TypeScript for simple triggers.
-
-* **Routing:** React Router.
-
-* **Mandatory Routes:**
-
-  * `/settings`: Always include a settings page. Give users maximum control (Appearance, Notifications, Data preferences). Persist these settings.
+* **`.gitignore`**: Exclude `node_modules`, `.env*`, `.next/`, `coverage/`, `.DS_Store`
+* **TypeScript**: Strict mode enabled, no `any` types without justification
+* **Testing**: Jest + React Testing Library (run tests in CI before build)
+* **Linting**: ESLint + consistent formatting
 
 # 2. Design System (Stripe-Inspired)
 
-* **Font:** Inter (Import from Google Fonts).
+* **Font:** Inter (from Google Fonts or CSS variables)
+* **Icons:** Lucide React (`lucide-react`)
 
-* **Icons:** Lucide React (`lucide-react`).
+## Color System (CSS Variables)
 
-## Color Palette (HelloFresh Internal)
+Use CSS variables (not Tailwind classes directly) for consistency:
 
-* **Background:** `$white: #fffdfa` (Warm/Off-white).
-
-* **Surface/Card:** `#ffffff` (Pure white).
-
-* **Text Main:** `$dark: #0f172a` (Slate-900).
-
-* **Primary Brand:** `$primary: #009646` (HelloFresh Green).
-
-* **Secondary Brand:** `$secondary: #125034` (Deep Green).
-
-* **Status Colors:**
-
-  * Success: `#00a61c`
-
-  * Warning: `#f6c400`
-
-  * Error: `#f30047`
-
-* **Anti-Pattern:** **DO NOT use neon gradients**, glowing text, or futuristic blur effects. These signal "AI-generated" designs. Stick to flat, matte colors and subtle shadows.
+```css
+--color-bg: #fffdfa           /* Warm off-white background */
+--color-surface: #ffffff       /* Card backgrounds */
+--color-text: #0f172a         /* Primary text */
+--color-text-secondary: #64748b /* Secondary text */
+--color-primary: #009646       /* HelloFresh Green */
+--color-secondary: #125034     /* Deep Green */
+--color-border: #e2e8f0       /* Borders */
+--color-success: #00a61c
+--color-warning: #f6c400
+--color-error: #f30047
+```
 
 ## UI Rules
 
-1. **Layout:** Card-based. Group data into white cards with soft borders (`border-slate-200`) on the `$white` background.
-
-2. **Shadows:** Minimal. `shadow-sm` or `shadow-md`.
-
+1. **Layout:** Card-based design with `var(--color-surface)` backgrounds and `var(--color-border)` borders
+2. **Shadows:** Minimal - use `shadow-sm` or `shadow-md`
 3. **Buttons:**
-
-   * Primary: `$primary` background, White text, Medium rounded (rounded-md).
-
-   * Secondary: White background, Slate border (`border-slate-300`), Slate text.
-
+   - Primary: `background: var(--color-primary)`, white text, `rounded-md`
+   - Secondary: white background, border, gray text
 4. **Responsiveness:**
+   - Mobile-first design
+   - Tables: horizontal scroll on mobile
+   - Sidebars: hamburger menus on mobile (<768px)
+   - Use Tailwind responsive prefixes: `md:`, `lg:`
+5. **Anti-Pattern:** NO neon gradients, glowing effects, or "AI-looking" designs
 
-   * Tables must have horizontal scroll on mobile.
+# 3. Code Quality Standards (STRICTLY ENFORCED)
 
-   * Sidebars must become "Hamburger menus" or bottom navs on mobile.
+## TypeScript Rules
 
-5. **Data Display (Tables):**
+1. **NO `any` types** without explicit justification and comment
+   ```typescript
+   // ❌ BAD
+   const data: any = response;
+   
+   // ✅ GOOD
+   interface ApiResponse { id: string; name: string; }
+   const data: ApiResponse = response;
+   
+   // ✅ ACCEPTABLE (with comment)
+   // Firebase error doesn't export proper type
+   const errorCode = (error as any).code;
+   ```
 
-   * **Search:** NEVER display a table without a real-time text search bar.
+2. **Proper Error Typing**
+   ```typescript
+   // ❌ BAD
+   catch (error) { console.log(error) }
+   
+   // ✅ GOOD
+   catch (error) {
+     logger.error('Operation failed', error as Error, { context });
+   }
+   ```
 
-   * **Filtering:** ALWAYS add filter functions (dropdowns or toggles) for key status fields or dates.
+3. **Strict Mode**: Always enabled in `tsconfig.json`
 
-   * **Controls:** Place Search/Filter controls inside the Card header, above the data.
+## Logging & Debugging
 
-# 3. Coding Standards & Tools
+**CRITICAL:** NEVER use `console.log`, `console.error`, or `console.warn` directly.
 
-## General
+```typescript
+// ❌ FORBIDDEN
+console.log('User logged in:', userId);
+console.error('Failed to save:', error);
 
-* **Documentation:** Every major function MUST have a docstring explaining inputs, outputs, and usage.
+// ✅ REQUIRED
+import { logger } from '@/lib/logger';
+logger.info('User logged in', { userId });
+logger.error('Failed to save', error as Error, { userId });
+```
 
-* **Simplicity:** Prefer readable code over clever one-liners.
+**Production Check:** All debug logs MUST be wrapped:
+```typescript
+if (process.env.NODE_ENV !== 'production') {
+  logger.debug('Debug info', { data });
+}
+```
 
-* **Exporting:** Always offer **CSV** and **PDF** export buttons for any data table.
+## Component Size Limits
 
-## Date & Time
+**ABSOLUTE MAXIMUM: 150 lines per component**
 
-* **Timezone:** HARDCODE `Europe/Berlin` for all display logic unless otherwise specified.
+If a component exceeds 150 lines:
+1. Extract sub-components
+2. Create custom hooks for logic
+3. Move constants to separate files
 
-* **Format:** Use `DD.MM.YYYY` (German format) for display.
+Example breakdown:
+```typescript
+// ❌ BAD: 1,600 line component
+app/page.tsx (1,600 lines)
 
-* **Library:** Use `date-fns` (JS) or `pendulum` (Python) to handle timezone conversions safely.
+// ✅ GOOD: Multiple focused files
+app/page.tsx (50 lines - layout & orchestration)
+components/TasksView.tsx (120 lines)
+components/NotesView.tsx (100 lines)
+components/MobileMenu.tsx (80 lines)
+components/FiltersPanel.tsx (90 lines)
+```
 
-## AI & Data (Gemini)
+## Code Cleanliness
 
-* **Model:** Google Gemini.
+1. **Guard Clauses** (Early Returns)
+   ```typescript
+   // ❌ BAD: Nested hell
+   if (user) {
+     if (user.isActive) {
+       if (user.hasPermission) {
+         doSomething();
+       }
+     }
+   }
+   
+   // ✅ GOOD: Guard clauses
+   if (!user) return;
+   if (!user.isActive) return;
+   if (!user.hasPermission) return;
+   doSomething();
+   ```
 
-* **Safety:** Wrap all LLM calls in `try/catch`.
+2. **Descriptive Naming**
+   ```typescript
+   // ❌ FORBIDDEN
+   const x = getData();
+   const res = await fetch();
+   const temp = user.name;
+   
+   // ✅ REQUIRED
+   const userData = getUserData();
+   const apiResponse = await fetchUser();
+   const displayName = user.name;
+   ```
 
-* **Secrets:** Server-side usage of API keys (e.g., in Python/Node) is permitted and standard. **CRITICAL:** Ensure keys are NEVER visible to the end-user in the client-side bundle or UI.
+3. **Single Responsibility**
+   ```typescript
+   // ❌ BAD: Function does 3 things
+   async function fetchAndProcessData() { ... }
+   
+   // ✅ GOOD: Separate concerns
+   async function fetchData() { ... }
+   function processData(data) { ... }
+   function saveData(processed) { ... }
+   ```
 
-## Code Cleanliness (Strict)
-* **Guard Clauses:** ALWAYS use early returns to avoid nesting.
-    * *Bad:* `if (user) { if (valid) { save() } }`
-    * *Good:* `if (!user || !valid) return; save();`
-* **Naming:** Variables must be verbose and descriptive.
-    * *Forbidden:* `x`, `data`, `res`, `temp`.
-    * *Required:* `userData`, `apiResponse`, `temporaryStorage`.
-* **Immutability:** Prefer `const` over `let`. Avoid direct state mutation.
-* **Functions:** Adhere to the Single Responsibility Principle. A function should do one thing. If the function name uses "and" (e.g., `fetchAndProcessData`), break it into two functions.
+4. **Constants Over Magic Values**
+   ```typescript
+   // ❌ BAD
+   if (status === 3) { ... }
+   setTimeout(callback, 5000);
+   
+   // ✅ GOOD
+   const STATUS_COMPLETED = 3;
+   const DEBOUNCE_DELAY_MS = 5000;
+   if (status === STATUS_COMPLETED) { ... }
+   setTimeout(callback, DEBOUNCE_DELAY_MS);
+   ```
 
-# 4. Deployment & Git
+5. **Immutability**
+   ```typescript
+   // ❌ BAD
+   let config = { ... };
+   config.debug = true;  // mutation
+   
+   // ✅ GOOD
+   const config = { ... };
+   const updatedConfig = { ...config, debug: true };
+   ```
 
-* **Repo:** GitHub.
+# 4. Security & Error Handling
 
-* **Commit Style:** Conventional Commits (e.g., `feat: add user login`, `fix: timezone error`).
+## Firebase Security Rules
 
-* **CI/CD:** If asked, set up GitHub Actions to deploy to Firebase.
+**CRITICAL:** NEVER trust the client to enforce permissions.
 
-# 5. Behavior Constraints
+```javascript
+// ❌ BAD: Backend will enforce (IT WON'T!)
+match /tasks/{taskId} {
+  allow read, write: if isAuthenticated();
+}
 
-* **Do not** use Class Components (React). Use Functional Components + Hooks.
+// ✅ GOOD: Rules enforce permissions
+match /tasks/{taskId} {
+  allow read: if isAuthenticated() && 
+    resource.data.projectId in get(/databases/$(database)/documents/userSettings/$(request.auth.uid)).data.projectIds;
+  allow write: if isAuthenticated() && 
+    hasProjectPermission(resource.data.projectId, ['owner', 'admin', 'editor']);
+}
+```
 
-* **Do not** suggest complex state libraries (Redux) unless necessary. Use `Zustand` or React Context.
+**Rule:** Backend logic is a second layer of defense, NOT the first.
 
-* **Always** validate inputs before sending them to the backend.
+## Error Handling
 
-* **Dialectic Approach:** If I propose a feature that seems brittle or bad for UX, **argue against it**.
-    * Format: "I can do that, but here is why it might risk stability/UX: [Reason]. A better alternative might be [Alternative]. Shall we proceed with the original request or the alternative?"
+1. **Always Provide User Feedback**
+   ```typescript
+   // ❌ BAD: Silent failure
+   try {
+     await saveData();
+   } catch (error) {
+     console.error(error);
+   }
+   
+   // ✅ GOOD: User feedback
+   try {
+     await saveData();
+     showSuccess('Data saved successfully');
+   } catch (error) {
+     logger.error('Save failed', error as Error, { userId });
+     showError('Failed to save data. Please try again.');
+   }
+   ```
 
-# 6. Cognitive Architecture & Quality Control
+2. **Add Error Boundaries**
+   ```typescript
+   // Wrap major sections in ErrorBoundary components
+   <ErrorBoundary fallback={<ErrorFallback />}>
+     <TaskBoard />
+   </ErrorBoundary>
+   ```
 
-## The "Red Team" Protocol (Self-Correction)
-Before writing any complex logic or non-trivial code block, you must perform a silent "Red Team" review:
-1. **Plan:** briefly outline the solution.
-2. **Critique:** Identify 3 ways this solution could break (Edge cases, Race conditions, Memory leaks).
-3. **Refine:** Update the plan to address these weaknesses *before* generating the final code.
-4. **Final Output:** Only output the robust, corrected code.
+3. **Retry Logic for Network Calls**
+   ```typescript
+   // Add retry with exponential backoff for critical operations
+   const data = await retryWithBackoff(() => fetchData(), {
+     maxRetries: 3,
+     initialDelay: 1000
+   });
+   ```
+
+## Input Validation
+
+1. **Validate on API routes** (server-side)
+2. **Sanitize user input** before storing
+3. **Validate types** with Zod or similar
+4. **Never trust client-side validation alone**
+
+## Environment Variables
+
+* Keep `.env.local` out of git
+* Never expose secrets in client bundles
+* Use `process.env` checks for production vs development
+
+# 5. Testing Requirements
+
+## Coverage Standards
+
+* **Minimum:** 90% coverage on all `lib/` utilities
+* **Required:** Unit tests for all custom hooks
+* **Target:** Component tests for critical user flows
+* **CI:** Tests must pass before deployment (`prebuild` script)
+
+## Testing Patterns
+
+```typescript
+// 1. Test utilities thoroughly
+describe('sanitizeHTML', () => {
+  it('should remove script tags', () => {
+    expect(sanitizeHTML('<script>alert("xss")</script>')).toBe('');
+  });
+  
+  it('should handle null/undefined', () => {
+    expect(sanitizeHTML(null)).toBe('');
+  });
+});
+
+// 2. Test custom hooks
+describe('useTaskFilters', () => {
+  it('should filter by deadline', () => {
+    const { filteredTasks } = renderHook(() => useTaskFilters(mockTasks));
+    expect(filteredTasks).toHaveLength(5);
+  });
+});
+
+// 3. Test critical flows (Add more of these!)
+describe('Task Creation Flow', () => {
+  it('should create task and show success message', async () => {
+    // TODO: Add integration tests
+  });
+});
+```
+
+## What to Test
+
+* ✅ **All functions in `lib/`** - 100% coverage
+* ✅ **Custom hooks** - Logic and state changes
+* ⚠️ **Critical user flows** - Task creation, auth, data persistence
+* ⚠️ **Error states** - Network failures, validation errors
+* ⚠️ **Edge cases** - Empty states, null values, race conditions
+
+# 6. Performance & Optimization
+
+## React Best Practices
+
+1. **Memoization**
+   ```typescript
+   // Use useMemo for expensive computations
+   const filteredTasks = useMemo(() => 
+     tasks.filter(t => t.status === 'active'),
+     [tasks]
+   );
+   
+   // Use useCallback for callbacks passed to children
+   const handleSave = useCallback(() => {
+     saveTask(task);
+   }, [task]);
+   ```
+
+2. **Code Splitting**
+   ```typescript
+   // Lazy load heavy components
+   const TaskModal = lazy(() => import('@/components/TaskModal'));
+   const ChartView = lazy(() => import('@/components/ChartView'));
+   ```
+
+3. **Avoid Re-renders**
+   - Extract static JSX outside components
+   - Use React.memo for pure components
+   - Keep component state minimal
+
+## Loading States
+
+**ALWAYS show loading indicators:**
+```typescript
+if (loading) return <Spinner />;
+if (error) return <ErrorState error={error} />;
+return <Content data={data} />;
+```
+
+# 7. Date & Time Handling
+
+* **Timezone:** Default to `Europe/Berlin` (from user settings or constant)
+* **Format:** `DD.MM.YYYY` for display (German format)
+* **Library:** Use `date-fns` and `date-fns-tz`
+* **Consistency:** Always convert to user's timezone before display
+
+```typescript
+import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+
+const userDate = toZonedTime(timestamp, userTimezone);
+const formatted = format(userDate, 'dd.MM.yyyy');
+```
+
+# 8. Git & Deployment
+
+## Commit Style
+
+Use Conventional Commits:
+* `feat: add user authentication`
+* `fix: resolve timezone conversion bug`
+* `refactor: break down page.tsx into smaller components`
+* `test: add unit tests for task filters`
+* `chore: update dependencies`
+* `docs: update README with deployment steps`
+
+## Deployment Process
+
+1. **Tests pass** (`npm run test:ci`)
+2. **Build succeeds** (`npm run build`)
+3. **Docker cleanup** (automatic in `deploy-fast.sh`)
+4. **Cloud Run deployment**
+5. **Firebase Hosting update**
+
+## Pre-commit Checks
+
+* No `console.log` statements
+* No `any` types without comments
+* No files >150 lines
+* All tests passing
+* No linter errors
+
+# 9. AI Assistant Behavior
+
+## Dialectic Approach
+
+If the user requests something that could harm UX, stability, or security, **PUSH BACK**:
+
+> "I can do that, but here's why it might be problematic: [Reason]. A better approach would be [Alternative]. Which would you prefer?"
+
+## Code Review Standards
+
+* **Reject:** Nested if/else chains → Use guard clauses
+* **Reject:** Magic numbers/strings → Extract to constants
+* **Reject:** Large components (>150 lines) → Break into smaller pieces
+* **Reject:** `any` types → Define proper interfaces
+* **Reject:** console.log → Use logger utility
+* **Reject:** Silent errors → Add user feedback
+
+## Quality Gates
+
+Before generating code, perform "Red Team" review:
+1. **Plan:** Outline the solution
+2. **Critique:** Identify 3 potential failure modes
+3. **Refine:** Address weaknesses
+4. **Output:** Only the robust, corrected code
 
 ## Anti-Hallucination Rules
-1. **No "Lazy" Placeholders:** NEVER use `// ... rest of code` or ``. If you edit a file, output the *entire* file or a strictly accurate search-and-replace block.
-2. **Import Verification:** Before importing a library, check `package.json`. If it's not there, ask permission to install it or use native JS/Python alternatives.
-3. **Context Check:** If I ask you to fix a bug, do not assume the cause. Ask to see the relevant files first if they are not active.
 
-## The "Junior vs. Senior" Filter
-Act as a Senior Principal Engineer.
-- **Reject:** Deeply nested `if/else` chains (arrow code). Refactor to "Early Returns" / Guard Clauses.
-- **Reject:** Magic numbers or strings. Extract them to constants/config.
-- **Reject:** Large components. If a React component exceeds 150 lines, suggest breaking it down immediately.
+1. **NO lazy placeholders** like `// ... rest of code`
+2. **Verify imports** against `package.json` before suggesting
+3. **Ask for context** instead of assuming bug causes
+4. **Complete edits only** - never partial file outputs
+
+# 10. Documentation Standards
+
+## Function Documentation
+
+Every major function needs JSDoc:
+```typescript
+/**
+ * Filters tasks based on deadline criteria
+ * @param tasks - Array of tasks to filter
+ * @param deadline - Deadline filter ('overdue' | 'today' | 'this-week')
+ * @returns Filtered array of tasks matching criteria
+ */
+function filterByDeadline(tasks: Task[], deadline: DeadlineFilter): Task[] {
+  // ...
+}
+```
+
+## README Requirements
+
+Every project must have:
+* Setup instructions
+* Environment variables needed
+* Deployment process
+* Testing commands
+* Architecture overview
+
+## Code Comments
+
+* Explain **WHY**, not **WHAT**
+* Document non-obvious decisions
+* Flag TODOs with issue numbers
+* Add security warnings where relevant
+
+---
+
+## Summary: The Non-Negotiables
+
+1. ✅ TypeScript strict mode, no `any` without justification
+2. ✅ Use `logger` utility, NEVER `console.log`
+3. ✅ Components max 150 lines
+4. ✅ >90% test coverage on utilities
+5. ✅ Firebase rules enforce permissions (not just backend)
+6. ✅ Guard clauses over nested if/else
+7. ✅ Descriptive naming (no `x`, `data`, `temp`)
+8. ✅ Error boundaries and user feedback
+9. ✅ Loading states for all async operations
+10. ✅ Conventional commits, tests pass before deploy
