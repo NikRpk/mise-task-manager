@@ -50,6 +50,10 @@ const COLORS = [
 export default function TipTapEditor({ value, onChange, placeholder = 'Start typing...', disabled = false, people = [] }: TipTapEditorProps) {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [isInTable, setIsInTable] = useState(false);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showImageDialog, setShowImageDialog] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
 
   // Mention suggestion configuration
   const mentionSuggestion = useCallback(() => ({
@@ -214,22 +218,40 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         const items = event.clipboardData?.items;
         if (!items) return false;
         
+        // Check if there's an image in the clipboard
+        let hasImage = false;
         for (const item of Array.from(items)) {
           if (item.type.indexOf('image') !== -1) {
-            event.preventDefault();
-            const file = item.getAsFile();
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = (e) => {
-                const base64 = e.target?.result as string;
-                // Insert image as HTML since commands.setImage might not be available
-                editor?.commands.insertContent(`<img src="${base64}" alt="Uploaded image" class="rounded-md max-w-full h-auto" />`);
-              };
-              reader.readAsDataURL(file);
-            }
-            return true;
+            hasImage = true;
+            break;
           }
         }
+        
+        // If there's an image, process only the image and prevent text paste
+        if (hasImage) {
+          event.preventDefault();
+          event.stopPropagation();
+          
+          for (const item of Array.from(items)) {
+            if (item.type.indexOf('image') !== -1) {
+              const file = item.getAsFile();
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  const base64 = e.target?.result as string;
+                  // Use setTimeout to ensure editor is ready
+                  setTimeout(() => {
+                    editor?.commands.insertContent(`<img src="${base64}" alt="Pasted image" class="rounded-md max-w-full h-auto" />`);
+                  }, 0);
+                };
+                reader.readAsDataURL(file);
+              }
+              break; // Only process first image
+            }
+          }
+          return true;
+        }
+        
         return false;
       },
     },
@@ -386,10 +408,8 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           {/* Link & Media */}
           <button
             onClick={() => {
-              const url = window.prompt('Enter URL:');
-              if (url) {
-                editor.chain().focus().setLink({ href: url }).run();
-              }
+              setLinkUrl('');
+              setShowLinkDialog(true);
             }}
             className={`p-1.5 rounded transition-colors ${editor.isActive('link') ? 'text-white' : 'hover:bg-gray-200'}`}
             style={editor.isActive('link') ? { backgroundColor: 'var(--color-primary)' } : {}}
@@ -402,11 +422,8 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           
           <button
             onClick={() => {
-              const url = window.prompt('Enter image URL (or paste image with Ctrl+V):');
-              if (url) {
-                // Insert image as HTML
-                editor.commands.insertContent(`<img src="${url}" alt="Image from URL" class="rounded-md max-w-full h-auto" />`);
-              }
+              setImageUrl('');
+              setShowImageDialog(true);
             }}
             className="p-1.5 rounded hover:bg-gray-200 transition-colors"
             title="Insert Image"
@@ -834,6 +851,119 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           margin: 0;
         }
       `}</style>
+      
+      {/* Link Dialog */}
+      {showLinkDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" onClick={() => setShowLinkDialog(false)}>
+          <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>Insert Link</h3>
+            <input
+              type="url"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://example.com"
+              className="w-full px-3 py-2 border rounded-md mb-4"
+              style={{ borderColor: 'var(--color-border)' }}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && linkUrl.trim()) {
+                  editor.chain().focus().setLink({ href: linkUrl }).run();
+                  setShowLinkDialog(false);
+                  setLinkUrl('');
+                }
+                if (e.key === 'Escape') {
+                  setShowLinkDialog(false);
+                  setLinkUrl('');
+                }
+              }}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowLinkDialog(false);
+                  setLinkUrl('');
+                }}
+                className="px-4 py-2 rounded-md border"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (linkUrl.trim()) {
+                    editor.chain().focus().setLink({ href: linkUrl }).run();
+                    setShowLinkDialog(false);
+                    setLinkUrl('');
+                  }
+                }}
+                disabled={!linkUrl.trim()}
+                className="px-4 py-2 rounded-md text-white disabled:opacity-50"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                Insert
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Image Dialog */}
+      {showImageDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" onClick={() => setShowImageDialog(false)}>
+          <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>Insert Image</h3>
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://example.com/image.jpg"
+              className="w-full px-3 py-2 border rounded-md mb-2"
+              style={{ borderColor: 'var(--color-border)' }}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && imageUrl.trim()) {
+                  editor.commands.insertContent(`<img src="${imageUrl}" alt="Image" class="rounded-md max-w-full h-auto" />`);
+                  setShowImageDialog(false);
+                  setImageUrl('');
+                }
+                if (e.key === 'Escape') {
+                  setShowImageDialog(false);
+                  setImageUrl('');
+                }
+              }}
+            />
+            <p className="text-xs mb-4" style={{ color: 'var(--color-text-secondary)' }}>
+              Or paste an image with Ctrl+V in the editor
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowImageDialog(false);
+                  setImageUrl('');
+                }}
+                className="px-4 py-2 rounded-md border"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (imageUrl.trim()) {
+                    editor.commands.insertContent(`<img src="${imageUrl}" alt="Image" class="rounded-md max-w-full h-auto" />`);
+                    setShowImageDialog(false);
+                    setImageUrl('');
+                  }
+                }}
+                disabled={!imageUrl.trim()}
+                className="px-4 py-2 rounded-md text-white disabled:opacity-50"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                Insert
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
