@@ -108,6 +108,86 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
     },
   }), [people]);
 
+  // Image compression utility
+  const compressImage = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // Skip compression for images under 500KB
+      const SIZE_THRESHOLD = 500 * 1024; // 500KB in bytes
+      
+      if (file.size < SIZE_THRESHOLD) {
+        console.log('[Image Upload] Skipping compression - file under 500KB', {
+          size: `${(file.size / 1024).toFixed(0)}KB`,
+        });
+        
+        // Just convert to base64 without compression
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          resolve(e.target?.result as string);
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+        return;
+      }
+      
+      // Compress images 500KB and above
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Create canvas for compression
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+          
+          // Calculate new dimensions (max 1200px width/height)
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = (height * MAX_WIDTH) / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = (width * MAX_HEIGHT) / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          
+          // Set canvas dimensions
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Draw and compress image
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to JPEG with 90% quality (higher quality for better text readability)
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.9);
+          
+          console.log('[Image Compression]', {
+            originalSize: `${(file.size / 1024).toFixed(0)}KB`,
+            originalDimensions: `${img.width}x${img.height}`,
+            newDimensions: `${width}x${height}`,
+            compressedSize: `${(compressedBase64.length / 1024).toFixed(0)}KB`,
+            reduction: `${(100 - (compressedBase64.length / file.size * 100)).toFixed(0)}%`
+          });
+          
+          resolve(compressedBase64);
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -127,9 +207,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         placeholder,
       }),
       Underline,
-      ResizableImage.configure({
-        inline: true,
-      }),
+      ResizableImage,
       CodeBlock.configure({
         HTMLAttributes: {
           class: 'code-block',
@@ -218,41 +296,40 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         const items = event.clipboardData?.items;
         if (!items) return false;
         
-        // Check if there's an image in the clipboard
-        let hasImage = false;
+        // Check for images in clipboard
         for (const item of Array.from(items)) {
           if (item.type.indexOf('image') !== -1) {
-            hasImage = true;
-            break;
-          }
-        }
-        
-        // If there's an image, process only the image and prevent text paste
-        if (hasImage) {
-          event.preventDefault();
-          event.stopPropagation();
-          
-          for (const item of Array.from(items)) {
-            if (item.type.indexOf('image') !== -1) {
-              const file = item.getAsFile();
-              if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                  const base64 = e.target?.result as string;
-                  // Use setTimeout to ensure editor is ready
-                  setTimeout(() => {
-                    editor?.commands.insertContent(`<img src="${base64}" alt="Pasted image" class="rounded-md max-w-full h-auto" />`);
-                  }, 0);
-                };
-                reader.readAsDataURL(file);
-              }
-              break; // Only process first image
+            // Prevent default paste behavior
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const file = item.getAsFile();
+            if (file) {
+              // Compress image before inserting
+              compressImage(file)
+                .then((compressedBase64) => {
+                  if (editor) {
+                    editor.chain().focus().setImage({ src: compressedBase64 }).run();
+                  }
+                })
+                .catch((error) => {
+                  console.error('[Image Paste] Compression failed:', error);
+                  // Fallback to uncompressed if compression fails
+                  const reader = new FileReader();
+                  reader.onload = (e) => {
+                    const base64 = e.target?.result as string;
+                    if (editor) {
+                      editor.chain().focus().setImage({ src: base64 }).run();
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                });
             }
+            return true; // Handled - don't continue with default paste
           }
-          return true;
         }
         
-        return false;
+        return false; // Not an image, allow default paste
       },
     },
   });
@@ -854,7 +931,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
       
       {/* Link Dialog */}
       {showLinkDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" onClick={() => setShowLinkDialog(false)}>
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-[10000]" style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }} onClick={() => setShowLinkDialog(false)}>
           <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>Insert Link</h3>
             <input
@@ -909,31 +986,85 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
       
       {/* Image Dialog */}
       {showImageDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" onClick={() => setShowImageDialog(false)}>
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-[10000]" style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }} onClick={() => setShowImageDialog(false)}>
           <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>Insert Image</h3>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://example.com/image.jpg"
-              className="w-full px-3 py-2 border rounded-md mb-2"
-              style={{ borderColor: 'var(--color-border)' }}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && imageUrl.trim()) {
-                  editor.commands.insertContent(`<img src="${imageUrl}" alt="Image" class="rounded-md max-w-full h-auto" />`);
-                  setShowImageDialog(false);
-                  setImageUrl('');
-                }
-                if (e.key === 'Escape') {
-                  setShowImageDialog(false);
-                  setImageUrl('');
-                }
-              }}
-            />
+            
+            {/* File Upload Option */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                Upload from device
+              </label>
+              <label className="w-full px-3 py-2 border rounded-md text-sm cursor-pointer inline-block text-center"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}>
+                Choose file
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      // Compress and insert image
+                      compressImage(file)
+                        .then((compressedBase64) => {
+                          editor.chain().focus().setImage({ src: compressedBase64 }).run();
+                          setShowImageDialog(false);
+                          setImageUrl('');
+                        })
+                        .catch((error) => {
+                          console.error('[Image Upload] Compression failed:', error);
+                          // Fallback to uncompressed if compression fails
+                          const reader = new FileReader();
+                          reader.onload = (e) => {
+                            const base64 = e.target?.result as string;
+                            editor.chain().focus().setImage({ src: base64 }).run();
+                            setShowImageDialog(false);
+                            setImageUrl('');
+                          };
+                          reader.readAsDataURL(file);
+                        });
+                    }
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            
+            {/* Divider */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-border)' }} />
+              <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>OR</span>
+              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-border)' }} />
+            </div>
+            
+            {/* URL Option */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                Insert from URL
+              </label>
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                className="w-full px-3 py-2 border rounded-md"
+                style={{ borderColor: 'var(--color-border)' }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && imageUrl.trim()) {
+                    editor.chain().focus().setImage({ src: imageUrl }).run();
+                    setShowImageDialog(false);
+                    setImageUrl('');
+                  }
+                  if (e.key === 'Escape') {
+                    setShowImageDialog(false);
+                    setImageUrl('');
+                  }
+                }}
+              />
+            </div>
+            
             <p className="text-xs mb-4" style={{ color: 'var(--color-text-secondary)' }}>
-              Or paste an image with Ctrl+V in the editor
+              You can also paste an image with Ctrl+V in the editor
             </p>
             <div className="flex gap-2 justify-end">
               <button
@@ -949,7 +1080,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               <button
                 onClick={() => {
                   if (imageUrl.trim()) {
-                    editor.commands.insertContent(`<img src="${imageUrl}" alt="Image" class="rounded-md max-w-full h-auto" />`);
+                    editor.chain().focus().setImage({ src: imageUrl }).run();
                     setShowImageDialog(false);
                     setImageUrl('');
                   }

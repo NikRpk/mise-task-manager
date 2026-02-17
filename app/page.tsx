@@ -1172,7 +1172,8 @@ function HomePage() {
             }}
           >
             <div className="px-5 py-3" style={{ backgroundColor: 'var(--color-bg)' }}>
-              <div className="w-full">
+              {/* Search Bar */}
+              <div className="w-full mb-4">
                 <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
                   Search
                 </label>
@@ -1195,6 +1196,136 @@ function HomePage() {
                   }}
                 />
               </div>
+
+              {/* Desktop Filters - Hidden on mobile */}
+              {currentView === 'tasks' && (
+                <div className="hidden md:block">
+                  <div className="flex items-center gap-4">
+                    <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)', flexShrink: 0 }}>
+                      Filters:
+                    </label>
+                    <div className="flex items-center gap-4 flex-1">
+                      {/* Deadline Filter */}
+                      <div className="flex items-center gap-2 flex-1">
+                        <label className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
+                          Deadline
+                        </label>
+                        <select
+                          value={filters.deadline || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setFilters({ 
+                              ...filters, 
+                              deadline: value ? (value as 'overdue' | 'today' | 'this-week' | 'this-month' | 'future') : undefined 
+                            });
+                          }}
+                          className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
+                          style={{
+                            borderColor: 'var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                          }}
+                        >
+                          <option value="">All</option>
+                          <option value="overdue">Overdue</option>
+                          <option value="today">Today</option>
+                          <option value="this-week">This Week</option>
+                          <option value="this-month">This Month</option>
+                          <option value="future">Future</option>
+                        </select>
+                      </div>
+                      
+                      {/* Status Filter */}
+                      <div className="flex items-center gap-2 flex-1">
+                        <label className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
+                          Status
+                        </label>
+                        <select
+                          value={filters.status?.[0] || ''}
+                          onChange={(e) => setFilters({ 
+                            ...filters, 
+                            status: e.target.value ? [e.target.value as TaskStatus] : undefined 
+                          })}
+                          className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
+                          style={{
+                            borderColor: 'var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                          }}
+                        >
+                          <option value="">All</option>
+                          {statusColumns.map(option => (
+                            <option key={option.id} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {/* Priority Filter */}
+                      <div className="flex items-center gap-2 flex-1">
+                        <label className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
+                          Priority
+                        </label>
+                        <select
+                          value={filters.priority?.[0] || ''}
+                          onChange={(e) => setFilters({ 
+                            ...filters, 
+                            priority: e.target.value ? [e.target.value as Priority] : undefined 
+                          })}
+                          className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
+                          style={{
+                            borderColor: 'var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                          }}
+                        >
+                          <option value="">All</option>
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
+                        </select>
+                      </div>
+                      
+                      {/* Owner Filter */}
+                      <div className="flex items-center gap-2 flex-1">
+                        <label className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
+                          Owner
+                        </label>
+                        <select
+                          value={filters.owner?.[0] || ''}
+                          onChange={(e) => setFilters({ 
+                            ...filters, 
+                            owner: e.target.value ? [e.target.value] : undefined 
+                          })}
+                          className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
+                          style={{
+                            borderColor: 'var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                          }}
+                        >
+                          <option value="">All</option>
+                          {owners.map(owner => (
+                            <option key={owner} value={owner}>{owner}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {/* Clear Filters Button */}
+                      {(filters.deadline || filters.status || filters.priority || filters.owner) && (
+                        <button
+                          onClick={() => setFilters({})}
+                          className="px-4 py-1.5 text-sm border rounded-md transition-all duration-200 font-medium whitespace-nowrap flex-shrink-0"
+                          style={{ 
+                            borderColor: 'var(--color-border)',
+                            color: 'var(--color-text-secondary)',
+                            backgroundColor: 'var(--color-surface)'
+                          }}
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
