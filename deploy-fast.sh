@@ -13,6 +13,11 @@ IMAGE_NAME="gcr.io/$PROJECT_ID/$SERVICE_NAME"
 echo "🚀 Fast Deployment - Building locally..."
 echo ""
 
+# Clean up old Docker images and build cache
+echo "🧹 Cleaning up old Docker images and cache..."
+docker system prune -f --filter "until=24h"
+echo ""
+
 # Verify .env.local exists for server secrets
 if [ ! -f .env.local ]; then
   echo "❌ Error: .env.local file not found"
