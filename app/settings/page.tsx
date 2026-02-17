@@ -16,6 +16,7 @@ import { authenticatedFetch } from '@/lib/api-client';
 import { colorSchemes, useTheme, ColorScheme } from '@/lib/theme-context';
 import TipTapEditor from '@/components/TipTapEditor';
 import { ProjectSettings, StatusOption, PriorityOption, CustomField, ProjectMember, ProjectRole } from '@/types';
+import { logger } from '@/lib/logger';
 
 interface UserSettings {
   colorScheme: string;
