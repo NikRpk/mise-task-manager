@@ -309,7 +309,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               compressImage(file)
                 .then((compressedBase64) => {
                   if (editor) {
-                    editor.chain().focus().setImage({ src: compressedBase64 }).run();
+                    editor.chain().focus().insertContent(`<img src="${compressedBase64}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
                   }
                 })
                 .catch((error) => {
@@ -319,7 +319,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
                   reader.onload = (e) => {
                     const base64 = e.target?.result as string;
                     if (editor) {
-                      editor.chain().focus().setImage({ src: base64 }).run();
+                      editor.chain().focus().insertContent(`<img src="${base64}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
                     }
                   };
                   reader.readAsDataURL(file);
@@ -1005,23 +1005,23 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
                     const file = e.target.files?.[0];
                     if (file) {
                       // Compress and insert image
-                      compressImage(file)
-                        .then((compressedBase64) => {
-                          editor.chain().focus().setImage({ src: compressedBase64 }).run();
-                          setShowImageDialog(false);
-                          setImageUrl('');
-                        })
+                    compressImage(file)
+                      .then((compressedBase64) => {
+                        editor.chain().focus().insertContent(`<img src="${compressedBase64}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
+                        setShowImageDialog(false);
+                        setImageUrl('');
+                      })
                         .catch((error) => {
                           console.error('[Image Upload] Compression failed:', error);
                           // Fallback to uncompressed if compression fails
-                          const reader = new FileReader();
-                          reader.onload = (e) => {
-                            const base64 = e.target?.result as string;
-                            editor.chain().focus().setImage({ src: base64 }).run();
-                            setShowImageDialog(false);
-                            setImageUrl('');
-                          };
-                          reader.readAsDataURL(file);
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                          const base64 = e.target?.result as string;
+                          editor.chain().focus().insertContent(`<img src="${base64}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
+                          setShowImageDialog(false);
+                          setImageUrl('');
+                        };
+                        reader.readAsDataURL(file);
                         });
                     }
                   }}
@@ -1051,7 +1051,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
                 style={{ borderColor: 'var(--color-border)' }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && imageUrl.trim()) {
-                    editor.chain().focus().setImage({ src: imageUrl }).run();
+                    editor.chain().focus().insertContent(`<img src="${imageUrl}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
                     setShowImageDialog(false);
                     setImageUrl('');
                   }
@@ -1080,7 +1080,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               <button
                 onClick={() => {
                   if (imageUrl.trim()) {
-                    editor.chain().focus().setImage({ src: imageUrl }).run();
+                    editor.chain().focus().insertContent(`<img src="${imageUrl}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
                     setShowImageDialog(false);
                     setImageUrl('');
                   }
