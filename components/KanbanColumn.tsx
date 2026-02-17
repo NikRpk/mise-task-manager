@@ -4,7 +4,8 @@ import { useDroppable } from '@dnd-kit/core';
 import { Task } from '@/types';
 import TaskCard from './TaskCard';
 import { KANBAN_COLUMN_MIN_HEIGHT } from '@/lib/constants';
-import { memo } from 'react';
+import { memo, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 interface KanbanColumnProps {
   id: string;
@@ -19,6 +20,9 @@ interface KanbanColumnProps {
   showPriority?: boolean;
   showDueDate?: boolean;
 }
+
+const INITIAL_DONE_LIMIT = 10;
+const LOAD_MORE_INCREMENT = 20;
 
 const KanbanColumn = memo(function KanbanColumn({ 
   id, 
@@ -40,6 +44,17 @@ const KanbanColumn = memo(function KanbanColumn({
   
   const columnColor = color || 'var(--color-primary)';
   
+  // Pagination state for done column
+  const [doneLimit, setDoneLimit] = useState(INITIAL_DONE_LIMIT);
+  
+  // Check if this is the done column
+  const isDoneColumn = id === 'done';
+  
+  // Apply limit only to done column
+  const displayedTasks = isDoneColumn ? tasks.slice(0, doneLimit) : tasks;
+  const hasMoreTasks = isDoneColumn && tasks.length > doneLimit;
+  const remainingCount = isDoneColumn ? tasks.length - doneLimit : 0;
+  
   // Convert hex to RGB for gradient
   const hexToRgb = (hex: string) => {
     if (hex.startsWith('var(')) return '0, 150, 70'; // fallback
@@ -47,6 +62,10 @@ const KanbanColumn = memo(function KanbanColumn({
     return result 
       ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
       : '0, 150, 70';
+  };
+
+  const handleLoadMore = () => {
+    setDoneLimit(prev => prev + LOAD_MORE_INCREMENT);
   };
 
   return (
@@ -82,7 +101,7 @@ const KanbanColumn = memo(function KanbanColumn({
         </span>
       </div>
       <div className={`md:flex-1 ${viewMode === 'compact' ? 'p-2 space-y-1.5' : 'p-3.5 space-y-3'} md:overflow-y-auto`}>
-        {tasks.map(task => (
+        {displayedTasks.map(task => (
           <TaskCard
             key={task.id}
             task={task}
@@ -96,6 +115,21 @@ const KanbanColumn = memo(function KanbanColumn({
             showDueDate={showDueDate}
           />
         ))}
+        
+        {/* Show More button for done column */}
+        {hasMoreTasks && (
+          <button
+            onClick={handleLoadMore}
+            className="w-full py-3 mt-2 rounded-lg border-2 border-dashed transition-all duration-200 hover:border-solid hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-medium"
+            style={{
+              borderColor: columnColor,
+              color: columnColor,
+            }}
+          >
+            <ChevronDown size={16} />
+            <span>Show {Math.min(remainingCount, LOAD_MORE_INCREMENT)} more {remainingCount > LOAD_MORE_INCREMENT ? `(${remainingCount} total)` : ''}</span>
+          </button>
+        )}
       </div>
     </div>
   );
