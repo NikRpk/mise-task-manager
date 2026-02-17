@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DndContext, DragEndEvent, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { Plus, Settings, LayoutGrid, List, X, Search, FileText, Trash2, Edit, Calendar, Menu, MessageSquare, LogOut } from 'lucide-react';
+import { Plus, Settings, LayoutGrid, List, X, Search, FileText, Trash2, Edit, Calendar, Menu, MessageSquare, LogOut, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { Task, TaskStatus, Note, Priority } from '@/types';
 import TaskCard from '@/components/TaskCard';
@@ -1117,6 +1117,19 @@ function HomePage() {
                   
                   {/* Profile Actions */}
                   <div className="space-y-2">
+                    <Link
+                      href="/quick"
+                      onClick={() => setShowMobileMenu(false)}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors"
+                      style={{ 
+                        backgroundColor: 'var(--color-primary)',
+                        color: 'white'
+                      }}
+                    >
+                      <Zap size={18} />
+                      <span className="text-sm font-medium">Quick Task</span>
+                    </Link>
+                    
                     <Link
                       href="/settings"
                       onClick={() => setShowMobileMenu(false)}
