@@ -9,8 +9,6 @@ import { Task, TaskStatus, Note, Priority } from '@/types';
 import TaskCard from '@/components/TaskCard';
 import TaskModal from '@/components/TaskModal';
 import ProjectSelector from '@/components/ProjectSelector';
-import Filters from '@/components/Filters';
-import DisplayOptionsMenu from '@/components/DisplayOptionsMenu';
 import DailyStatsCard from '@/components/DailyStatsCard';
 import KanbanColumn from '@/components/KanbanColumn';
 import AuthGuard from '@/components/AuthGuard';
