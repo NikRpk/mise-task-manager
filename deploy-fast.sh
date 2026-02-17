@@ -46,7 +46,13 @@ gcloud run deploy $SERVICE_NAME \
   --update-env-vars="GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI,SLACK_BOT_TOKEN=$SLACK_BOT_TOKEN"
 
 echo ""
+echo "🌐 Deploying to Firebase Hosting..."
+firebase deploy --only hosting:hf-tasks --project $PROJECT_ID
+
+echo ""
 echo "✅ Fast deployment complete!"
 echo ""
 echo "🌐 Your app is live at:"
-gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(status.url)"
+echo "   Cloud Run: $(gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(status.url)")"
+echo "   Firebase:  https://hf-tasks.web.app"
+echo ""
