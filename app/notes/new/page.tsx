@@ -27,6 +27,7 @@ import OwnerSelector from '@/components/OwnerSelector';
 import PreviousMeetingSection from '@/components/PreviousMeetingSection';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { logger } from '@/lib/logger';
 
 function NewNotePage() {
   const router = useRouter();
