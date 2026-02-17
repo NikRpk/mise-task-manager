@@ -1,8 +1,8 @@
-# 🚀 Deployment & Development Guide
+# 🚀 Deployment Guide
 
 ## Fast Deployment (Recommended!)
 
-### Method 1: Local Docker Build + Push (FASTEST! ~2-3 minutes)
+### Local Docker Build + Push (~2-3 minutes)
 ```bash
 ./deploy-fast.sh
 ```
@@ -11,11 +11,52 @@
 - Builds Docker image on your local machine (uses your CPU, not Cloud Build)
 - Pushes pre-built image to Cloud Run
 - Skips the slow remote build process
-- **5-10x faster** than the standard deployment
+- **5-10x faster** than remote builds
 
-### Method 2: Standard Deployment (~5-8 minutes)
+**Requirements:**
+- Docker Desktop running
+- gcloud CLI authenticated
+- Environment variables in `.env.local`
+
+### Deploy to Custom Domain
 ```bash
-./deploy.sh
+./deploy-to-custom-domain.sh
+```
+
+This deploys to Cloud Run AND configures Firebase Hosting at https://hf-tasks.web.app/
+
+## Development
+
+### Local Development
+```bash
+npm run dev
+# or
+./dev-local.sh
+```
+
+Opens at http://localhost:3000
+
+### Environment Variables
+
+Create `.env.local` with:
+```
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_SECRET=your_client_secret
+SLACK_BOT_TOKEN=your_slack_token
+```
+
+## Troubleshooting
+
+### Docker Issues
+If deployment fails with I/O errors:
+1. Restart Docker Desktop
+2. Or reset: `docker system prune -a`
+3. Retry deployment
+
+### Authentication Issues
+```bash
+gcloud auth login
+gcloud config set project dach-ai-mvps
 ```
 
 ### Method 3: Deploy to Custom Domain (~6-10 minutes)
