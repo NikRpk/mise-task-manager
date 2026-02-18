@@ -9,13 +9,7 @@ import { useCachedFetch, useCache } from '@/lib/cache-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { useCallback } from 'react';
-
-interface UserSettings {
-  timezone?: string;
-  theme?: 'light' | 'dark' | 'auto';
-  googleCalendarRefreshToken?: string;
-  [key: string]: string | number | boolean | undefined;
-}
+import { UserSettings } from '@/types';
 
 const USER_SETTINGS_KEY = 'user-settings';
 const SETTINGS_TTL = 5 * 60 * 1000; // 5 minutes
@@ -58,7 +52,7 @@ export function useUserSettings() {
   }, [invalidate, refetch]);
 
   return {
-    settings: settings || {},
+    settings: (settings || {}) as UserSettings,
     isLoading,
     error,
     updateSettings,

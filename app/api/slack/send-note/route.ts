@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sendNoteToAttendees } from '@/lib/slack-client';
+import { adminDb } from '@/lib/firebase-admin';
 import { logger } from '@/lib/logger';
 import { NoteTask } from '@/types';
 
@@ -79,6 +80,28 @@ export async function POST(request: NextRequest) {
       attendeeCount: attendees.length 
     });
     
+    // Fetch custom template from first attendee's settings (if available)
+    // In practice, you might want to fetch each user's template individually
+    let customTemplate: string | undefined;
+    try {
+      const firstAttendee = attendees[0];
+      // Try to get user ID from email
+      const userSnapshot = await adminDb
+        .collection('users')
+        .where('email', '==', firstAttendee.email)
+        .limit(1)
+        .get();
+      
+      if (!userSnapshot.empty) {
+        const userId = userSnapshot.docs[0].id;
+        const userSettingsDoc = await adminDb.collection('userSettings').doc(userId).get();
+        const settings = userSettingsDoc.data();
+        customTemplate = settings?.slackTemplates?.meetingNote;
+      }
+    } catch (error) {
+      logger.warn('Could not fetch custom Slack template, using default', error as Error);
+    }
+    
     // Send notifications
     const results = await sendNoteToAttendees(
       {
@@ -88,7 +111,8 @@ export async function POST(request: NextRequest) {
         meetingDate,
         allTasks: allTasks as NoteTask[],
       },
-      attendees
+      attendees,
+      customTemplate
     );
     
     // Count successes and failures

@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { colorSchemes, useTheme, ColorScheme } from '@/lib/theme-context';
 import TipTapEditor from '@/components/TipTapEditor';
+import Toggle from '@/components/ui/Toggle';
 import { ProjectSettings, StatusOption, PriorityOption, CustomField, ProjectMember, ProjectRole } from '@/types';
 import { logger } from '@/lib/logger';
 
@@ -27,8 +28,15 @@ interface UserSettings {
   driveFolderId?: string;
   defaultProjectId?: string;
   notifications?: {
-    email: boolean;
-    desktop: boolean;
+    dailyTaskReminder?: {
+      slack: boolean;
+      email: boolean;
+      time?: string; // Format: "HH:MM" (24-hour)
+    };
+  };
+  slackTemplates?: {
+    meetingNote?: string;
+    dailyReminder?: string;
   };
 }
 
@@ -201,19 +209,13 @@ function SettingsContent() {
   const [userSettings, setUserSettings] = useState<UserSettings>({
     colorScheme: 'hellofresh',
     displayName: '',
-    notifications: {
-      email: true,
-      desktop: true,
-    },
+    notifications: {},
   });
 
   const [originalUserSettings, setOriginalUserSettings] = useState<UserSettings>({
     colorScheme: 'hellofresh',
     displayName: '',
-    notifications: {
-      email: true,
-      desktop: true,
-    },
+    notifications: {},
   });
 
   const [userProjects, setUserProjects] = useState<Array<{id: string; name: string}>>([]);
@@ -535,7 +537,14 @@ function SettingsContent() {
     
     try {
       const res = await authenticatedFetch(`/api/tasks?projectId=${projectId}`);
-      const tasks = await res.json();
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+      }
+      
+      const data = await res.json();
+      const tasks = data.tasks || data; // Handle both {tasks: [...]} and [...] responses
       
       interface TaskWithStatus {
         status: string;
@@ -579,10 +588,11 @@ function SettingsContent() {
       }
     } catch (error) {
       console.error('Failed to check tasks:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setAlertDialog({
         isOpen: true,
         title: 'Error',
-        message: 'Failed to check if tasks are using this status. Please try again.',
+        message: `Failed to check if tasks are using this status: ${errorMessage}`,
         type: 'error',
       });
     }
@@ -594,7 +604,14 @@ function SettingsContent() {
     try {
       // Migrate tasks to new status
       const res = await authenticatedFetch(`/api/tasks?projectId=${projectId}`);
-      const tasks = await res.json();
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+      }
+      
+      const data = await res.json();
+      const tasks = data.tasks || data; // Handle both {tasks: [...]} and [...] responses
       
       interface TaskWithStatus {
         status: string;
@@ -645,10 +662,11 @@ function SettingsContent() {
       });
     } catch (error) {
       console.error('Failed to migrate tasks:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setAlertDialog({
         isOpen: true,
         title: 'Error',
-        message: 'Failed to migrate tasks. Please try again.',
+        message: `Failed to migrate tasks: ${errorMessage}`,
         type: 'error',
       });
     }
@@ -1730,8 +1748,8 @@ function SettingsContent() {
       case 'notifications':
         return (
           <div className="space-y-6">
-            <div className="rounded-lg shadow-sm border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-              <div className="flex items-center justify-between mb-6">
+            <div className="rounded-lg shadow-sm border p-4" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
                   Notification Settings
                 </h2>
@@ -1764,51 +1782,200 @@ function SettingsContent() {
                   )}
                 </button>
               </div>
-              <div className="space-y-3">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={userSettings.notifications?.email || false}
-                    onChange={(e) => setUserSettings({
-                      ...userSettings,
-                      notifications: {
-                        email: e.target.checked,
-                        desktop: userSettings.notifications?.desktop || false,
+            </div>
+
+            <div className="rounded-lg shadow-sm border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>
+                Daily Task Reminders
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Receive daily summaries for overdue and upcoming tasks via Slack
+              </p>
+              
+              {/* Toggle and Time Picker in one section */}
+              <div className="space-y-4">
+                <Toggle
+                  label="Enable Daily Slack Reminders"
+                  labelPosition="left"
+                  checked={userSettings.notifications?.dailyTaskReminder?.slack || false}
+                  onChange={(checked) => setUserSettings({
+                    ...userSettings,
+                    notifications: {
+                      ...userSettings.notifications,
+                      dailyTaskReminder: {
+                        slack: checked,
+                        email: false,
+                        time: userSettings.notifications?.dailyTaskReminder?.time || '08:00',
                       },
-                    })}
-                    className="w-4 h-4 rounded"
-                  />
+                    },
+                  })}
+                />
+
+                {/* Time Picker - only show when enabled */}
+                {userSettings.notifications?.dailyTaskReminder?.slack && (
                   <div>
-                    <p className="font-medium" style={{ color: 'var(--color-text)' }}>
-                      Email Notifications
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Receive email updates about tasks and comments
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                      Reminder Time (Europe/Berlin)
+                    </label>
+                    <input
+                      type="time"
+                      value={userSettings.notifications?.dailyTaskReminder?.time || '08:00'}
+                      onChange={(e) => setUserSettings({
+                        ...userSettings,
+                        notifications: {
+                          ...userSettings.notifications,
+                          dailyTaskReminder: {
+                            ...userSettings.notifications?.dailyTaskReminder,
+                            slack: userSettings.notifications?.dailyTaskReminder?.slack || false,
+                            email: false,
+                            time: e.target.value,
+                          },
+                        },
+                      })}
+                      className="px-3 py-2 border rounded-md text-sm"
+                      style={{ 
+                        borderColor: 'var(--color-border)',
+                        color: 'var(--color-text)',
+                      }}
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Daily reminders will be sent at this time
                     </p>
                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* Slack Message Templates */}
+            <div className="rounded-lg shadow-sm border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>
+                Slack Message Templates
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Customize how Slack notifications look. Use variables like {'{{taskCount}}'} and Slack markdown (e.g., *bold*, _italic_, emojis like :fire:).
+              </p>
+              
+              {/* Meeting Notes Template */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--color-text)' }}>
+                  Meeting Notes Notification
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={userSettings.notifications?.desktop || false}
-                    onChange={(e) => setUserSettings({
-                      ...userSettings,
-                      notifications: {
-                        email: userSettings.notifications?.email || false,
-                        desktop: e.target.checked,
-                      },
-                    })}
-                    className="w-4 h-4 rounded"
-                  />
-                  <div>
-                    <p className="font-medium" style={{ color: 'var(--color-text)' }}>
-                      Desktop Notifications
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Show browser notifications for important updates
-                    </p>
-                  </div>
+                <p className="text-xs text-gray-500 mb-2">
+                  Available variables: {'{{noteTitle}}'}, {'{{noteUrl}}'}, {'{{taskCount}}'}, {'{{tasks}}'} (array)
+                </p>
+                <textarea
+                  value={userSettings.slackTemplates?.meetingNote || `Notes from *"{{noteTitle}}"*
+
+:page_facing_up: <{{noteUrl}}|View full meeting notes>
+
+{{#if hasTasks}}
+---
+*Your Tasks ({{taskCount}}):*
+{{#each tasks}}
+• {{title}}{{#if deadline}}   \`Due: {{deadline}}\`{{/if}}
+{{/each}}
+{{/if}}`}
+                  onChange={(e) => setUserSettings({
+                    ...userSettings,
+                    slackTemplates: {
+                      ...userSettings.slackTemplates,
+                      meetingNote: e.target.value,
+                    },
+                  })}
+                  rows={12}
+                  className="w-full px-3 py-2 border rounded-md font-mono text-sm"
+                  style={{ 
+                    borderColor: 'var(--color-border)',
+                    backgroundColor: '#f8fafc',
+                  }}
+                />
+                <button
+                  onClick={() => setUserSettings({
+                    ...userSettings,
+                    slackTemplates: {
+                      ...userSettings.slackTemplates,
+                      meetingNote: undefined,
+                    },
+                  })}
+                  className="mt-2 text-sm text-blue-600 hover:underline"
+                >
+                  Reset to default
+                </button>
+              </div>
+
+              {/* Daily Reminder Template */}
+              <div>
+                <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--color-text)' }}>
+                  Daily Task Reminder
                 </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Available variables: {'{{userName}}'}, {'{{totalTasks}}'}, {'{{overdueTasks}}'}, {'{{todayTasks}}'}, {'{{tomorrowTasks}}'}, {'{{appUrl}}'}
+                </p>
+                <textarea
+                  value={userSettings.slackTemplates?.dailyReminder || `*Daily Task Summary*
+
+Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}s{{/unless}} that need your attention.
+
+{{#if overdueTasks}}
+---
+*🔴 OVERDUE ({{overdueCount}} task{{#unless singleOverdue}}s{{/unless}})*
+{{#each overdueTasks}}
+- {{title}}
+{{/each}}
+{{/if}}
+
+{{#if todayTasks}}
+---
+*📅 DUE TODAY ({{todayCount}} task{{#unless singleToday}}s{{/unless}})*
+{{#each todayTasks}}
+- {{title}}
+{{/each}}
+{{/if}}
+
+{{#if tomorrowTasks}}
+---
+*📆 DUE TOMORROW ({{tomorrowCount}} task{{#unless singleTomorrow}}s{{/unless}})*
+{{#each tomorrowTasks}}
+- {{title}}
+{{/each}}
+{{/if}}
+
+---
+<{{appUrl}}|View all tasks →>`}
+                  onChange={(e) => setUserSettings({
+                    ...userSettings,
+                    slackTemplates: {
+                      ...userSettings.slackTemplates,
+                      dailyReminder: e.target.value,
+                    },
+                  })}
+                  rows={12}
+                  className="w-full px-3 py-2 border rounded-md font-mono text-sm"
+                  style={{ 
+                    borderColor: 'var(--color-border)',
+                    backgroundColor: '#f8fafc',
+                  }}
+                />
+                <button
+                  onClick={() => setUserSettings({
+                    ...userSettings,
+                    slackTemplates: {
+                      ...userSettings.slackTemplates,
+                      dailyReminder: undefined,
+                    },
+                  })}
+                  className="mt-2 text-sm text-blue-600 hover:underline"
+                >
+                  Reset to default
+                </button>
+              </div>
+
+              <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-900">
+                  <strong>Tips:</strong> Use *bold*, _italic_, and emojis like :fire:. 
+                  Separate sections with ---. Loops: {'{{#each tasks}}...{{/each}}'}. 
+                  Conditionals: {'{{#if hasTasks}}...{{/if}}'}.
+                </p>
               </div>
             </div>
           </div>
@@ -1869,7 +2036,7 @@ function SettingsContent() {
                   Template Content
                 </label>
                 <TipTapEditor
-                  value={userSettings.noteTemplate || ''}
+                  value={userSettings.noteTemplate || '<h2>Agenda</h2><ul><li></li></ul><h2>Notes</h2><ul><li></li></ul><h2>Action Items</h2><ul><li></li></ul>'}
                   onChange={(value) => setUserSettings({ ...userSettings, noteTemplate: value })}
                   placeholder="Create your note template with headers and bullet points..."
                 />

@@ -64,17 +64,11 @@ export function TaskDetails({
 
   return (
     <div>
-      <div className="mb-3 pb-3" style={{ borderBottom: '2px solid #f1f5f9' }}>
-        <span className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text)', letterSpacing: '0.5px' }}>
-          Details
-        </span>
-      </div>
-      
       <div className="rounded-lg p-5" style={{ background: '#fafbfc', border: '1px solid #e2e8f0' }}>
         <div className="space-y-4">
           {/* Status */}
           <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
               Status
             </label>
             <select
@@ -108,7 +102,7 @@ export function TaskDetails({
 
           {/* Priority */}
           <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
               Priority
             </label>
             <select
@@ -152,8 +146,8 @@ export function TaskDetails({
           </div>
 
           {/* Owner */}
-          <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
               Owner
             </label>
             <input
@@ -172,7 +166,7 @@ export function TaskDetails({
           {/* Links */}
           <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+              <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
                 Links
               </label>
               <button
@@ -215,7 +209,7 @@ export function TaskDetails({
           {/* Tags */}
           <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+              <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
                 Tags
               </label>
               <button
@@ -256,7 +250,7 @@ export function TaskDetails({
           {/* Custom Fields */}
           {customFields.length > 0 && customFields.map((field) => (
             <div key={field.id} className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
                 {field.name} {field.required && <span style={{ color: '#f30047' }}>*</span>}
               </label>
               {field.type === 'text' && (

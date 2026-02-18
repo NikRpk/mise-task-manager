@@ -55,8 +55,8 @@ export function CommentsSection({
   };
 
   return (
-    <div>
-      <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+    <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+      <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
         Comments
       </label>
       

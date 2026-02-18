@@ -190,3 +190,27 @@ export interface User {
   displayName: string | null;
   photoURL: string | null;
 }
+
+// ========== USER SETTINGS ==========
+
+export interface UserSettings {
+  colorScheme: string;
+  displayName?: string;
+  timezone?: string;
+  noteTemplate?: string;
+  driveFolderId?: string;
+  defaultProjectId?: string;
+  googleCalendarRefreshToken?: string;
+  googleCalendarConnectedAt?: string;
+  notifications?: {
+    dailyTaskReminder?: {
+      slack: boolean;
+      email: boolean;
+      time?: string; // Format: "HH:MM" (24-hour)
+    };
+  };
+  slackTemplates?: {
+    meetingNote?: string;
+    dailyReminder?: string;
+  };
+}

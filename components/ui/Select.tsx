@@ -68,7 +68,7 @@ export default function Select({
       {label && (
         <label 
           className="block text-xs font-semibold uppercase tracking-wide mb-2"
-          style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}
+          style={{ color: '#0f172a', letterSpacing: '0.5px' }}
         >
           {label}
         </label>
@@ -78,7 +78,7 @@ export default function Select({
           type="button"
           onClick={() => !disabled && setIsOpen(!isOpen)}
           disabled={disabled}
-          className="w-full px-3 py-2 border rounded-md text-base text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-3 py-2 border rounded-md text-sm text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             borderColor: error ? '#f30047' : 'var(--color-border)',
             backgroundColor: '#ffffff',
@@ -113,7 +113,7 @@ export default function Select({
                     onChange(option.value);
                     setIsOpen(false);
                   }}
-                  className={`w-full px-3 py-3 text-base text-left hover:bg-gray-50 transition-colors ${
+                  className={`w-full px-3 py-3 text-sm text-left hover:bg-gray-50 transition-colors ${
                     index > 0 ? 'border-t' : ''
                   }`}
                   style={{ 

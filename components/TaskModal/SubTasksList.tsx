@@ -22,7 +22,7 @@ export function SubTasksList({ subTasks, onAdd, onUpdate, onRemove }: SubTasksLi
     <div>
       <div className="flex items-center justify-between mb-3 pb-3" style={{ borderBottom: '2px solid #f1f5f9' }}>
         <div className="flex items-center gap-4 flex-1">
-          <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text)', letterSpacing: '0.5px' }}>
+          <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
             Sub-tasks ({totalCount})
           </label>
         </div>

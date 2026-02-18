@@ -3,22 +3,10 @@ import { withAuth } from '@/lib/auth-middleware';
 import { adminDb } from '@/lib/firebase-admin';
 import { handleApiError, successResponse } from '@/lib/api-errors';
 import { logger } from '@/lib/logger';
+import { UserSettings } from '@/types';
 
 // User-specific settings (global, not project-specific)
-interface UserSettings {
-  colorScheme: string;
-  displayName?: string;
-  timezone?: string;
-  noteTemplate?: string;
-  driveFolderId?: string;
-  defaultProjectId?: string; // Default project for creating tasks from notes
-  googleCalendarRefreshToken?: string;
-  googleCalendarConnectedAt?: string;
-  notifications?: {
-    email: boolean;
-    desktop: boolean;
-  };
-}
+// Removed - now imported from @/types
 
 export async function GET(request: NextRequest) {
   return withAuth(request, async (req, user) => {
@@ -37,6 +25,10 @@ export async function GET(request: NextRequest) {
           notifications: {
             email: true,
             desktop: true,
+            dailyTaskReminder: {
+              slack: false,
+              email: false,
+            },
           },
         };
 
@@ -82,8 +74,11 @@ export async function PUT(request: NextRequest) {
         notifications: body.notifications || {
           email: true,
           desktop: true,
+          dailyTaskReminder: {
+            slack: false,
+            email: false,
+          },
         },
-        // Preserve calendar tokens if they exist
         googleCalendarRefreshToken: body.googleCalendarRefreshToken,
         googleCalendarConnectedAt: body.googleCalendarConnectedAt,
       };

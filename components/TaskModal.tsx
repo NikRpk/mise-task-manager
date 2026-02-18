@@ -923,7 +923,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text)' }}>
+                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
                   Description
                 </label>
                 {/* Desktop: Rich text editor */}
@@ -1095,8 +1095,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
               </div>
 
               {/* Comments Section - Desktop only */}
-              <div className="hidden md:block">
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+              <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
                   Comments
                 </label>
                 
@@ -1236,10 +1236,11 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
 
             {/* Right Column - Metadata Sidebar - Shows first on mobile */}
             <div className="lg:order-2 order-1">
-              <div className="mb-3 pb-3" style={{ borderBottom: '2px solid #f1f5f9' }}>
-                <span className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text)', letterSpacing: '0.5px' }}>
+              {/* Details Header - Desktop only, aligns with Description label */}
+              <div className="hidden lg:block mb-2">
+                <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
                   Details
-                </span>
+                </label>
               </div>
               
               <div className="rounded-lg md:p-5 p-4" style={{ background: '#fafbfc', border: '1px solid #e2e8f0' }}>
@@ -1296,7 +1297,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                   </div>
 
                   {/* Deadline */}
-                  <div className="pb-4">
+                  <div className="pb-2">
                     <DatePicker
                       label={`Due Date${formData.isRecurring ? ' *' : ''}`}
                       value={formData.deadline}
@@ -1307,7 +1308,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                   </div>
 
                   {/* Recurring Task */}
-                  <div className="pb-0">
+                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <Toggle
                       label="Recurring Task"
                       labelPosition="left"
@@ -1390,8 +1391,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                   </div>
 
                   {/* Owner - Desktop only */}
-                  <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                  <div className="hidden md:block">
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#0f172a', letterSpacing: '0.5px' }}>
                       Owner
                     </label>
                     {isOpen && (

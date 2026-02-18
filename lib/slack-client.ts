@@ -4,8 +4,162 @@
  */
 
 import { WebClient } from '@slack/web-api';
-import { NoteTask } from '@/types';
+import { NoteTask, Task, Priority } from '@/types';
 import { logger } from './logger';
+
+/**
+ * Default Slack message templates
+ */
+export const DEFAULT_SLACK_TEMPLATES = {
+  meetingNote: `Notes from *"{{noteTitle}}"*
+
+:page_facing_up: <{{noteUrl}}|View full meeting notes>
+
+{{#if hasTasks}}
+---
+*Your Tasks ({{taskCount}}):*
+{{#each tasks}}
+• {{title}}{{#if deadline}}   \`Due: {{deadline}}\`{{/if}}
+{{/each}}
+{{/if}}`,
+  
+  dailyReminder: `*Daily Task Summary*
+
+Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}s{{/unless}} that need your attention.
+
+{{#if overdueTasks}}
+---
+*🔴 OVERDUE ({{overdueCount}} task{{#unless singleOverdue}}s{{/unless}})*
+{{#each overdueTasks}}
+- {{title}}
+{{/each}}
+{{/if}}
+
+{{#if todayTasks}}
+---
+*📅 DUE TODAY ({{todayCount}} task{{#unless singleToday}}s{{/unless}})*
+{{#each todayTasks}}
+- {{title}}
+{{/each}}
+{{/if}}
+
+{{#if tomorrowTasks}}
+---
+*📆 DUE TOMORROW ({{tomorrowCount}} task{{#unless singleTomorrow}}s{{/unless}})*
+{{#each tomorrowTasks}}
+- {{title}}
+{{/each}}
+{{/if}}
+
+---
+<{{appUrl}}|View all tasks →>`
+};
+
+/**
+ * Replaces template variables with actual values
+ * Supports basic Slack markdown
+ * @param template - Template string with variables
+ * @param variables - Object with variable values
+ * @returns Rendered string
+ */
+function renderTemplate(template: string, variables: Record<string, unknown>): string {
+  let result = template;
+  
+  // Replace simple variables {{varName}}
+  result = result.replace(/\{\{([^#/}]+)\}\}/g, (match, varName) => {
+    const trimmedVarName = varName.trim();
+    const value = variables[trimmedVarName];
+    return value !== undefined && value !== null ? String(value) : '';
+  });
+  
+  // Handle {{#if condition}} blocks
+  result = result.replace(/\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (match, condition, content) => {
+    return variables[condition] ? content : '';
+  });
+  
+  // Handle {{#unless condition}} blocks
+  result = result.replace(/\{\{#unless\s+(\w+)\}\}([\s\S]*?)\{\{\/unless\}\}/g, (match, condition, content) => {
+    return !variables[condition] ? content : '';
+  });
+  
+  // Handle {{#each array}} blocks
+  result = result.replace(/\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (match, arrayName, itemTemplate) => {
+    const array = variables[arrayName];
+    if (!Array.isArray(array) || array.length === 0) return '';
+    
+    return array.map(item => {
+      let itemResult = itemTemplate;
+      // Replace variables within the item
+      if (typeof item === 'object' && item !== null) {
+        Object.keys(item).forEach(key => {
+          const value = (item as Record<string, unknown>)[key];
+          itemResult = itemResult.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), 
+            value !== undefined && value !== null ? String(value) : '');
+        });
+      }
+      return itemResult;
+    }).join('');
+  });
+  
+  // Clean up empty lines
+  result = result.replace(/\n\s*\n\s*\n/g, '\n\n');
+  
+  return result.trim();
+}
+
+/**
+ * Converts rendered markdown text to Slack Block Kit format
+ * @param text - Markdown text
+ * @returns Slack blocks
+ */
+function markdownToBlocks(text: string): Array<Record<string, unknown>> {
+  const blocks: Array<Record<string, unknown>> = [];
+  const lines = text.split('\n');
+  let currentSection = '';
+  
+  for (const line of lines) {
+    if (line.trim() === '---') {
+      // Add current section if exists
+      if (currentSection.trim()) {
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: currentSection.trim(),
+          },
+        });
+        currentSection = '';
+      }
+      // Add divider
+      blocks.push({ type: 'divider' });
+    } else if (line.trim()) {
+      currentSection += line + '\n';
+    } else if (currentSection.trim()) {
+      // Empty line - end current section
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: currentSection.trim(),
+        },
+      });
+      currentSection = '';
+    }
+  }
+  
+  // Add remaining section
+  if (currentSection.trim()) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: currentSection.trim(),
+      },
+    });
+  }
+  
+  return blocks;
+}
 
 // Initialize Slack client
 const slackToken = process.env.SLACK_BOT_TOKEN;
@@ -175,6 +329,7 @@ function formatMessageBlocks(
  * @param meetingDate - Date of the meeting
  * @param userTasks - Tasks assigned to this user
  * @param allTasks - All tasks from the meeting
+ * @param customTemplate - Optional custom Slack template
  * @returns Success status and message
  */
 export async function sendNoteToSlackUser(
@@ -184,7 +339,8 @@ export async function sendNoteToSlackUser(
   noteUrl: string,
   meetingDate: string,
   userTasks: NoteTask[],
-  _allTasks: NoteTask[]
+  _allTasks: NoteTask[],
+  customTemplate?: string
 ): Promise<{ success: boolean; message: string }> {
   // Check if Slack is configured
   if (!slack) {
@@ -204,8 +360,30 @@ export async function sendNoteToSlackUser(
       };
     }
 
-    // Format message blocks
-    const blocks = formatMessageBlocks(noteTitle, noteContent, noteUrl, meetingDate, userTasks);
+    // Prepare template variables
+    const tasks = userTasks.map(task => ({
+      title: task.title,
+      deadline: task.deadline 
+        ? (() => {
+            const deadlineDate = new Date(task.deadline);
+            return `${String(deadlineDate.getDate()).padStart(2, '0')}.${String(deadlineDate.getMonth() + 1).padStart(2, '0')}`;
+          })()
+        : null,
+    }));
+
+    const templateVars = {
+      noteTitle,
+      noteUrl,
+      meetingDate,
+      hasTasks: userTasks.length > 0,
+      taskCount: userTasks.length,
+      tasks,
+    };
+
+    // Render template
+    const template = customTemplate || DEFAULT_SLACK_TEMPLATES.meetingNote;
+    const renderedText = renderTemplate(template, templateVars);
+    const blocks = markdownToBlocks(renderedText);
 
     // Send message
     const messageResult = await slack.chat.postMessage({
@@ -219,9 +397,6 @@ export async function sendNoteToSlackUser(
     if (!messageResult.ok) {
       throw new Error('Failed to send Slack message');
     }
-
-    // Note: File upload removed - requires files:write permission
-    // Users can access the full notes via the link provided in the message
 
     logger.info('Slack notification sent successfully', { email, noteTitle });
     
@@ -253,6 +428,7 @@ export async function sendNoteToSlackUser(
  * Sends meeting notes to multiple attendees
  * @param noteData - Meeting note data
  * @param attendees - List of attendee emails with their tasks
+ * @param customTemplate - Optional custom Slack template
  * @returns Results for each attendee
  */
 export async function sendNoteToAttendees(
@@ -263,7 +439,8 @@ export async function sendNoteToAttendees(
     meetingDate: string;
     allTasks: NoteTask[];
   },
-  attendees: Array<{ email: string; tasks: NoteTask[] }>
+  attendees: Array<{ email: string; tasks: NoteTask[] }>,
+  customTemplate?: string
 ): Promise<Array<{ email: string; success: boolean; message: string }>> {
   const results = await Promise.all(
     attendees.map(async (attendee) => {
@@ -274,7 +451,8 @@ export async function sendNoteToAttendees(
         noteData.noteUrl,
         noteData.meetingDate,
         attendee.tasks,
-        noteData.allTasks
+        noteData.allTasks,
+        customTemplate
       );
       
       return {
@@ -311,6 +489,122 @@ export async function testSlackConnection(): Promise<{ success: boolean; message
     return {
       success: false,
       message: err.message || 'Connection failed',
+    };
+  }
+}
+
+/**
+ * Get priority circle emoji for task reminders
+ */
+function getPriorityCircle(priority: Priority): string {
+  const priorityMap = {
+    high: ':red_circle:',
+    medium: ':large_yellow_circle:',
+    low: ':large_green_circle:',
+  };
+  return priorityMap[priority] || '';
+}
+
+interface TaskGroup {
+  overdue: Task[];
+  today: Task[];
+  tomorrow: Task[];
+}
+
+/**
+ * Sends daily task reminder to a Slack user
+ * @param email - User's email address
+ * @param userName - User's display name
+ * @param tasks - Grouped tasks (overdue, today, tomorrow)
+ * @param projectNames - Map of project IDs to project names
+ * @param appUrl - URL to the task manager app
+ * @param customTemplate - Optional custom Slack template
+ * @returns Success status and message
+ */
+export async function sendDailyTaskReminder(
+  email: string,
+  userName: string,
+  tasks: TaskGroup,
+  projectNames: Map<string, string>,
+  appUrl: string = 'https://hf-tasks.web.app',
+  customTemplate?: string
+): Promise<{ success: boolean; message: string }> {
+  if (!slack) {
+    return {
+      success: false,
+      message: 'Slack bot token not configured',
+    };
+  }
+
+  try {
+    const userId = await getUserIdByEmail(email);
+    if (!userId) {
+      return {
+        success: false,
+        message: `User not found in Slack workspace: ${email}`,
+      };
+    }
+
+    const totalTasks = tasks.overdue.length + tasks.today.length + tasks.tomorrow.length;
+
+    // Prepare template variables
+    const templateVars = {
+      userName,
+      totalTasks,
+      singleTask: totalTasks === 1,
+      appUrl,
+      // Overdue tasks
+      overdueTasks: tasks.overdue.length > 0 ? tasks.overdue.map(t => ({ title: t.title || t.description })) : null,
+      overdueCount: tasks.overdue.length,
+      singleOverdue: tasks.overdue.length === 1,
+      // Today tasks
+      todayTasks: tasks.today.length > 0 ? tasks.today.map(t => ({ title: t.title || t.description })) : null,
+      todayCount: tasks.today.length,
+      singleToday: tasks.today.length === 1,
+      // Tomorrow tasks
+      tomorrowTasks: tasks.tomorrow.length > 0 ? tasks.tomorrow.map(t => ({ title: t.title || t.description })) : null,
+      tomorrowCount: tasks.tomorrow.length,
+      singleTomorrow: tasks.tomorrow.length === 1,
+    };
+
+    // Render template
+    const template = customTemplate || DEFAULT_SLACK_TEMPLATES.dailyReminder;
+    const renderedText = renderTemplate(template, templateVars);
+    const blocks = markdownToBlocks(renderedText);
+
+    const messageResult = await slack.chat.postMessage({
+      channel: userId,
+      text: `Daily Task Summary: ${totalTasks} task${totalTasks !== 1 ? 's' : ''} need your attention`,
+      blocks: blocks as never,
+      unfurl_links: false,
+      unfurl_media: false,
+    });
+
+    if (!messageResult.ok) {
+      throw new Error('Failed to send Slack message');
+    }
+
+    logger.info('Daily task reminder sent via Slack', { email, totalTasks });
+    
+    return {
+      success: true,
+      message: 'Reminder sent successfully',
+    };
+  } catch (error) {
+    logger.error('Failed to send daily task reminder via Slack', error as Error, { email });
+    
+    const err = error as { message?: string; data?: { error?: string } };
+    let errorMessage = err.message || 'Failed to send reminder';
+    
+    if (err.data?.error === 'channel_not_found') {
+      errorMessage = 'Cannot send DM - user may need to message the bot first';
+    } else if (err.data?.error === 'not_in_channel') {
+      errorMessage = 'Bot does not have permission to send DMs';
+    }
+    
+    return {
+      success: false,
+      message: errorMessage,
     };
   }
 }

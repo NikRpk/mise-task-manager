@@ -11,6 +11,8 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
+import BoldExtension from '@tiptap/extension-bold';
+import ItalicExtension from '@tiptap/extension-italic';
 import ResizableImage from 'tiptap-extension-resize-image';
 import CodeBlock from '@tiptap/extension-code-block';
 import { Color } from '@tiptap/extension-color';
@@ -193,9 +195,11 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
       StarterKit.configure({
         codeBlock: false, // Using custom CodeBlock
         horizontalRule: false, // Using custom HorizontalRule
-        bold: false, // Imported separately below
-        italic: false, // Imported separately below
+        bold: false, // Using custom Bold extension
+        italic: false, // Using custom Italic extension
       }),
+      BoldExtension,
+      ItalicExtension,
       Link.configure({
         openOnClick: true,
         HTMLAttributes: {
