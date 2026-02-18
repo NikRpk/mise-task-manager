@@ -203,6 +203,8 @@ export interface UserSettings {
   googleCalendarRefreshToken?: string;
   googleCalendarConnectedAt?: string;
   notifications?: {
+    email?: boolean;
+    desktop?: boolean;
     dailyTaskReminder?: {
       slack: boolean;
       email: boolean;
