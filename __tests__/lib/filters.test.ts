@@ -19,7 +19,6 @@ function createMockTask(overrides: Partial<Task> = {}): Task {
     owner: 'John Doe',
     projectId: 'project-1',
     priority: 'medium',
-    tags: [],
     images: [],
     comments: [],
     createdAt: new Date().toISOString(),
@@ -206,43 +205,6 @@ describe('filterTasks', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].priority).toBe('high');
-    });
-  });
-
-  describe('Tags Filtering', () => {
-    test('filters by single tag', () => {
-      const tasks = [
-        createMockTask({ id: '1', tags: ['urgent', 'bug'] }),
-        createMockTask({ id: '2', tags: ['feature'] }),
-      ];
-
-      const result = filterTasks(tasks, { tags: ['urgent'] });
-
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('1');
-    });
-
-    test('filters by multiple tags (OR logic)', () => {
-      const tasks = [
-        createMockTask({ id: '1', tags: ['urgent'] }),
-        createMockTask({ id: '2', tags: ['bug'] }),
-        createMockTask({ id: '3', tags: ['feature'] }),
-      ];
-
-      const result = filterTasks(tasks, { tags: ['urgent', 'bug'] });
-
-      expect(result).toHaveLength(2);
-    });
-
-    test('handles tasks without tags', () => {
-      const tasks = [
-        createMockTask({ id: '1', tags: [] }),
-        createMockTask({ id: '2', tags: ['urgent'] }),
-      ];
-
-      const result = filterTasks(tasks, { tags: ['urgent'] });
-
-      expect(result).toHaveLength(1);
     });
   });
 
