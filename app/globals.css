@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../node_modules/flowbite-datepicker";
 
 :root {
   --background: #f8fafc;
@@ -21,6 +22,7 @@
   --gray-700: #334155;
   --gray-800: #1e293b;
   --gray-900: #0f172a;
+  --color-primary-rgb: 0, 150, 70;
 }
 
 @theme inline {
@@ -345,3 +347,134 @@ html {
   position: relative;
   z-index: 100;
 }
+
+/* Flowbite Datepicker Custom Styles */
+.datepicker {
+  font-family: var(--font-sans) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  background-color: white !important;
+  z-index: 9999 !important;
+}
+
+.datepicker-picker {
+  padding: 8px !important;
+}
+
+.datepicker-header {
+  padding: 12px !important;
+  background-color: white !important;
+  border-bottom: 1px solid var(--color-border) !important;
+}
+
+.datepicker-title {
+  color: var(--color-text) !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+.datepicker-controls {
+  padding: 8px !important;
+}
+
+.datepicker-controls button {
+  color: var(--color-text) !important;
+  transition: all 0.15s ease !important;
+}
+
+.datepicker-controls button:hover {
+  background-color: var(--color-surface-muted) !important;
+  border-radius: 6px !important;
+}
+
+.datepicker-view .dow {
+  color: var(--color-text-secondary) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.datepicker-cell {
+  border-radius: 6px !important;
+  transition: all 0.15s ease !important;
+}
+
+.datepicker-cell:not(.disabled):hover {
+  background-color: var(--color-surface-muted) !important;
+}
+
+.datepicker-cell.focused:not(.selected) {
+  background-color: var(--color-surface-muted) !important;
+}
+
+.datepicker-cell.selected,
+.datepicker-cell.selected:hover {
+  background-color: var(--color-primary) !important;
+  color: white !important;
+  font-weight: 600 !important;
+}
+
+.datepicker-cell.today {
+  background-color: rgba(var(--color-primary-rgb), 0.1) !important;
+  font-weight: 600 !important;
+  color: var(--color-primary) !important;
+}
+
+.datepicker-cell.today.selected {
+  background-color: var(--color-primary) !important;
+  color: white !important;
+}
+
+.datepicker-cell.prev,
+.datepicker-cell.next {
+  color: var(--color-text-secondary) !important;
+  opacity: 0.4 !important;
+}
+
+.datepicker-cell.disabled {
+  color: var(--color-text-secondary) !important;
+  opacity: 0.3 !important;
+  cursor: not-allowed !important;
+}
+
+.datepicker-footer {
+  border-top: 1px solid var(--color-border) !important;
+  padding: 8px !important;
+  background-color: white !important;
+}
+
+.datepicker-footer button {
+  padding: 6px 12px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+  transition: all 0.15s ease !important;
+}
+
+.datepicker-footer .today-btn {
+  background-color: var(--color-primary) !important;
+  color: white !important;
+}
+
+.datepicker-footer .today-btn:hover {
+  opacity: 0.9 !important;
+}
+
+.datepicker-footer .clear-btn {
+  border: 1px solid var(--color-border) !important;
+  background-color: white !important;
+  color: var(--color-text) !important;
+}
+
+.datepicker-footer .clear-btn:hover {
+  background-color: var(--color-surface-muted) !important;
+}
+
+/* Mobile datepicker adjustments */
+@media (max-width: 768px) {
+  .datepicker {
+    width: calc(100vw - 32px) !important;
+    max-width: 360px !important;
+  }
+}
+
