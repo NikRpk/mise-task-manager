@@ -67,8 +67,6 @@ export default function QuickTaskPage() {
           priority: 'medium',
           owner: user?.email || '',
           projectId: defaultProjectId,
-          tags: [],
-          links: [],
           subTasks: [],
           deadline: deadline ? new Date(deadline).toISOString() : null,
           createdAt: new Date().toISOString(),

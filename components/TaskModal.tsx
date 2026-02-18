@@ -43,11 +43,9 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
     subTasks: [],
     deadline: null,
     status: 'todo',
-    links: [],
     owner: '',
     projectId: '',
     priority: 'medium',
-    tags: [],
     images: [],
     comments: [],
     // Don't include recurring fields in initial state - they'll be added when toggled ON
@@ -239,11 +237,9 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
         subTasks: [],
         deadline: null,
         status: 'todo',
-        links: [],
         owner: '',
         projectId: defaultProjectId || projects[0]?.id || '',
         priority: 'medium',
-        tags: [],
         images: [],
         comments: [],
       });
@@ -338,9 +334,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
       const hasContent = 
         formDataRef.current.title?.trim() ||
         formDataRef.current.description?.trim() ||
-        (formDataRef.current.subTasks && formDataRef.current.subTasks.length > 0) ||
-        (formDataRef.current.links && formDataRef.current.links.length > 0) ||
-        (formDataRef.current.tags && formDataRef.current.tags.length > 0);
+        (formDataRef.current.subTasks && formDataRef.current.subTasks.length > 0);
       
       if (hasContent) {
         // Show confirmation dialog for unsaved new task
@@ -546,78 +540,6 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
     const updatedData = {
       ...formData,
       subTasks: formData.subTasks?.filter(st => st.id !== id),
-    };
-    setFormData(updatedData);
-    setHasUnsavedChanges(true);
-    
-    // Auto-save
-    if (task) {
-      debouncedSave(updatedData);
-    }
-  };
-
-  const addLink = () => {
-    setInputDialog({
-      isOpen: true,
-      title: 'Add Link',
-      placeholder: 'Enter URL',
-      defaultValue: '',
-      onConfirm: (url) => {
-        const updatedData = {
-          ...formData,
-          links: [...(formData.links || []), url],
-        };
-        setFormData(updatedData);
-        setHasUnsavedChanges(true);
-        
-        // Auto-save
-        if (task) {
-          debouncedSave(updatedData);
-        }
-      },
-    });
-  };
-
-  const removeLink = (index: number) => {
-    const updatedData = {
-      ...formData,
-      links: formData.links?.filter((_, i) => i !== index),
-    };
-    setFormData(updatedData);
-    setHasUnsavedChanges(true);
-    
-    // Auto-save
-    if (task) {
-      debouncedSave(updatedData);
-    }
-  };
-
-  const addTag = () => {
-    setInputDialog({
-      isOpen: true,
-      title: 'Add Tag',
-      placeholder: 'Enter tag name',
-      defaultValue: '',
-      onConfirm: (tag) => {
-        const updatedData = {
-          ...formData,
-          tags: [...(formData.tags || []), tag],
-        };
-        setFormData(updatedData);
-        setHasUnsavedChanges(true);
-        
-        // Auto-save
-        if (task) {
-          debouncedSave(updatedData);
-        }
-      },
-    });
-  };
-
-  const removeTag = (index: number) => {
-    const updatedData = {
-      ...formData,
-      tags: formData.tags?.filter((_, i) => i !== index),
     };
     setFormData(updatedData);
     setHasUnsavedChanges(true);
@@ -1575,100 +1497,6 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                         disabled={false}
                       />
                     )}
-                  </div>
-
-                  {/* Links - Desktop only */}
-                  <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                        Links
-                      </label>
-                      <button
-                        type="button"
-                        onClick={addLink}
-                        className="text-xs flex items-center gap-1 transition-colors"
-                        style={{ color: 'var(--color-primary)' }}
-                      >
-                        <Plus size={14} />
-                        Add
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {formData.links?.map((link, idx) => {
-                        // Handle both string links and object links {url, label}
-                        interface LinkObject {
-                          url?: string;
-                          label?: string;
-                        }
-                        const linkUrl = typeof link === 'string' ? link : (link as LinkObject).url || '';
-                        const linkLabel = typeof link === 'string' ? link : (link as LinkObject).label || linkUrl;
-                        
-                        return (
-                          <div key={idx} className="flex items-center gap-2 p-2 rounded-md" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                            <a
-                              href={linkUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex-1 truncate transition-colors text-xs"
-                              style={{
-                                color: 'var(--color-primary)',
-                              }}
-                            >
-                              {linkLabel}
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => removeLink(idx)}
-                              className="transition-colors"
-                              style={{ color: '#f30047' }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Tags - Desktop only */}
-                  <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                        Tags
-                      </label>
-                      <button
-                        type="button"
-                        onClick={addTag}
-                        className="text-xs flex items-center gap-1 transition-colors"
-                        style={{ color: 'var(--color-primary)' }}
-                      >
-                        <Plus size={14} />
-                        Add
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.tags?.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-1 rounded-md text-xs flex items-center gap-1"
-                          style={{
-                            backgroundColor: 'var(--color-surface)',
-                            color: 'var(--color-text)',
-                            border: '1px solid #e2e8f0',
-                          }}
-                        >
-                          {tag}
-                          <button
-                            type="button"
-                            onClick={() => removeTag(idx)}
-                            className="transition-colors"
-                            style={{ color: '#f30047' }}
-                          >
-                            <X size={12} />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
                   </div>
 
                   {/* Custom Fields */}

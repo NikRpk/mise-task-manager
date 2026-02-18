@@ -30,11 +30,9 @@ export interface Task {
   subTasks: SubTask[];
   deadline: string | null; // ISO date string
   status: TaskStatus;
-  links: string[];
   owner: string;
   projectId: string;
   priority: Priority;
-  tags: string[];
   createdAt: string;
   updatedAt: string;
   images?: string[];
@@ -103,7 +101,6 @@ export interface FilterOptions {
   status?: TaskStatus[];
   owner?: string[];
   priority?: Priority[];
-  tags?: string[];
 }
 
 // ========== NOTES & TEMPLATES ==========
