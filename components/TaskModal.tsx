@@ -15,7 +15,7 @@ import { AUTO_SAVE_DELAY_MS, TOAST_DURATION_MS, DEFAULT_PROJECT_ICON } from '@/l
 import { logger } from '@/lib/logger';
 import OwnerSelector from './OwnerSelector';
 import { usePeopleData } from '@/hooks/usePeopleData';
-import { Select, Toggle } from './ui';
+import { Select, Toggle, DatePicker } from './ui';
 
 interface TaskModalProps {
   task: Task | null;
@@ -1379,25 +1379,13 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
 
                   {/* Deadline */}
                   <div className="pb-4">
-                    <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                      Due Date {formData.isRecurring && <span style={{ color: '#f30047' }}>*</span>}
-                    </label>
-                    <input
-                      type="date"
-                      value={formatDateLocal(formData.deadline)}
-                      onChange={(e) => updateFormData({ deadline: e.target.value ? new Date(e.target.value).toISOString() : null })}
-                      className="w-full px-3 py-2 border-0 rounded-md focus:outline-none text-sm font-medium"
-                      style={{
-                        background: '#ffffff',
-                        color: 'var(--color-text)',
-                        border: formData.isRecurring && !formData.deadline ? '2px solid #f30047' : 'none',
-                      }}
+                    <DatePicker
+                      label={`Due Date${formData.isRecurring ? ' *' : ''}`}
+                      value={formData.deadline}
+                      onChange={(date) => updateFormData({ deadline: date ? new Date(date).toISOString() : null })}
+                      error={formData.isRecurring && !formData.deadline ? 'Due date is required for recurring tasks' : undefined}
+                      fullWidth
                     />
-                    {formData.isRecurring && !formData.deadline && (
-                      <p className="text-xs mt-1" style={{ color: '#f30047' }}>
-                        Due date is required for recurring tasks
-                      </p>
-                    )}
                   </div>
 
                   {/* Recurring Task */}

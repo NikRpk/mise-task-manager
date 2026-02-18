@@ -21,13 +21,40 @@
 
 ```
 ├── app/                  # Next.js App Router pages & API routes
-├── components/           # Reusable UI components (max 150 lines each)
+├── components/           # Feature-specific UI components
+│   └── ui/              # Shared UI primitives (Button, Input, DatePicker, etc.)
 ├── hooks/                # Custom React hooks
 ├── lib/                  # Utilities, Firebase, constants
 ├── types/                # TypeScript type definitions
 ├── __tests__/            # Jest tests (maintain >90% coverage)
 └── public/               # Static assets
 ```
+
+## Component Organization (CRITICAL)
+
+**ALWAYS use shared components from `components/ui/` when available:**
+
+* ✅ **DO:** `import { Button, Input, DatePicker } from '@/components/ui'`
+* ❌ **DON'T:** Create custom buttons, inputs, or form elements outside of `components/ui/`
+
+**When to create in `components/ui/`:**
+- Form inputs (text, date, select, toggle, etc.)
+- Buttons and interactive elements
+- Reusable UI primitives used across multiple features
+- Any component that could be used in 2+ places
+
+**When to create in `components/`:**
+- Feature-specific components (TaskModal, NoteCard, etc.)
+- Page-specific layouts
+- Domain logic components
+
+**Shared Component Rules:**
+1. Export from `components/ui/index.ts` barrel file
+2. Add TypeScript interface export (e.g., `ButtonProps`)
+3. Add JSDoc documentation with usage example
+4. Use CSS variables for styling (not hardcoded colors)
+5. Ensure mobile responsiveness
+6. Maximum 150 lines per component
 
 ## Mandatory Setup
 

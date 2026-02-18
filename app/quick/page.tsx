@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { DatePicker } from '@/components/ui';
 
 export default function QuickTaskPage() {
   const router = useRouter();
@@ -144,23 +145,13 @@ export default function QuickTaskPage() {
             </div>
 
             {/* Deadline Input */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                Due Date (Optional)
-              </label>
-              <input
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                style={{
-                  borderColor: 'var(--color-border)',
-                  backgroundColor: '#ffffff',
-                  color: 'var(--color-text)',
-                }}
-                disabled={creating}
-              />
-            </div>
+            <DatePicker
+              label="Due Date (Optional)"
+              value={deadline}
+              onChange={(date) => setDeadline(date || '')}
+              disabled={creating}
+              fullWidth
+            />
 
             {/* Error Message */}
             {error && (

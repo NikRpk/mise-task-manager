@@ -15,6 +15,7 @@ import { authenticatedFetch } from '@/lib/api-client';
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { DEFAULT_TIMEZONE } from '@/lib/constants';
+import { DatePicker } from './ui';
 
 interface NoteModalProps {
   note: Note | null;
@@ -399,13 +400,10 @@ ACTION ITEMS
                               />
                             </td>
                             <td className="px-4 py-3">
-                              <input
-                                type="date"
+                              <DatePicker
                                 value={task.deadline || ''}
-                                onChange={(e) => updateTask(task.id, { deadline: e.target.value || null })}
+                                onChange={(date) => updateTask(task.id, { deadline: date })}
                                 disabled={!isEditMode}
-                                className="w-full px-2 py-1 border rounded text-sm"
-                                style={{ borderColor: 'var(--color-border)' }}
                               />
                             </td>
                             {isEditMode && (

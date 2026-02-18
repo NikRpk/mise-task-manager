@@ -15,3 +15,6 @@ export type { SelectProps, SelectOption } from './Select';
 
 export { default as Toggle } from './Toggle';
 export type { ToggleProps } from './Toggle';
+
+export { default as DatePicker } from './DatePicker';
+export type { DatePickerProps } from './DatePicker';

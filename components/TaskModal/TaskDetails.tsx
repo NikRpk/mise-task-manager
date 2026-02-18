@@ -9,6 +9,7 @@ import { Plus, X, Trash2 } from 'lucide-react';
 import { TaskStatus, Priority, StatusOption, PriorityOption, CustomField } from '@/types';
 import { formatInTimeZone } from 'date-fns-tz';
 import { DEFAULT_TIMEZONE } from '@/lib/constants';
+import { DatePicker } from '@/components/ui';
 
 interface TaskDetailsProps {
   isNewTask: boolean;
@@ -168,18 +169,11 @@ export function TaskDetails({
 
           {/* Deadline */}
           <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-              Due Date
-            </label>
-            <input
-              type="date"
-              value={formatDateLocal(deadline)}
-              onChange={(e) => onUpdate('deadline', e.target.value ? new Date(e.target.value).toISOString() : null)}
-              className="w-full px-3 py-2 border-0 rounded-md focus:outline-none text-sm font-medium"
-              style={{
-                background: '#ffffff',
-                color: 'var(--color-text)',
-              }}
+            <DatePicker
+              label="Due Date"
+              value={deadline}
+              onChange={(date) => onUpdate('deadline', date ? new Date(date).toISOString() : null)}
+              fullWidth
             />
           </div>
 
