@@ -315,7 +315,7 @@ function SettingsContent() {
           setCustomColors(data.customColorScheme);
         }
       } else {
-        logger.warn('Failed to fetch settings', undefined, { 
+        logger.warn('Failed to fetch settings', { 
           status: res.status,
           userId: user?.uid,
         });
