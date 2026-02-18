@@ -99,7 +99,9 @@ export async function POST(request: NextRequest) {
         customTemplate = settings?.slackTemplates?.meetingNote;
       }
     } catch (error) {
-      logger.warn('Could not fetch custom Slack template, using default', error as Error);
+      logger.warn('Could not fetch custom Slack template, using default', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
     
     // Send notifications
