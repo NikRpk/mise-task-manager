@@ -353,25 +353,16 @@ const TaskCard = memo(function TaskCard({
         </div>
       )}
 
-      {/* Bottom row: Date and Tags - only show if there's content */}
-      {((showDueDate && task.deadline) || (task.tags && task.tags.length > 0)) && (
+      {/* Bottom row: Date - only show if there's content */}
+      {showDueDate && task.deadline && (
         <div className="flex items-center justify-between text-[10px] relative" style={{ color: 'var(--color-text-secondary)' }}>
-          {showDueDate && task.deadline ? (
-            <span
+          <span
               className="flex items-center gap-1"
               style={isOverdue ? { color: '#f30047', fontWeight: 600 } : (isToday || isTomorrow) ? { color: '#00a61c', fontWeight: 600 } : { fontWeight: 500 }}
             >
               <Calendar size={11} />
               {formatDeadlineDisplay(task.deadline)}
             </span>
-          ) : (
-            <span></span>
-          )}
-          {task.tags && task.tags.length > 0 && (
-            <span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-              {task.tags.length} tag{task.tags.length !== 1 ? 's' : ''}
-            </span>
-          )}
         </div>
       )}
     </div>
