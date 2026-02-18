@@ -48,11 +48,6 @@ export function filterTasks(tasks: Task[], filters: FilterOptions): Task[] {
       if (!filters.priority.includes(task.priority)) return false;
     }
 
-    // Tags filter
-    if (filters.tags && filters.tags.length > 0) {
-      if (!filters.tags.some(tag => task.tags.includes(tag))) return false;
-    }
-
     return true;
   });
 }
