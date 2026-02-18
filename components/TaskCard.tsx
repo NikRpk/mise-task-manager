@@ -248,8 +248,8 @@ const TaskCard = memo(function TaskCard({
     );
   }
 
-  // Check if card should be compact (no deadline showing, no tags, no owner showing)
-  const shouldBeCompact = !(showDueDate && task.deadline) && (!task.tags || task.tags.length === 0) && !(showOwner && task.owner);
+  // Check if card should be compact (no deadline showing, no owner showing)
+  const shouldBeCompact = !(showDueDate && task.deadline) && !(showOwner && task.owner);
 
   // Normal view rendering
   return (
