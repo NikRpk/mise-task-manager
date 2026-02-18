@@ -1244,86 +1244,6 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
               
               <div className="rounded-lg md:p-5 p-4" style={{ background: '#fafbfc', border: '1px solid #e2e8f0' }}>
                 <div className="md:space-y-4 space-y-3">
-                  {/* Project - Desktop only */}
-                  <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <Select
-                      label="Project"
-                      value={formData.projectId || ''}
-                      onChange={(newProjectId) => {
-                        // Reload project settings when project changes
-                        if (newProjectId) {
-                          authenticatedFetch(`/api/projects/${newProjectId}/settings`)
-                            .then(res => {
-                              if (!res.ok) throw new Error('Failed to fetch settings');
-                              return res.json();
-                            })
-                            .then(data => {
-                              const newStatusOptions = data.statusOptions || [];
-                              const newPriorityOptions = data.priorityOptions || [];
-                              const newCustomFields = data.customFields || [];
-
-                              // Update options
-                              if (Array.isArray(newStatusOptions)) {
-                                setStatusOptions(newStatusOptions);
-                              }
-                              if (Array.isArray(newPriorityOptions)) {
-                                setPriorityOptions(newPriorityOptions);
-                              }
-                              if (Array.isArray(newCustomFields)) {
-                                setCustomFields(newCustomFields);
-                              }
-
-                              // Check if current field values exist in new project's options
-                              const updatedFormData: Partial<Task> = { projectId: newProjectId };
-
-                              // Clear status if it doesn't exist in new project
-                              if (formData.status && !newStatusOptions.find((opt: StatusOption) => opt.id === formData.status)) {
-                                updatedFormData.status = newStatusOptions[0]?.id || 'todo';
-                                logger.info('Cleared incompatible status when moving to new project', {
-                                  oldStatus: formData.status,
-                                  newStatus: updatedFormData.status,
-                                  newProjectId,
-                                });
-                              }
-
-                              // Clear priority if it doesn't exist in new project
-                              if (formData.priority && !newPriorityOptions.find((opt: PriorityOption) => opt.id === formData.priority)) {
-                                updatedFormData.priority = newPriorityOptions[0]?.id || 'medium';
-                                logger.info('Cleared incompatible priority when moving to new project', {
-                                  oldPriority: formData.priority,
-                                  newPriority: updatedFormData.priority,
-                                  newProjectId,
-                                });
-                              }
-
-                              // Clear custom fields if they don't exist in new project
-                              // (Assuming customFields is an object with field IDs as keys)
-                              // This would need to be adjusted based on your actual custom fields structure
-
-                              // Apply all updates at once
-                              updateFormData(updatedFormData);
-                            })
-                            .catch((error) => {
-                              logger.error('Failed to fetch project settings after project change', error as Error, {
-                                projectId: newProjectId,
-                              });
-                              // Still update the projectId even if settings fetch fails
-                              updateFormData({ projectId: newProjectId });
-                            });
-                        }
-                      }}
-                      options={projects.map(project => ({
-                        value: project.id,
-                        label: project.name,
-                      }))}
-                      style={{
-                        background: '#ffffff',
-                        color: '#0f172a',
-                        border: '2px solid var(--color-primary)',
-                      }}
-                    />
-                  </div>
-
                   {/* Status - Desktop only */}
                   <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <Select
@@ -1340,9 +1260,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                         { value: 'done', label: 'Done' },
                       ]}
                       style={{
-                        background: formData.status && statusOptions.find(s => s.id === formData.status)?.color 
-                          ? `${statusOptions.find(s => s.id === formData.status)?.color}20` 
-                          : '#ffffff',
+                        background: '#ffffff',
                         color: formData.status && statusOptions.find(s => s.id === formData.status)?.color 
                           ? statusOptions.find(s => s.id === formData.status)?.color 
                           : '#0f172a',

@@ -72,30 +72,6 @@ export function TaskDetails({
       
       <div className="rounded-lg p-5" style={{ background: '#fafbfc', border: '1px solid #e2e8f0' }}>
         <div className="space-y-4">
-          {/* Project - Only show for new tasks */}
-          {isNewTask && (
-            <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                Project
-              </label>
-              <select
-                value={projectId || ''}
-                onChange={(e) => onUpdate('projectId', e.target.value)}
-                className="w-full px-3 py-2 border-0 rounded-md focus:outline-none text-sm font-medium"
-                style={{
-                  background: '#ffffff',
-                  color: 'var(--color-text)',
-                }}
-                required
-              >
-                <option value="">Select a project</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {/* Status */}
           <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
@@ -106,9 +82,7 @@ export function TaskDetails({
               onChange={(e) => onUpdate('status', e.target.value as TaskStatus)}
               className="w-full px-3 py-2 rounded-md focus:outline-none text-sm font-medium"
               style={{
-                background: status && statusOptions.find(s => s.id === status)?.color 
-                  ? `${statusOptions.find(s => s.id === status)?.color}20` 
-                  : '#ffffff',
+                background: '#ffffff',
                 color: status && statusOptions.find(s => s.id === status)?.color 
                   ? statusOptions.find(s => s.id === status)?.color 
                   : '#0f172a',
