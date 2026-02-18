@@ -40,8 +40,7 @@ export function useTaskFilters(tasks: Task[]): UseTaskFiltersResult {
       result = result.filter(t =>
         (t.title && t.title.toLowerCase().includes(searchQueryLower)) ||
         t.description.toLowerCase().includes(searchQueryLower) ||
-        t.owner.toLowerCase().includes(searchQueryLower) ||
-        t.tags.some(tag => tag.toLowerCase().includes(searchQueryLower))
+        t.owner.toLowerCase().includes(searchQueryLower)
       );
     }
 
