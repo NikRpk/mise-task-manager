@@ -28,7 +28,7 @@ fi
 GOOGLE_CLIENT_ID=$(grep "GOOGLE_CLIENT_ID=" .env.local | cut -d '=' -f2 | tr -d '"')
 GOOGLE_CLIENT_SECRET=$(grep "GOOGLE_CLIENT_SECRET=" .env.local | cut -d '=' -f2 | tr -d '"')
 SLACK_BOT_TOKEN=$(grep "SLACK_BOT_TOKEN=" .env.local | cut -d '=' -f2 | tr -d '"')
-GOOGLE_REDIRECT_URI="https://hf-tasks.web.app/api/auth/google/callback"
+GOOGLE_REDIRECT_URI="https://hf-tasks-4e5l57e4iq-ew.a.run.app/api/auth/google/callback"
 
 echo "📦 Building Docker image locally..."
 docker build --platform linux/amd64 -t $IMAGE_NAME:latest .
