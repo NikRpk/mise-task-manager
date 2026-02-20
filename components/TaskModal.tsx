@@ -648,11 +648,11 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
       
       {/* Scrollable modal container */}
       <div
-        className="fixed inset-0 z-[101] md:flex md:items-center md:justify-center md:p-4 overflow-y-auto"
+        className="fixed inset-0 z-[101] md:flex md:items-center md:justify-center md:p-4 overflow-y-scroll"
         onClick={handleClose}
       >
         <div
-          className="bg-surface md:rounded-lg w-full max-w-7xl md:max-h-[90vh] min-h-screen md:min-h-0 overflow-y-auto md:my-auto"
+          className="bg-surface md:rounded-lg w-full max-w-7xl md:max-h-[90vh] min-h-screen md:min-h-0 overflow-y-scroll md:my-auto"
           onClick={(e) => e.stopPropagation()}
           style={{ 
             border: '1px solid #e2e8f0',

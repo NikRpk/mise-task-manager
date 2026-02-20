@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
         subTasks: body.subTasks || [],
         deadline: body.deadline || null,
         status: body.status || 'todo',
-        owner: body.owner || user.displayName,
+        owner: body.owner || user.email, // Always use email as ID
         projectId: body.projectId,
         priority: body.priority || 'medium',
         images: body.images || [],

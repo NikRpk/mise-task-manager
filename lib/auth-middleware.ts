@@ -5,6 +5,7 @@ import { ProjectRole } from '@/types';
 import { AuthenticationError, AuthorizationError, NotFoundError, DatabaseError } from './errors';
 import { logger } from './logger';
 import { handleApiError } from './api-errors';
+import { ensureUserSettings } from './user-init';
 
 export interface AuthenticatedRequest extends NextRequest {
   user?: {
@@ -151,7 +152,7 @@ export async function getUserProjectRole(
 
 /**
  * Middleware wrapper for protected API routes
- * Automatically handles authentication errors
+ * Automatically handles authentication errors and ensures user settings exist
  */
 export async function withAuth(
   request: NextRequest,
@@ -159,6 +160,12 @@ export async function withAuth(
 ): Promise<Response> {
   try {
     const user = await verifyAuth(request);
+    
+    // Ensure user settings are initialized (runs async, doesn't block request)
+    ensureUserSettings(user.uid, user.email, user.displayName).catch(err => {
+      logger.error('Background user settings initialization failed', err);
+    });
+    
     return await handler(request, user);
   } catch (error) {
     return handleApiError(error, {

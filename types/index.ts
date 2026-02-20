@@ -194,6 +194,7 @@ export interface User {
 // ========== USER SETTINGS ==========
 
 export interface UserSettings {
+  email?: string;
   colorScheme: string;
   displayName?: string;
   timezone?: string;

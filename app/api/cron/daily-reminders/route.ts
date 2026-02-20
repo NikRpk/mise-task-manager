@@ -6,7 +6,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
-import admin from 'firebase-admin';
 import { handleApiError, successResponse } from '@/lib/api-errors';
 import { logger } from '@/lib/logger';
 import { sendDailyTaskReminder } from '@/lib/slack-client';
@@ -65,7 +64,11 @@ function groupTasksByDeadline(tasks: Task[]): {
  */
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== DAILY REMINDERS CRON START ===');
+    
     const schedulerHeader = request.headers.get('X-CloudScheduler-JobName');
+    
+    console.log('Scheduler header:', schedulerHeader);
     
     if (schedulerHeader !== 'daily-task-reminders') {
       logger.warn('Unauthorized cron request', { 
@@ -81,48 +84,58 @@ export async function POST(request: NextRequest) {
 
     const results: NotificationResult[] = [];
 
+    console.log('Fetching userSettings collection...');
     const usersSnapshot = await adminDb.collection('userSettings').get();
+    console.log('UserSettings collection size:', usersSnapshot.size);
+    
+    logger.info('Checking user settings', { totalUsers: usersSnapshot.size });
+    
+    console.log('Starting loop through users...');
+
+    console.log('Starting loop through users...');
 
     for (const userDoc of usersSnapshot.docs) {
       const userId = userDoc.id;
+      console.log(`Processing user ${userId}...`);
       const settings = userDoc.data() as UserSettings;
+      console.log(`User ${userId} settings:`, JSON.stringify(settings.notifications?.dailyTaskReminder || null));
 
       const dailyReminderSettings = settings.notifications?.dailyTaskReminder;
       
+      logger.info('User settings check', {
+        userId,
+        hasEmail: !!settings.email,
+        hasNotifications: !!settings.notifications,
+        hasDailyTaskReminder: !!dailyReminderSettings,
+        slackEnabled: dailyReminderSettings?.slack,
+      });
+      
       if (!dailyReminderSettings || !dailyReminderSettings.slack) {
+        console.log(`Skipping user ${userId} - slack not enabled`);
+        logger.info('Skipping user - daily reminder not enabled', { userId });
         continue;
       }
 
+      if (!settings.email) {
+        console.log(`Skipping user ${userId} - no email`);
+        logger.warn('Skipping user - no email in settings', { userId });
+        continue;
+      }
+
+      console.log(`User ${userId} passed all checks! Processing...`);
+
       try {
-        // Try to get email from users collection first, fallback to Auth
-        let userEmail: string | undefined;
-        let userName: string;
-        
-        const userRef = await adminDb.collection('users').doc(userId).get();
-        if (userRef.exists) {
-          const userData = userRef.data();
-          userEmail = userData?.email;
-          userName = settings.displayName || userData?.displayName || 'User';
-        } else {
-          // Fallback: get email from Firebase Auth
-          try {
-            const authUser = await admin.auth().getUser(userId);
-            userEmail = authUser.email;
-            userName = settings.displayName || authUser.displayName || 'User';
-          } catch (authError) {
-            logger.warn('Could not get user from Auth', { userId });
-          }
-        }
+        const userEmail = settings.email;
+        const userName = settings.displayName || 'User';
 
-        if (!userEmail) {
-          logger.warn('User has no email', { userId });
-          continue;
-        }
-
+        console.log(`Fetching projects for user ${userId}...`);
         const projectsSnapshot = await adminDb.collection('projects').get();
+        console.log(`Found ${projectsSnapshot.size} projects total`);
         const allTasks: Task[] = [];
         const projectNames = new Map<string, string>();
 
+        // Build map of project IDs where user is a member
+        const userProjectIds = new Set<string>();
         for (const projectDoc of projectsSnapshot.docs) {
           const projectData = projectDoc.data();
           projectNames.set(projectDoc.id, projectData.name || 'Unnamed Project');
@@ -132,21 +145,30 @@ export async function POST(request: NextRequest) {
             (m: { userId: string }) => m.userId === userId
           );
 
-          if (!userMember) {
-            continue;
+          if (userMember) {
+            userProjectIds.add(projectDoc.id);
           }
-
-          const tasksSnapshot = await adminDb
-            .collection('projects')
-            .doc(projectDoc.id)
-            .collection('tasks')
-            .where('owner', '==', userEmail)
-            .get();
-
-          tasksSnapshot.docs.forEach(taskDoc => {
-            allTasks.push({ id: taskDoc.id, ...taskDoc.data() } as Task);
-          });
         }
+
+        console.log(`User ${userId} is member of ${userProjectIds.size} projects`);
+
+        // Query tasks from top-level tasks collection where owner is user's email
+        const tasksSnapshot = await adminDb
+          .collection('tasks')
+          .where('owner', '==', userEmail)
+          .get();
+
+        console.log(`Found ${tasksSnapshot.size} tasks for user ${userId}`);
+
+        // Filter tasks to only include those in projects where user is a member
+        tasksSnapshot.docs.forEach(taskDoc => {
+          const taskData = taskDoc.data();
+          if (userProjectIds.has(taskData.projectId)) {
+            allTasks.push({ id: taskDoc.id, ...taskData } as Task);
+          }
+        });
+
+        console.log(`User ${userId} has ${allTasks.length} total tasks in their projects`);
 
         const groupedTasks = groupTasksByDeadline(allTasks);
         const totalRelevantTasks =
@@ -154,7 +176,10 @@ export async function POST(request: NextRequest) {
           groupedTasks.today.length +
           groupedTasks.tomorrow.length;
 
+        console.log(`User ${userId} has ${totalRelevantTasks} relevant tasks (overdue: ${groupedTasks.overdue.length}, today: ${groupedTasks.today.length}, tomorrow: ${groupedTasks.tomorrow.length})`);
+
         if (totalRelevantTasks === 0) {
+          console.log(`Skipping user ${userId} - no relevant tasks`);
           logger.info('No relevant tasks for user', { userId, userEmail });
           continue;
         }
@@ -178,15 +203,19 @@ export async function POST(request: NextRequest) {
         );
 
         results.push(result);
+        console.log(`Successfully processed user ${userId}`);
         logger.info('Daily reminder processed', {
           userId,
           userEmail,
           tasksCount: totalRelevantTasks,
         });
       } catch (error) {
+        console.error(`Error processing user ${userId}:`, error);
         logger.error('Failed to process user reminder', error as Error, { userId });
       }
     }
+
+    console.log(`Finished processing all users. Total processed: ${results.length}`);
 
     logger.apiResponse('POST', '/api/cron/daily-reminders', 200, undefined, {
       totalUsers: results.length,
