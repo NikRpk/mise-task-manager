@@ -202,10 +202,11 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
           {/* Custom Calendar Popup */}
           {showCalendar && (
             <div
-              className="absolute z-50 mt-2 bg-white rounded-lg shadow-xl border left-0 right-0"
+              className="absolute z-50 mt-2 bg-white rounded-lg shadow-xl border"
               style={{
                 borderColor: 'var(--color-border)',
-                minWidth: '280px',
+                width: '280px',
+                left: 0,
               }}
             >
               {/* Calendar Header */}
