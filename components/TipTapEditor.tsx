@@ -25,6 +25,7 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
+import Typography from '@tiptap/extension-typography';
 import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Link2, Undo, Redo, Image as ImageIcon, Heading1, Heading2, Type, Code, Minus, CheckSquare, Palette, Table as TableIcon, Columns, Rows, Trash2, Plus, ArrowLeftToLine, ArrowRightToLine, ArrowUpToLine, ArrowDownToLine } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { Person } from '@/types';
@@ -200,6 +201,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
       }),
       BoldExtension,
       ItalicExtension,
+      Typography,
       Link.configure({
         openOnClick: true,
         HTMLAttributes: {
