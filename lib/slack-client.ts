@@ -32,7 +32,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 ---
 *🔴 OVERDUE ({{overdueCount}} task{{#unless singleOverdue}}s{{/unless}})*
 {{#each overdueTasks}}
-- {{title}}
+• {{title}}
 {{/each}}
 {{/if}}
 
@@ -40,7 +40,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 ---
 *📅 DUE TODAY ({{todayCount}} task{{#unless singleToday}}s{{/unless}})*
 {{#each todayTasks}}
-- {{title}}
+• {{title}}
 {{/each}}
 {{/if}}
 
@@ -48,7 +48,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 ---
 *📆 DUE TOMORROW ({{tomorrowCount}} task{{#unless singleTomorrow}}s{{/unless}})*
 {{#each tomorrowTasks}}
-- {{title}}
+• {{title}}
 {{/each}}
 {{/if}}
 

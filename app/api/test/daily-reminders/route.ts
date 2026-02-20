@@ -1,6 +1,6 @@
 /**
  * Test API for Daily Task Reminders
- * Sends sample notifications to a specific user
+ * Sends sample notifications to a specific user with REAL tasks from database
  * 
  * POST /api/test/daily-reminders
  * Body: { email: string, userName?: string }
@@ -8,138 +8,154 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sendDailyTaskReminder } from '@/lib/slack-client';
-import { Task } from '@/types';
+import { adminDb } from '@/lib/firebase-admin';
+import { Task, UserSettings } from '@/types';
+import { startOfDay, addDays, isBefore, isSameDay, parseISO } from 'date-fns';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, userName = 'User' } = body;
+    const { email, userName = 'User', userId } = body;
 
-    if (!email) {
+    if (!email && !userId) {
       return NextResponse.json(
-        { error: 'Email is required' },
+        { error: 'Email or userId is required' },
         { status: 400 }
       );
     }
 
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Find user by email OR userId
+    let userDoc;
+    let foundUserId: string = '';
+    
+    if (userId) {
+      const doc = await adminDb.collection('users').doc(userId).get();
+      if (doc.exists) {
+        userDoc = doc;
+        foundUserId = userId;
+      }
+    } else if (email) {
+      const usersSnapshot = await adminDb.collection('users').where('email', '==', email).limit(1).get();
+      if (!usersSnapshot.empty) {
+        userDoc = usersSnapshot.docs[0];
+        foundUserId = userDoc.id;
+      }
+    }
+    
+    if (!userDoc) {
+      // Try to find ANY user with settings for testing
+      const allUsersSnapshot = await adminDb.collection('users').limit(5).get();
+      return NextResponse.json(
+        { 
+          error: 'User not found', 
+          email,
+          userId,
+          hint: 'Try using one of these userIds',
+          availableUsers: allUsersSnapshot.docs.map(doc => ({
+            userId: doc.id,
+            email: doc.data().email,
+            displayName: doc.data().displayName,
+          }))
+        },
+        { status: 404 }
+      );
+    }
 
-    const overdueDate = new Date(today);
-    overdueDate.setDate(overdueDate.getDate() - 2);
+    const settings = userDoc.data() as UserSettings;
+    const userEmail = settings.email || email;
+    const displayName = settings.displayName || userName;
 
-    // Sample task data
-    const sampleTasks: {
-      overdue: Task[];
-      today: Task[];
-      tomorrow: Task[];
-    } = {
-      overdue: [
-        {
-          id: '1',
-          title: 'Fix production bug',
-          description: 'Critical bug in payment processing',
-          projectId: 'proj1',
-          priority: 'high',
-          status: 'in-progress',
-          owner: email,
-          deadline: overdueDate.toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          subTasks: [],
-        },
-        {
-          id: '2',
-          title: 'Review PR #1234',
-          description: 'Code review for new feature',
-          projectId: 'proj2',
-          priority: 'medium',
-          status: 'review',
-          owner: email,
-          deadline: new Date(today.getTime() - 86400000).toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          subTasks: [],
-        },
-      ],
-      today: [
-        {
-          id: '3',
-          title: 'Update documentation',
-          description: 'Update API documentation',
-          projectId: 'proj1',
-          priority: 'medium',
-          status: 'todo',
-          owner: email,
-          deadline: today.toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          subTasks: [],
-        },
-        {
-          id: '4',
-          title: 'Client presentation',
-          description: 'Present Q1 results to stakeholders',
-          projectId: 'proj3',
-          priority: 'high',
-          status: 'todo',
-          owner: email,
-          deadline: today.toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          subTasks: [],
-        },
-        {
-          id: '5',
-          title: 'Code review',
-          description: 'Review backend refactoring',
-          projectId: 'proj2',
-          priority: 'low',
-          status: 'todo',
-          owner: email,
-          deadline: today.toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          subTasks: [],
-        },
-      ],
-      tomorrow: [
-        {
-          id: '6',
-          title: 'Team standup preparation',
-          description: 'Prepare sprint updates',
-          projectId: 'proj1',
-          priority: 'medium',
-          status: 'todo',
-          owner: email,
-          deadline: tomorrow.toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          subTasks: [],
-        },
-      ],
+    if (!userEmail) {
+      return NextResponse.json(
+        { error: 'User has no email configured', userId: foundUserId },
+        { status: 400 }
+      );
+    }
+
+    // Fetch all projects to build project names map and find user's projects
+    const projectsSnapshot = await adminDb.collection('projects').get();
+    const projectNames = new Map<string, string>();
+    const userProjectIds = new Set<string>();
+
+    for (const projectDoc of projectsSnapshot.docs) {
+      const projectData = projectDoc.data();
+      projectNames.set(projectDoc.id, projectData.name || 'Unnamed Project');
+
+      const members = projectData.members || [];
+      const userMember = members.find((m: { userId: string }) => m.userId === foundUserId);
+      if (userMember) {
+        userProjectIds.add(projectDoc.id);
+      }
+    }
+
+    // Fetch user's tasks
+    const tasksSnapshot = await adminDb
+      .collection('tasks')
+      .where('owner', '==', userEmail)
+      .get();
+
+    const allTasks: Task[] = [];
+    tasksSnapshot.docs.forEach(taskDoc => {
+      const taskData = taskDoc.data();
+      if (userProjectIds.has(taskData.projectId)) {
+        allTasks.push({ id: taskDoc.id, ...taskData } as Task);
+      }
+    });
+
+    // Group tasks by deadline
+    const today = startOfDay(new Date());
+    const tomorrow = addDays(today, 1);
+
+    const groupedTasks = {
+      overdue: allTasks.filter(
+        task =>
+          task.deadline &&
+          isBefore(parseISO(task.deadline), today) &&
+          task.status !== 'done'
+      ),
+      today: allTasks.filter(
+        task =>
+          task.deadline &&
+          isSameDay(parseISO(task.deadline), today) &&
+          task.status !== 'done'
+      ),
+      tomorrow: allTasks.filter(
+        task =>
+          task.deadline &&
+          isSameDay(parseISO(task.deadline), tomorrow) &&
+          task.status !== 'done'
+      ),
     };
 
-    // Project names mapping
-    const projectNames = new Map([
-      ['proj1', 'Project Alpha'],
-      ['proj2', 'Backend Team'],
-      ['proj3', 'Sales Team'],
-    ]);
+    const totalTasks = groupedTasks.overdue.length + groupedTasks.today.length + groupedTasks.tomorrow.length;
+
+    if (totalTasks === 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'No tasks found for this user',
+        recipient: email,
+        taskCounts: {
+          overdue: 0,
+          today: 0,
+          tomorrow: 0,
+        }
+      });
+    }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hf-tasks.web.app';
+    const customTemplate = settings.slackTemplates?.dailyReminder;
 
     let slackResult: { success: boolean; message: string };
 
-    // Send Slack notification
+    // Send Slack notification with real tasks
     try {
       slackResult = await sendDailyTaskReminder(
-        email,
-        userName,
-        sampleTasks,
+        userEmail,
+        displayName,
+        groupedTasks,
         projectNames,
-        appUrl
+        appUrl,
+        customTemplate
       );
     } catch (error) {
       slackResult = {
@@ -152,7 +168,15 @@ export async function POST(request: NextRequest) {
       success: slackResult.success,
       message: slackResult.success ? 'Test Slack notification sent successfully' : 'Failed to send Slack notification',
       slack: slackResult,
-      recipient: email,
+      recipient: userEmail,
+      userId: foundUserId,
+      usedCustomTemplate: !!customTemplate,
+      taskCounts: {
+        overdue: groupedTasks.overdue.length,
+        today: groupedTasks.today.length,
+        tomorrow: groupedTasks.tomorrow.length,
+        total: totalTasks,
+      }
     });
   } catch (error) {
     return NextResponse.json(
