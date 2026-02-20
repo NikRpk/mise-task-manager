@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
 import { handleApiError, successResponse } from '@/lib/api-errors';
 import { logger } from '@/lib/logger';
 import { sendDailyTaskReminder } from '@/lib/slack-client';
@@ -93,10 +94,25 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        // Try to get email from users collection first, fallback to Auth
+        let userEmail: string | undefined;
+        let userName: string;
+        
         const userRef = await adminDb.collection('users').doc(userId).get();
-        const userData = userRef.data();
-        const userEmail = userData?.email;
-        const userName = settings.displayName || userData?.displayName || 'User';
+        if (userRef.exists) {
+          const userData = userRef.data();
+          userEmail = userData?.email;
+          userName = settings.displayName || userData?.displayName || 'User';
+        } else {
+          // Fallback: get email from Firebase Auth
+          try {
+            const authUser = await admin.auth().getUser(userId);
+            userEmail = authUser.email;
+            userName = settings.displayName || authUser.displayName || 'User';
+          } catch (authError) {
+            logger.warn('Could not get user from Auth', { userId });
+          }
+        }
 
         if (!userEmail) {
           logger.warn('User has no email', { userId });
