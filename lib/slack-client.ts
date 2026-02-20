@@ -65,27 +65,13 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 function renderTemplate(template: string, variables: Record<string, unknown>): string {
   let result = template;
   
-  // Replace simple variables {{varName}}
-  result = result.replace(/\{\{([^#/}]+)\}\}/g, (match, varName) => {
-    const trimmedVarName = varName.trim();
-    const value = variables[trimmedVarName];
-    return value !== undefined && value !== null ? String(value) : '';
-  });
-  
-  // Handle {{#if condition}} blocks
-  result = result.replace(/\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (match, condition, content) => {
-    return variables[condition] ? content : '';
-  });
-  
-  // Handle {{#unless condition}} blocks
-  result = result.replace(/\{\{#unless\s+(\w+)\}\}([\s\S]*?)\{\{\/unless\}\}/g, (match, condition, content) => {
-    return !variables[condition] ? content : '';
-  });
-  
-  // Handle {{#each array}} blocks
+  // FIRST: Handle {{#each array}} blocks (before replacing simple variables!)
   result = result.replace(/\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (match, arrayName, itemTemplate) => {
     const array = variables[arrayName];
     if (!Array.isArray(array) || array.length === 0) return '';
+    
+    console.log(`Processing {{#each ${arrayName}}}:`, array);
+    console.log('Item template:', itemTemplate);
     
     return array.map(item => {
       let itemResult = itemTemplate;
@@ -93,12 +79,31 @@ function renderTemplate(template: string, variables: Record<string, unknown>): s
       if (typeof item === 'object' && item !== null) {
         Object.keys(item).forEach(key => {
           const value = (item as Record<string, unknown>)[key];
+          console.log(`Replacing {{${key}}} with:`, value);
           itemResult = itemResult.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), 
             value !== undefined && value !== null ? String(value) : '');
         });
       }
+      console.log('Item result:', itemResult);
       return itemResult;
     }).join('');
+  });
+  
+  // THEN: Handle {{#if condition}} blocks
+  result = result.replace(/\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (match, condition, content) => {
+    return variables[condition] ? content : '';
+  });
+  
+  // THEN: Handle {{#unless condition}} blocks
+  result = result.replace(/\{\{#unless\s+(\w+)\}\}([\s\S]*?)\{\{\/unless\}\}/g, (match, condition, content) => {
+    return !variables[condition] ? content : '';
+  });
+  
+  // FINALLY: Replace simple variables {{varName}}
+  result = result.replace(/\{\{([^#/}]+)\}\}/g, (match, varName) => {
+    const trimmedVarName = varName.trim();
+    const value = variables[trimmedVarName];
+    return value !== undefined && value !== null ? String(value) : '';
   });
   
   // Clean up empty lines
@@ -547,6 +552,13 @@ export async function sendDailyTaskReminder(
 
     const totalTasks = tasks.overdue.length + tasks.today.length + tasks.tomorrow.length;
 
+    console.log('Preparing daily reminder for', email);
+    console.log('Tasks:', {
+      overdue: tasks.overdue.length,
+      today: tasks.today.length,
+      tomorrow: tasks.tomorrow.length,
+    });
+
     // Prepare template variables
     const templateVars = {
       userName,
@@ -554,18 +566,38 @@ export async function sendDailyTaskReminder(
       singleTask: totalTasks === 1,
       appUrl,
       // Overdue tasks
-      overdueTasks: tasks.overdue.length > 0 ? tasks.overdue.map(t => ({ title: t.title || t.description })) : null,
+      overdueTasks: tasks.overdue.length > 0 ? tasks.overdue.map(t => {
+        const taskTitle = t.title || t.description || 'Untitled task';
+        const projectName = t.projectId ? projectNames.get(t.projectId) : null;
+        return { 
+          title: projectName ? `${taskTitle} (${projectName})` : taskTitle
+        };
+      }) : null,
       overdueCount: tasks.overdue.length,
       singleOverdue: tasks.overdue.length === 1,
       // Today tasks
-      todayTasks: tasks.today.length > 0 ? tasks.today.map(t => ({ title: t.title || t.description })) : null,
+      todayTasks: tasks.today.length > 0 ? tasks.today.map(t => {
+        const taskTitle = t.title || t.description || 'Untitled task';
+        const projectName = t.projectId ? projectNames.get(t.projectId) : null;
+        return { 
+          title: projectName ? `${taskTitle} (${projectName})` : taskTitle
+        };
+      }) : null,
       todayCount: tasks.today.length,
       singleToday: tasks.today.length === 1,
       // Tomorrow tasks
-      tomorrowTasks: tasks.tomorrow.length > 0 ? tasks.tomorrow.map(t => ({ title: t.title || t.description })) : null,
+      tomorrowTasks: tasks.tomorrow.length > 0 ? tasks.tomorrow.map(t => {
+        const taskTitle = t.title || t.description || 'Untitled task';
+        const projectName = t.projectId ? projectNames.get(t.projectId) : null;
+        return { 
+          title: projectName ? `${taskTitle} (${projectName})` : taskTitle
+        };
+      }) : null,
       tomorrowCount: tasks.tomorrow.length,
       singleTomorrow: tasks.tomorrow.length === 1,
     };
+
+    console.log('Template vars:', JSON.stringify(templateVars, null, 2));
 
     // Render template
     const template = customTemplate || DEFAULT_SLACK_TEMPLATES.dailyReminder;
