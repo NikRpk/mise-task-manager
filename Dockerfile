@@ -1,5 +1,6 @@
 # Multi-stage Dockerfile for Next.js on Cloud Run
-FROM node:20-alpine AS base
+# Using HelloFresh Artifactory mirror instead of Docker Hub
+FROM repo.tools-k8s.hellofresh.io/node:20-alpine AS base
 
 # Install dependencies
 FROM base AS deps
