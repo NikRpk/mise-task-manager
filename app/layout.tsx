@@ -15,8 +15,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "HelloFresh Task Manager",
-  description: "Internal task management system for HelloFresh",
+  title: "Mise - Task and Notes",
+  description: "Internal task management and note-taking system",
   icons: {
     icon: [
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },

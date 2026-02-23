@@ -6,26 +6,6 @@ This project can be deployed in two ways:
 1. **Cloud Build** (recommended) - No local Docker needed
 2. **Local Build** - Faster, requires Docker/Colima
 
-## Important: HelloFresh Artifactory Compliance
-
-✅ **For local builds: Use `Dockerfile.artifactory`**
-
-When building locally with Colima, use the Artifactory-compliant Dockerfile:
-```bash
-docker build -f Dockerfile.artifactory -t my-app .
-```
-
-✅ **For Cloud Build: Use standard `Dockerfile`**
-
-Google Cloud Build can't access HelloFresh's internal Artifactory, so it uses Docker Hub.
-This is acceptable for Cloud Build since it runs in Google's infrastructure.
-
-**File breakdown:**
-- `Dockerfile` - Uses `node:20-alpine` from Docker Hub (for Cloud Build)
-- `Dockerfile.artifactory` - Uses `repo.tools-k8s.hellofresh.io/node:20-alpine` (for local builds)
-
-The `npm run deploy` script automatically uses `Dockerfile.artifactory` for compliance.
-
 ---
 
 ## Method 1: Cloud Build (Recommended)
@@ -119,7 +99,6 @@ SLACK_BOT_TOKEN="..."
 | Docker needed locally | ❌ No | ✅ Yes |
 | Setup complexity | Low | Medium |
 | Best for | Occasional deploys | Frequent iteration |
-| HelloFresh compliant | ✅ Yes | ✅ Yes |
 
 ---
 

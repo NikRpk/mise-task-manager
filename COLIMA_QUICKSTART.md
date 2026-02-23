@@ -32,7 +32,7 @@ npm run deploy
 ```
 
 This will:
-1. ✅ Build Docker image locally using Artifactory (HelloFresh compliant)
+1. ✅ Build Docker image locally
 2. ✅ Push to Google Container Registry
 3. ✅ Deploy to Cloud Run
 4. ✅ Deploy to Firebase Hosting

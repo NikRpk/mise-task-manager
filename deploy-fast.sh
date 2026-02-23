@@ -2,7 +2,6 @@
 
 # Fast Deployment - Build locally, push to Cloud Run
 # Compatible with Docker Desktop or Colima
-# Uses HelloFresh Artifactory for base images
 
 set -e
 
@@ -43,8 +42,8 @@ GOOGLE_CLIENT_SECRET=$(grep "GOOGLE_CLIENT_SECRET=" .env.production.local | cut 
 SLACK_BOT_TOKEN=$(grep "SLACK_BOT_TOKEN=" .env.production.local | cut -d '=' -f2 | tr -d '"')
 GOOGLE_REDIRECT_URI="https://hf-tasks.web.app/api/auth/google/callback"
 
-echo "📦 Building Docker image locally (using Artifactory mirror)..."
-docker build --platform linux/amd64 -f Dockerfile.artifactory -t $IMAGE_NAME:latest .
+echo "📦 Building Docker image locally..."
+docker build --platform linux/amd64 -t $IMAGE_NAME:latest .
 
 echo "⬆️  Pushing image to Google Container Registry..."
 docker push $IMAGE_NAME:latest

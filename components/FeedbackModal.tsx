@@ -35,7 +35,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
     try {
       const payload = {
-        tool: 'Note & Task Manager',
+        tool: 'Mise - Task and Notes',
         type: type.charAt(0).toUpperCase() + type.slice(1), // Capitalize first letter
         message: message.trim(),
         user: user?.email || 'unknown@example.com',

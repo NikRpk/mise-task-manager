@@ -55,7 +55,7 @@ export default function LoginPage() {
         <div className="bg-white rounded-xl shadow-lg p-8 border" style={{ borderColor: 'var(--color-border)' }}>
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--color-text)' }}>
-              HelloFresh Task Manager
+              Mise - Task and Notes
             </h1>
             <p className="text-gray-600">Sign in to manage your tasks and projects</p>
           </div>
@@ -89,7 +89,7 @@ export default function LoginPage() {
           </button>
 
           <p className="mt-6 text-center text-sm text-gray-500">
-            Sign in with your HelloFresh Google account
+            Sign in with your Google account
           </p>
         </div>
       </div>

@@ -1,6 +1,4 @@
 # Multi-stage Dockerfile for Next.js on Cloud Run
-# Note: For HelloFresh compliance, use local builds with Colima + Artifactory
-# Cloud Build uses public registries (can't access HelloFresh Artifactory)
 FROM node:20-alpine AS base
 
 # Install dependencies

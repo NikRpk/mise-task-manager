@@ -70,4 +70,4 @@ colima stop
 - Colima stores containers in `~/.colima/`
 - Compatible with all Docker commands
 - Much lighter than Docker Desktop
-- Compliant with HelloFresh security policies
+- Open source and free

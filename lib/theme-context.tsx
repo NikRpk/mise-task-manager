@@ -23,7 +23,7 @@ export interface ColorScheme {
 export const colorSchemes: ColorScheme[] = [
   {
     id: 'hellofresh',
-    name: 'HelloFresh Classic',
+    name: 'Classic Green',
     primary: '#009646',
     secondary: '#125034',
     success: '#00a61c',

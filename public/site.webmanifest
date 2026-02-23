@@ -1,6 +1,6 @@
 {
-  "name": "HelloFresh Task Manager",
-  "short_name": "HF Tasks",
+  "name": "Mise - Task and Notes",
+  "short_name": "Mise",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",
