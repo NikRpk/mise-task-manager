@@ -44,7 +44,7 @@ SLACK_BOT_TOKEN=$(grep "SLACK_BOT_TOKEN=" .env.production.local | cut -d '=' -f2
 GOOGLE_REDIRECT_URI="https://hf-tasks.web.app/api/auth/google/callback"
 
 echo "📦 Building Docker image locally (using Artifactory mirror)..."
-docker build --platform linux/amd64 -t $IMAGE_NAME:latest .
+docker build --platform linux/amd64 -f Dockerfile.artifactory -t $IMAGE_NAME:latest .
 
 echo "⬆️  Pushing image to Google Container Registry..."
 docker push $IMAGE_NAME:latest

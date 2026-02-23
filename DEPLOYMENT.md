@@ -8,14 +8,23 @@ This project can be deployed in two ways:
 
 ## Important: HelloFresh Artifactory Compliance
 
-✅ **This Dockerfile is compliant with HelloFresh security guidelines**
+✅ **For local builds: Use `Dockerfile.artifactory`**
 
-The base image uses Artifactory mirror instead of Docker Hub:
-```dockerfile
-FROM repo.tools-k8s.hellofresh.io/node:20-alpine
+When building locally with Colima, use the Artifactory-compliant Dockerfile:
+```bash
+docker build -f Dockerfile.artifactory -t my-app .
 ```
 
-This ensures all base images are pulled through HelloFresh's approved registry.
+✅ **For Cloud Build: Use standard `Dockerfile`**
+
+Google Cloud Build can't access HelloFresh's internal Artifactory, so it uses Docker Hub.
+This is acceptable for Cloud Build since it runs in Google's infrastructure.
+
+**File breakdown:**
+- `Dockerfile` - Uses `node:20-alpine` from Docker Hub (for Cloud Build)
+- `Dockerfile.artifactory` - Uses `repo.tools-k8s.hellofresh.io/node:20-alpine` (for local builds)
+
+The `npm run deploy` script automatically uses `Dockerfile.artifactory` for compliance.
 
 ---
 
