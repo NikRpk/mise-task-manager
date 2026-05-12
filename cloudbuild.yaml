@@ -1,0 +1,114 @@
+steps:
+  - name: 'node:22-alpine'
+    id: 'run-tests'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        npm ci --prefer-offline --no-audit
+        npm run test:ci
+    timeout: 600s
+    env:
+      - 'CI=true'
+
+  # Configure Docker credential helper for Artifact Registry — mounted volume
+  # persists the config.json into all subsequent Docker steps.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'configure-docker'
+    entrypoint: gcloud
+    args:
+      - 'auth'
+      - 'configure-docker'
+      - 'europe-west1-docker.pkg.dev'
+      - '--quiet'
+    volumes:
+      - name: docker-config
+        path: /root/.docker
+    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-image'
+    args:
+      - 'build'
+      - '--cache-from=europe-west1-docker.pkg.dev/$PROJECT_ID/hf-tasks/hf-tasks:latest'
+      - '--build-arg=BUILDKIT_INLINE_CACHE=1'
+      - '--build-arg=SKIP_PREBUILD=1'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/$PROJECT_ID/hf-tasks/hf-tasks:$_TAG'
+      - '-t'
+      - 'europe-west1-docker.pkg.dev/$PROJECT_ID/hf-tasks/hf-tasks:latest'
+      - '.'
+    volumes:
+      - name: docker-config
+        path: /root/.docker
+    timeout: 1200s
+    waitFor: ['run-tests', 'configure-docker']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-sha'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/$PROJECT_ID/hf-tasks/hf-tasks:$_TAG'
+    volumes:
+      - name: docker-config
+        path: /root/.docker
+    waitFor: ['build-image']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-latest'
+    args:
+      - 'push'
+      - 'europe-west1-docker.pkg.dev/$PROJECT_ID/hf-tasks/hf-tasks:latest'
+    volumes:
+      - name: docker-config
+        path: /root/.docker
+    waitFor: ['build-image']
+
+  # Public Cloud Run invoker is INTENTIONAL — see SECURITY.md.
+  # Auth is enforced at the application layer (Firebase Auth + @hellofresh.de
+  # domain restriction) on every page and API route. This is the standard
+  # HelloFresh Next.js + Firebase Hosting + Cloud Run pattern, documented in
+  # the `deploying-nextjs-to-cloud-run` skill.
+  #
+  # DO NOT change `--allow-unauthenticated` to `--no-allow-unauthenticated`
+  # without first removing the Firebase Hosting rewrite — anonymous browser
+  # requests will otherwise hit a Google Frontend 403 before Next.js can show
+  # the login page, taking the whole site down.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-cloud-run'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'hf-tasks'
+      - '--image'
+      - 'europe-west1-docker.pkg.dev/$PROJECT_ID/hf-tasks/hf-tasks:$_TAG'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,NEXT_TELEMETRY_DISABLED=1'
+      - '--update-secrets'
+      - >-
+        GOOGLE_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID:latest,
+        GOOGLE_CLIENT_SECRET=GOOGLE_OAUTH_CLIENT_SECRET:latest,
+        GOOGLE_REDIRECT_URI=GOOGLE_REDIRECT_URI:latest,
+        NEXT_PUBLIC_APP_URL=NEXT_PUBLIC_APP_URL:latest
+    waitFor: ['push-sha', 'push-latest']
+
+images:
+  - 'europe-west1-docker.pkg.dev/$PROJECT_ID/hf-tasks/hf-tasks:$_TAG'
+  - 'europe-west1-docker.pkg.dev/$PROJECT_ID/hf-tasks/hf-tasks:latest'
+
+substitutions:
+  _TAG: 'manual-build'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+  env:
+    - 'DOCKER_BUILDKIT=1'
+
+timeout: 1800s
