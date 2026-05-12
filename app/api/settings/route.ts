@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
       if (!userSettingsDoc.exists) {
         // Return default settings
         const defaultSettings: UserSettings = {
+          email: user.email,
           colorScheme: 'hellofresh',
           displayName: user.displayName,
           timezone: 'Europe/Berlin',
@@ -65,6 +66,7 @@ export async function PUT(request: NextRequest) {
       const userSettingsRef = adminDb.collection('userSettings').doc(user.uid);
 
       const settings: UserSettings = {
+        email: user.email || body.email,
         colorScheme: body.colorScheme || 'hellofresh',
         displayName: body.displayName || user.displayName,
         timezone: body.timezone || 'Europe/Berlin',

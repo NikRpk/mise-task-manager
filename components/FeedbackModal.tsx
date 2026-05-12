@@ -35,12 +35,10 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
     try {
       const payload = {
+        tool: 'Mise - Task and Notes',
         type: type.charAt(0).toUpperCase() + type.slice(1), // Capitalize first letter
         message: message.trim(),
-        tool: 'Note & Task Manager',
-        user: user?.email || 'Unknown user',
-        userName: user?.displayName || 'Unknown',
-        timestamp: new Date().toISOString(),
+        user: user?.email || 'unknown@example.com',
       };
 
       const response = await fetch('/api/feedback', {

@@ -14,10 +14,13 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state'); // Contains user ID
     const error = searchParams.get('error');
     
-    // Get the proper base URL from the request headers
-    const host = request.headers.get('host') || 'hf-tasks-4e5l57e4iq-ew.a.run.app';
-    const protocol = request.headers.get('x-forwarded-proto') || 'https';
-    const baseUrl = `${protocol}://${host}`;
+    // Get the proper base URL from environment variable or request headers
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+      (() => {
+        const host = request.headers.get('host');
+        const protocol = request.headers.get('x-forwarded-proto') || 'https';
+        return host ? `${protocol}://${host}` : 'https://hf-tasks.web.app';
+      })();
     
     // Check if user denied access
     if (error) {
@@ -51,9 +54,12 @@ export async function GET(request: NextRequest) {
     logger.error('OAuth callback error', error as Error);
     
     // Use proper base URL for error redirect too
-    const host = request.headers.get('host') || 'hf-tasks-4e5l57e4iq-ew.a.run.app';
-    const protocol = request.headers.get('x-forwarded-proto') || 'https';
-    const baseUrl = `${protocol}://${host}`;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+      (() => {
+        const host = request.headers.get('host');
+        const protocol = request.headers.get('x-forwarded-proto') || 'https';
+        return host ? `${protocol}://${host}` : 'https://hf-tasks.web.app';
+      })();
     
     return NextResponse.redirect(
       new URL('/settings?section=profile&calendar=error', baseUrl)

@@ -4,6 +4,7 @@
  */
 
 import { WebClient } from '@slack/web-api';
+import Handlebars from 'handlebars';
 import { NoteTask, Task, Priority } from '@/types';
 import { logger } from './logger';
 
@@ -31,7 +32,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 ---
 *🔴 OVERDUE ({{overdueCount}} task{{#unless singleOverdue}}s{{/unless}})*
 {{#each overdueTasks}}
-- {{title}}
+• {{title}}
 {{/each}}
 {{/if}}
 
@@ -39,7 +40,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 ---
 *📅 DUE TODAY ({{todayCount}} task{{#unless singleToday}}s{{/unless}})*
 {{#each todayTasks}}
-- {{title}}
+• {{title}}
 {{/each}}
 {{/if}}
 
@@ -47,7 +48,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 ---
 *📆 DUE TOMORROW ({{tomorrowCount}} task{{#unless singleTomorrow}}s{{/unless}})*
 {{#each tomorrowTasks}}
-- {{title}}
+• {{title}}
 {{/each}}
 {{/if}}
 
@@ -56,55 +57,14 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 };
 
 /**
- * Replaces template variables with actual values
- * Supports basic Slack markdown
- * @param template - Template string with variables
+ * Renders a Handlebars template with given variables
+ * @param template - Handlebars template string
  * @param variables - Object with variable values
  * @returns Rendered string
  */
 function renderTemplate(template: string, variables: Record<string, unknown>): string {
-  let result = template;
-  
-  // Replace simple variables {{varName}}
-  result = result.replace(/\{\{([^#/}]+)\}\}/g, (match, varName) => {
-    const trimmedVarName = varName.trim();
-    const value = variables[trimmedVarName];
-    return value !== undefined && value !== null ? String(value) : '';
-  });
-  
-  // Handle {{#if condition}} blocks
-  result = result.replace(/\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (match, condition, content) => {
-    return variables[condition] ? content : '';
-  });
-  
-  // Handle {{#unless condition}} blocks
-  result = result.replace(/\{\{#unless\s+(\w+)\}\}([\s\S]*?)\{\{\/unless\}\}/g, (match, condition, content) => {
-    return !variables[condition] ? content : '';
-  });
-  
-  // Handle {{#each array}} blocks
-  result = result.replace(/\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (match, arrayName, itemTemplate) => {
-    const array = variables[arrayName];
-    if (!Array.isArray(array) || array.length === 0) return '';
-    
-    return array.map(item => {
-      let itemResult = itemTemplate;
-      // Replace variables within the item
-      if (typeof item === 'object' && item !== null) {
-        Object.keys(item).forEach(key => {
-          const value = (item as Record<string, unknown>)[key];
-          itemResult = itemResult.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), 
-            value !== undefined && value !== null ? String(value) : '');
-        });
-      }
-      return itemResult;
-    }).join('');
-  });
-  
-  // Clean up empty lines
-  result = result.replace(/\n\s*\n\s*\n/g, '\n\n');
-  
-  return result.trim();
+  const compiledTemplate = Handlebars.compile(template);
+  return compiledTemplate(variables);
 }
 
 /**
@@ -554,15 +514,33 @@ export async function sendDailyTaskReminder(
       singleTask: totalTasks === 1,
       appUrl,
       // Overdue tasks
-      overdueTasks: tasks.overdue.length > 0 ? tasks.overdue.map(t => ({ title: t.title || t.description })) : null,
+      overdueTasks: tasks.overdue.length > 0 ? tasks.overdue.map(t => {
+        const taskTitle = t.title || t.description || 'Untitled task';
+        const projectName = t.projectId ? projectNames.get(t.projectId) : null;
+        return { 
+          title: projectName ? `${taskTitle} (${projectName})` : taskTitle
+        };
+      }) : null,
       overdueCount: tasks.overdue.length,
       singleOverdue: tasks.overdue.length === 1,
       // Today tasks
-      todayTasks: tasks.today.length > 0 ? tasks.today.map(t => ({ title: t.title || t.description })) : null,
+      todayTasks: tasks.today.length > 0 ? tasks.today.map(t => {
+        const taskTitle = t.title || t.description || 'Untitled task';
+        const projectName = t.projectId ? projectNames.get(t.projectId) : null;
+        return { 
+          title: projectName ? `${taskTitle} (${projectName})` : taskTitle
+        };
+      }) : null,
       todayCount: tasks.today.length,
       singleToday: tasks.today.length === 1,
       // Tomorrow tasks
-      tomorrowTasks: tasks.tomorrow.length > 0 ? tasks.tomorrow.map(t => ({ title: t.title || t.description })) : null,
+      tomorrowTasks: tasks.tomorrow.length > 0 ? tasks.tomorrow.map(t => {
+        const taskTitle = t.title || t.description || 'Untitled task';
+        const projectName = t.projectId ? projectNames.get(t.projectId) : null;
+        return { 
+          title: projectName ? `${taskTitle} (${projectName})` : taskTitle
+        };
+      }) : null,
       tomorrowCount: tasks.tomorrow.length,
       singleTomorrow: tasks.tomorrow.length === 1,
     };

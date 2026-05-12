@@ -99,7 +99,10 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
       const firstDay = new Date(year, month, 1);
       const lastDay = new Date(year, month + 1, 0);
       const daysInMonth = lastDay.getDate();
-      const startingDayOfWeek = firstDay.getDay();
+      
+      // Convert Sunday (0) to 7, so Monday becomes 1 and Sunday becomes 7
+      let startingDayOfWeek = firstDay.getDay();
+      startingDayOfWeek = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
 
       const days: (Date | null)[] = [];
 
@@ -199,10 +202,11 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
           {/* Custom Calendar Popup */}
           {showCalendar && (
             <div
-              className="absolute z-50 mt-2 bg-white rounded-lg shadow-xl border left-0 right-0"
+              className="absolute z-50 mt-2 bg-white rounded-lg shadow-xl border"
               style={{
                 borderColor: 'var(--color-border)',
-                minWidth: '280px',
+                width: '280px',
+                left: 0,
               }}
             >
               {/* Calendar Header */}
@@ -232,7 +236,7 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
               <div className="p-3">
                 {/* Day names */}
                 <div className="grid grid-cols-7 gap-1 mb-2">
-                  {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                  {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(day => (
                     <div key={day} className="text-center text-xs font-medium p-1" style={{ color: 'var(--color-text-secondary)' }}>
                       {day}
                     </div>

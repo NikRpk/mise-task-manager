@@ -1,15 +1,15 @@
-# HelloFresh Task Manager
+# Mise - Task and Notes
 
-An internal task management system for HelloFresh, built with Next.js, Firebase, and Tailwind CSS.
+A task management and note-taking system, built with Next.js, Firebase, and Tailwind CSS.
 
 ## Features
 
-- 🔐 **Google Authentication** - Sign in with your HelloFresh Google account
+- 🔐 **Google Authentication** - Sign in with your Google account
 - 📋 **Project Management** - Create and manage multiple projects
 - ✅ **Task Tracking** - Kanban-style task boards with drag-and-drop
 - 👥 **Team Collaboration** - Share projects with role-based permissions (VIEW/EDIT/ADMIN)
 - ⚙️ **Project-Specific Settings** - Custom status options, priorities, and fields per project
-- 🎨 **Multiple Color Schemes** - Choose from HelloFresh Green, Ocean Blue, Dark Mode, or Minimal Grey
+- 🎨 **Multiple Color Schemes** - Choose from Classic Green, Ocean Blue, Dark Mode, or Minimal Grey
 - 📱 **Fully Responsive** - Works seamlessly on desktop, tablet, and mobile
 
 ## Tech Stack
@@ -27,7 +27,7 @@ An internal task management system for HelloFresh, built with Next.js, Firebase,
 
 - Node.js 18+ and npm
 - Firebase project set up (see `FIREBASE_SETUP.md`)
-- HelloFresh Google Workspace account
+- Google Workspace account
 
 ### Installation
 
@@ -85,7 +85,7 @@ hf-task-manager/
 
 ### Authentication
 
-The app uses Firebase Authentication with Google Sign-In. Only users with HelloFresh Google accounts can access the system (enforced via IAM).
+The app uses Firebase Authentication with Google Sign-In.
 
 ### Projects
 
@@ -222,12 +222,12 @@ npm run firebase:indexes
 
 ## Contributing
 
-This is an internal HelloFresh tool. For feature requests or bug reports, contact the development team.
+For feature requests or bug reports, use the in-app feedback button.
 
 ## License
 
-Internal use only - HelloFresh GmbH
+Proprietary
 
 ---
 
-Built with ❤️ for HelloFresh
+Built with ❤️

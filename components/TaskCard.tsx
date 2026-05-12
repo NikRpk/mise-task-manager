@@ -127,8 +127,6 @@ const TaskCard = memo(function TaskCard({
     ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
         zIndex: 999,
-        backfaceVisibility: 'hidden' as const,
-        WebkitFontSmoothing: 'antialiased' as const,
       }
     : {};
   
@@ -194,7 +192,7 @@ const TaskCard = memo(function TaskCard({
           borderTopColor: isDragging ? '#cbd5e1' : '#e2e8f0',
           borderBottomColor: isDragging ? '#cbd5e1' : '#e2e8f0',
           transition: isDragging ? 'none' : 'box-shadow 0.15s ease, background-color 0.15s ease',
-          willChange: 'transform',
+          willChange: isDragging ? 'transform' : 'auto',
           ...dragStyle
         }}
       >
@@ -269,7 +267,7 @@ const TaskCard = memo(function TaskCard({
           borderTopColor: isDragging ? '#cbd5e1' : '#e2e8f0',
           borderBottomColor: isDragging ? '#cbd5e1' : '#e2e8f0',
           transition: isCompleting ? 'none' : (isDragging ? 'none' : 'box-shadow 0.15s ease, background-color 0.15s ease'),
-          willChange: 'transform',
+          willChange: isDragging ? 'transform' : 'auto',
           minHeight: '52px',
           ...dragStyle
         }}

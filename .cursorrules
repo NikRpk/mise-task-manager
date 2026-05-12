@@ -1,6 +1,6 @@
 # Project Context
 
-* **Goal:** Build production-ready internal tools for HelloFresh that are secure, maintainable, and professional.
+* **Goal:** Build production-ready internal tools that are secure, maintainable, and professional.
 
 * **Aesthetic:** "Clean Admin" (Stripe/Shopify inspired). High clarity, clean typography, generous whitespace.
 
@@ -77,7 +77,7 @@ Use CSS variables (not Tailwind classes directly) for consistency:
 --color-surface: #ffffff       /* Card backgrounds */
 --color-text: #0f172a         /* Primary text */
 --color-text-secondary: #64748b /* Secondary text */
---color-primary: #009646       /* HelloFresh Green */
+--color-primary: #009646       /* Primary Green */
 --color-secondary: #125034     /* Deep Green */
 --color-border: #e2e8f0       /* Borders */
 --color-success: #00a61c
