@@ -22,7 +22,7 @@ export interface ColorScheme {
 
 export const colorSchemes: ColorScheme[] = [
   {
-    id: 'hellofresh',
+    id: 'mise',
     name: 'Classic Green',
     primary: '#009646',
     secondary: '#125034',
@@ -236,13 +236,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           const data = await res.json();
           if (data.colorScheme) {
-            // Check if it's a custom scheme
             if (data.colorScheme === 'custom' && data.customColorScheme) {
               setCurrentScheme(data.customColorScheme);
               applyScheme(data.customColorScheme);
             } else {
-              // Load predefined scheme
-              const scheme = colorSchemes.find(s => s.id === data.colorScheme);
+              // 'hellofresh' is the legacy ID for 'mise' — treat them as the same
+              const resolvedId = data.colorScheme === 'hellofresh' ? 'mise' : data.colorScheme;
+              const scheme = colorSchemes.find(s => s.id === resolvedId);
               if (scheme) {
                 setCurrentScheme(scheme);
                 applyScheme(scheme);
@@ -270,7 +270,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setScheme = (schemeId: string) => {
-    const scheme = colorSchemes.find(s => s.id === schemeId);
+    // 'hellofresh' is the legacy ID for 'mise'
+    const resolvedId = schemeId === 'hellofresh' ? 'mise' : schemeId;
+    const scheme = colorSchemes.find(s => s.id === resolvedId);
     if (scheme) {
       setCurrentScheme(scheme);
       applyScheme(scheme);

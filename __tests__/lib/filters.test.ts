@@ -15,7 +15,6 @@ function createMockTask(overrides: Partial<Task> = {}): Task {
     subTasks: [],
     deadline: null,
     status: 'todo',
-    links: [],
     owner: 'John Doe',
     projectId: 'project-1',
     priority: 'medium',
@@ -65,41 +64,50 @@ describe('filterTasks', () => {
 
     test('filters today tasks correctly', () => {
       const tasks = [
-        createMockTask({ id: '1', deadline: '2026-02-03T10:00:00Z' }), // today
-        createMockTask({ id: '2', deadline: '2026-02-02T10:00:00Z' }), // yesterday
-        createMockTask({ id: '3', deadline: '2026-02-04T10:00:00Z' }), // tomorrow
+        createMockTask({ id: '1', deadline: '2026-02-03T10:00:00Z', status: 'todo' }), // today
+        createMockTask({ id: '2', deadline: '2026-02-02T10:00:00Z', status: 'todo' }), // yesterday (overdue, included)
+        createMockTask({ id: '3', deadline: '2026-02-04T10:00:00Z', status: 'todo' }), // tomorrow (excluded)
+        createMockTask({ id: '4', deadline: '2026-02-01T10:00:00Z', status: 'done' }), // past but done (excluded)
       ];
 
       const result = filterTasks(tasks, { deadline: 'today' });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('1');
+      // today + overdue non-done tasks are included
+      expect(result).toHaveLength(2);
+      expect(result.map(t => t.id)).toContain('1');
+      expect(result.map(t => t.id)).toContain('2');
     });
 
     test('filters this-week tasks correctly', () => {
       const tasks = [
-        createMockTask({ id: '1', deadline: '2026-02-05T00:00:00Z' }), // within week
-        createMockTask({ id: '2', deadline: '2026-02-11T00:00:00Z' }), // next week
-        createMockTask({ id: '3', deadline: '2026-02-01T00:00:00Z' }), // past
+        createMockTask({ id: '1', deadline: '2026-02-05T00:00:00Z', status: 'todo' }), // within week
+        createMockTask({ id: '2', deadline: '2026-02-11T00:00:00Z', status: 'todo' }), // next week (excluded)
+        createMockTask({ id: '3', deadline: '2026-02-01T00:00:00Z', status: 'todo' }), // past overdue (included)
+        createMockTask({ id: '4', deadline: '2026-02-01T00:00:00Z', status: 'done' }), // past but done (excluded)
       ];
 
       const result = filterTasks(tasks, { deadline: 'this-week' });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('1');
+      // within-week + overdue non-done tasks are included
+      expect(result).toHaveLength(2);
+      expect(result.map(t => t.id)).toContain('1');
+      expect(result.map(t => t.id)).toContain('3');
     });
 
     test('filters this-month tasks correctly', () => {
       const tasks = [
-        createMockTask({ id: '1', deadline: '2026-02-15T00:00:00Z' }), // this month
-        createMockTask({ id: '2', deadline: '2026-03-05T00:00:00Z' }), // next month
-        createMockTask({ id: '3', deadline: '2026-01-15T00:00:00Z' }), // last month
+        createMockTask({ id: '1', deadline: '2026-02-15T00:00:00Z', status: 'todo' }), // this month
+        createMockTask({ id: '2', deadline: '2026-03-05T00:00:00Z', status: 'todo' }), // next month (excluded)
+        createMockTask({ id: '3', deadline: '2026-01-15T00:00:00Z', status: 'todo' }), // last month overdue (included)
+        createMockTask({ id: '4', deadline: '2026-01-15T00:00:00Z', status: 'done' }), // last month but done (excluded)
       ];
 
       const result = filterTasks(tasks, { deadline: 'this-month' });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('1');
+      // this-month + overdue non-done tasks are included
+      expect(result).toHaveLength(2);
+      expect(result.map(t => t.id)).toContain('1');
+      expect(result.map(t => t.id)).toContain('3');
     });
 
     test('filters future tasks correctly', () => {
@@ -255,6 +263,45 @@ describe('filterTasks', () => {
       });
 
       expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('Topic Filtering', () => {
+    test('returns tasks that match the specified topic', () => {
+      const tasks = [
+        createMockTask({ id: '1', topicId: 'topic-a' }),
+        createMockTask({ id: '2', topicId: 'topic-b' }),
+      ];
+      const result = filterTasks(tasks, { topic: ['topic-a'] });
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('1');
+    });
+
+    test('excludes tasks without a topicId when topic filter is active', () => {
+      const tasks = [
+        createMockTask({ id: '1', topicId: undefined }),
+        createMockTask({ id: '2', topicId: 'topic-a' }),
+      ];
+      const result = filterTasks(tasks, { topic: ['topic-a'] });
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('2');
+    });
+
+    test('excludes tasks whose topicId is not in the filter list', () => {
+      const tasks = [
+        createMockTask({ id: '1', topicId: 'topic-z' }),
+      ];
+      const result = filterTasks(tasks, { topic: ['topic-a', 'topic-b'] });
+      expect(result).toHaveLength(0);
+    });
+
+    test('skips topic filter when topic array is empty', () => {
+      const tasks = [
+        createMockTask({ id: '1', topicId: 'topic-a' }),
+        createMockTask({ id: '2', topicId: undefined }),
+      ];
+      const result = filterTasks(tasks, { topic: [] });
+      expect(result).toHaveLength(2);
     });
   });
 

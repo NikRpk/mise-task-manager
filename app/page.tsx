@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { DndContext, DragEndEvent, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { Plus, Settings, LayoutGrid, List, X, Search, FileText, Trash2, Edit, Calendar, Menu, MessageSquare, LogOut, Zap } from 'lucide-react';
 import Link from 'next/link';
-import { Task, TaskStatus, Note, Priority } from '@/types';
+import { Task, TaskStatus, Note, Priority, TopicOption } from '@/types';
+import { FilterPills } from '@/components/ui';
 import TaskCard from '@/components/TaskCard';
 import TaskModal from '@/components/TaskModal';
 import ProjectSelector from '@/components/ProjectSelector';
@@ -29,6 +30,7 @@ import { useDailyStats } from '@/hooks/useDailyStats';
 import { useNoteData } from '@/hooks/useNoteData';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useRealtimeListeners } from '@/lib/realtime-listeners';
+import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { DEFAULT_TIMEZONE } from '@/lib/constants';
@@ -36,7 +38,8 @@ import {
   DRAG_ACTIVATION_DISTANCE, 
   DRAG_ACTIVATION_DELAY, 
   DRAG_ACTIVATION_TOLERANCE,
-  DEFAULT_STATUS_OPTIONS 
+  DEFAULT_STATUS_OPTIONS,
+  DEFAULT_TASK_COLOR_FIELD,
 } from '@/lib/constants';
 
 interface StatusOption {
@@ -47,6 +50,12 @@ interface StatusOption {
 }
 
 type ViewMode = 'tasks' | 'notes';
+
+const PRIORITY_FILTER_OPTIONS = [
+  { value: 'high' as Priority, label: 'High', color: '#ef4444' },
+  { value: 'medium' as Priority, label: 'Medium', color: '#f59e0b' },
+  { value: 'low' as Priority, label: 'Low', color: '#94a3b8' },
+];
 
 function HomePage() {
   const searchParams = useSearchParams();
@@ -72,6 +81,9 @@ function HomePage() {
     saveTask,
     deleteTask,
   } = useTaskData(selectedProjectId, user?.uid);
+
+  // Prefetch calendar events in the background so they're ready when creating a note
+  useCalendarEvents(user?.uid);
   
   const {
     searchQuery,
@@ -80,6 +92,7 @@ function HomePage() {
     setFilters,
     filteredTasks,
     owners,
+    hiddenTaskCount,
   } = useTaskFilters(tasks);
   
   // Notes data
@@ -104,6 +117,8 @@ function HomePage() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusColumns, setStatusColumns] = useState<StatusOption[]>([]);
+  const [topicOptions, setTopicOptions] = useState<TopicOption[]>([]);
+  const [taskColorField, setTaskColorField] = useState<'status' | 'topic' | 'priority'>(DEFAULT_TASK_COLOR_FIELD);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [viewModeCompact, setViewModeCompact] = useState<'normal' | 'compact'>('normal');
   const [showOwner, setShowOwner] = useState(false);
@@ -135,6 +150,7 @@ function HomePage() {
     userId: user?.uid,
     selectedProjectId,
     enabled: true,
+    onTasksChanged: fetchTasks,
   });
   
   // Input dialog states
@@ -153,7 +169,6 @@ function HomePage() {
   const fetchProjectSettings = useCallback(async () => {
     if (!selectedProjectId) return;
 
-    // Helper to convert constants to StatusOption format
     const getDefaultStatusColumns = () => DEFAULT_STATUS_OPTIONS.map(opt => ({
       id: opt.id,
       label: opt.label,
@@ -162,7 +177,6 @@ function HomePage() {
     }));
 
     try {
-      // Use combined endpoint that fetches both project and settings
       const res = await authenticatedFetch(`/api/projects/${selectedProjectId}/full`);
       const data = await res.json();
       
@@ -180,16 +194,29 @@ function HomePage() {
           color: opt.color,
         })));
       } else {
-        // Fallback to default columns from constants
         setStatusColumns(getDefaultStatusColumns());
+      }
+
+      if (data.settings?.topicOptions && Array.isArray(data.settings.topicOptions)) {
+        setTopicOptions(data.settings.topicOptions as TopicOption[]);
+      } else {
+        setTopicOptions([]);
+      }
+
+
+      if (data.settings?.taskColorField) {
+        setTaskColorField(data.settings.taskColorField as 'status' | 'topic' | 'priority');
+      } else {
+        setTaskColorField(DEFAULT_TASK_COLOR_FIELD);
       }
     } catch (error) {
       logger.error('Failed to fetch project settings', error as Error, {
         projectId: selectedProjectId,
         userId: user?.uid,
       });
-      // Fallback to default columns from constants
       setStatusColumns(getDefaultStatusColumns());
+      setTopicOptions([]);
+      setTaskColorField(DEFAULT_TASK_COLOR_FIELD);
     }
   }, [selectedProjectId, user?.uid]);
 
@@ -266,19 +293,23 @@ function HomePage() {
   }, [pendingProjectName, createProjectApi]);
 
   const handleSaveTask = useCallback(async (taskData: Partial<Task>) => {
-    const taskWithMetadata = {
+    // Owner is stored as email (canonical ID). Only fall back to the current
+    // user's email when the caller did not provide an explicit owner — never
+    // overwrite an existing one, otherwise edits would clobber assignments
+    // and break the daily reminder cron, which looks up tasks by email.
+    const taskWithMetadata: Partial<Task> = {
       ...taskData,
       projectId: selectedProjectId!,
-      owner: user?.displayName || 'Unknown',
+      owner: taskData.owner || user?.email || '',
     };
-    
+
     try {
       await saveTask(taskWithMetadata);
     } catch (error) {
       // Error already logged in hook
       // Could show error toast here
     }
-  }, [selectedProjectId, user?.displayName, saveTask]);
+  }, [selectedProjectId, user?.email, saveTask]);
   
   // Optimistic update callback for auto-save changes (title, description, etc.)
   const handleOptimisticUpdate = useCallback((taskId: string, updates: Partial<Task>) => {
@@ -414,34 +445,57 @@ function HomePage() {
   const tasksByStatus = useMemo(() => {
     // Priority order: high > medium > low
     const priorityOrder = { high: 1, medium: 2, low: 3 };
-    
-    return statusColumns.reduce((acc, column) => {
-      const tasksInColumn = filteredTasks.filter(t => t.status === column.value);
-      
-      // Sort tasks: first by deadline (closest first), then by priority
-      const sortedTasks = tasksInColumn.sort((a, b) => {
-        // 1. Sort by deadline (tasks with deadlines come first, sorted by date)
+
+    const sortTasks = (tasksToSort: Task[]) =>
+      [...tasksToSort].sort((a, b) => {
         if (a.deadline && b.deadline) {
-          // Both have deadlines - compare dates
           return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
         } else if (a.deadline && !b.deadline) {
-          // a has deadline, b doesn't - a comes first
           return -1;
         } else if (!a.deadline && b.deadline) {
-          // b has deadline, a doesn't - b comes first
           return 1;
         }
-        
-        // 2. Neither has deadline (or same deadline) - sort by priority
         const aPriority = a.priority || 'low';
         const bPriority = b.priority || 'low';
         return priorityOrder[aPriority] - priorityOrder[bPriority];
       });
-      
-      acc[column.value] = sortedTasks;
+
+    const result = statusColumns.reduce((acc, column) => {
+      acc[column.value] = sortTasks(filteredTasks.filter(t => t.status === column.value));
       return acc;
     }, {} as Record<Task['status'], Task[]>);
+
+    // Tasks whose status no longer maps to any column fall into the first column
+    if (statusColumns.length > 0) {
+      const validStatuses = new Set(statusColumns.map(c => c.value));
+      const firstColumnValue = statusColumns[0].value;
+      const orphaned = filteredTasks.filter(t => !validStatuses.has(t.status));
+      if (orphaned.length > 0) {
+        result[firstColumnValue] = sortTasks([...(result[firstColumnValue] || []), ...orphaned]);
+      }
+    }
+
+    return result;
   }, [filteredTasks, statusColumns]);
+
+  // Priority colours for the task card colour resolver
+  const priorityColorMap: Record<Priority, string> = {
+    high: '#ef4444',
+    medium: '#f59e0b',
+    low: '#94a3b8',
+  };
+
+  // Resolves the task card border colour based on the project's taskColorField setting
+  const getTaskColor = useCallback((task: Task): string | undefined => {
+    if (taskColorField === 'priority') {
+      return priorityColorMap[task.priority] ?? undefined;
+    }
+    if (taskColorField === 'topic') {
+      return topicOptions.find(t => t.id === task.topicId)?.color ?? undefined;
+    }
+    // Default: status colour (same as column colour)
+    return statusColumns.find(c => c.value === task.status)?.color ?? undefined;
+  }, [taskColorField, topicOptions, statusColumns]);
 
   if (projectsLoading) {
     return (
@@ -460,36 +514,50 @@ function HomePage() {
         <div className="min-h-screen" style={{ backgroundColor: '#f8fafc' }}>
           <main className="px-5 py-4">
             <div className="bg-white rounded-xl border mb-4 shadow-sm" style={{ borderColor: '#e2e8f0' }}>
-              <div className="flex justify-between items-center px-5 py-3" style={{ borderBottom: '3px solid var(--color-primary)' }}>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-lg font-semibold" style={{ color: '#0f172a' }}>Task Manager</h1>
-                  {/* Tasks/Notes Toggle */}
-                  <div className="inline-flex items-center bg-gray-100 rounded-full p-1 ml-4">
+              <div className="flex justify-between items-center px-5 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <div className="flex items-center gap-6">
+                  <div className="text-xl font-light tracking-tight" style={{ color: '#0f172a', fontWeight: 300 }}>
+                    mise
+                  </div>
+                  {/* Tabs */}
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => setCurrentView('tasks')}
-                      className="px-3 py-1 text-sm rounded-full transition-all duration-200"
+                      className="px-4 py-2 text-sm transition-all duration-200 relative"
                       style={{ 
-                        backgroundColor: currentView === 'tasks' ? 'var(--color-primary)' : 'transparent',
-                        color: currentView === 'tasks' ? 'white' : 'var(--color-text-secondary)',
-                        fontWeight: currentView === 'tasks' ? 600 : 400,
+                        color: currentView === 'tasks' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                        fontWeight: currentView === 'tasks' ? 500 : 400,
                         border: 'none',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        background: 'transparent'
                       }}
                     >
                       Tasks
+                      {currentView === 'tasks' && (
+                        <div 
+                          className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                          style={{ backgroundColor: 'var(--color-primary)' }}
+                        />
+                      )}
                     </button>
                     <button
                       onClick={() => setCurrentView('notes')}
-                      className="px-3 py-1 text-sm rounded-full transition-all duration-200"
+                      className="px-4 py-2 text-sm transition-all duration-200 relative"
                       style={{ 
-                        backgroundColor: currentView === 'notes' ? 'var(--color-primary)' : 'transparent',
-                        color: currentView === 'notes' ? 'white' : 'var(--color-text-secondary)',
-                        fontWeight: currentView === 'notes' ? 600 : 400,
+                        color: currentView === 'notes' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                        fontWeight: currentView === 'notes' ? 500 : 400,
                         border: 'none',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        background: 'transparent'
                       }}
                     >
-                      Notes
+                      Meetings
+                      {currentView === 'notes' && (
+                        <div 
+                          className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                          style={{ backgroundColor: 'var(--color-primary)' }}
+                        />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -508,11 +576,11 @@ function HomePage() {
                   </div>
                   
                   <h2 className="text-2xl font-bold mb-3" style={{ color: 'var(--color-text)' }}>
-                    No Notes Yet
+                    No Meetings Yet
                   </h2>
                   
                   <p className="text-gray-600 mb-6">
-                    Notes are only available after creating a project. Create your first project to get started.
+                    Meetings are only available after creating a project. Create your first project to get started.
                   </p>
                   
                   <button
@@ -602,37 +670,56 @@ function HomePage() {
         {/* Page Header with Filters */}
         <div className="rounded-xl border mb-4 shadow-sm flex-shrink-0" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
           {/* Top Bar */}
-          <div className="flex justify-between items-center px-5 py-3" style={{ borderBottom: '3px solid var(--color-primary)' }}>
+          <div className="flex justify-between items-center px-5 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
             {/* Desktop View */}
-            <div className="hidden md:flex items-center gap-3 flex-1">
-              <div className="inline-flex items-center bg-gray-100 rounded-full p-1">
+            <div className="hidden md:flex items-center gap-6 flex-1">
+              {/* Logo */}
+              <div className="text-xl font-light tracking-tight" style={{ color: 'var(--color-text)', fontWeight: 300 }}>
+                mise
+              </div>
+              
+              {/* Tabs */}
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentView('tasks')}
-                  className="px-3 py-1 text-sm rounded-full transition-all duration-200"
+                  className="px-4 py-2 text-sm transition-all duration-200 relative"
                   style={{ 
-                    backgroundColor: currentView === 'tasks' ? 'var(--color-primary)' : 'transparent',
-                    color: currentView === 'tasks' ? 'white' : 'var(--color-text-secondary)',
-                    fontWeight: currentView === 'tasks' ? 600 : 400,
+                    color: currentView === 'tasks' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                    fontWeight: currentView === 'tasks' ? 500 : 400,
                     border: 'none',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    background: 'transparent'
                   }}
                 >
                   Tasks
+                  {currentView === 'tasks' && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    />
+                  )}
                 </button>
                 <button
                   onClick={() => setCurrentView('notes')}
-                  className="px-3 py-1 text-sm rounded-full transition-all duration-200"
+                  className="px-4 py-2 text-sm transition-all duration-200 relative"
                   style={{ 
-                    backgroundColor: currentView === 'notes' ? 'var(--color-primary)' : 'transparent',
-                    color: currentView === 'notes' ? 'white' : 'var(--color-text-secondary)',
-                    fontWeight: currentView === 'notes' ? 600 : 400,
+                    color: currentView === 'notes' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                    fontWeight: currentView === 'notes' ? 500 : 400,
                     border: 'none',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    background: 'transparent'
                   }}
                 >
-                  Notes
+                  Meetings
+                  {currentView === 'notes' && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    />
+                  )}
                 </button>
               </div>
+              
               {currentView === 'tasks' && (
                 <div key="project-selector" className="border-l pl-4 animate-fadeIn" style={{ borderColor: 'var(--color-border)' }}>
                   <ProjectSelector
@@ -645,30 +732,54 @@ function HomePage() {
               )}
             </div>
             
-            {/* Mobile View - New Task/Note Button */}
-            <div className="flex md:hidden items-center gap-2 flex-1">
-              {/* New Task/Note Button */}
-              {currentView === 'tasks' ? (
+            {/* Mobile View */}
+            <div className="flex md:hidden items-center gap-4 flex-1">
+              {/* Logo */}
+              <div className="text-lg font-light tracking-tight" style={{ color: 'var(--color-text)', fontWeight: 300 }}>
+                mise
+              </div>
+              
+              {/* Tabs */}
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={handleNewTask}
-                  disabled={!permissions.canEdit}
-                  className="px-3 py-1.5 text-sm rounded-md transition-all duration-200 flex items-center gap-1.5 font-medium text-white disabled:opacity-50"
-                  style={{ backgroundColor: permissions.canEdit ? 'var(--color-primary)' : '#94a3b8' }}
-                  title={!permissions.canEdit ? 'You need EDIT permission' : 'Create task'}
+                  onClick={() => setCurrentView('tasks')}
+                  className="px-3 py-1.5 text-sm transition-all duration-200 relative"
+                  style={{ 
+                    color: currentView === 'tasks' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                    fontWeight: currentView === 'tasks' ? 500 : 400,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: 'transparent'
+                  }}
                 >
-                  <Plus size={16} />
-                  <span>New Task</span>
+                  Tasks
+                  {currentView === 'tasks' && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    />
+                  )}
                 </button>
-              ) : (
                 <button
-                  onClick={handleNewNote}
-                  className="px-3 py-1.5 text-sm rounded-md transition-all duration-200 flex items-center gap-1.5 font-medium text-white"
-                  style={{ backgroundColor: 'var(--color-primary)' }}
+                  onClick={() => setCurrentView('notes')}
+                  className="px-3 py-1.5 text-sm transition-all duration-200 relative"
+                  style={{ 
+                    color: currentView === 'notes' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                    fontWeight: currentView === 'notes' ? 500 : 400,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: 'transparent'
+                  }}
                 >
-                  <Plus size={16} />
-                  <span>New Note</span>
+                  Meetings
+                  {currentView === 'notes' && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    />
+                  )}
                 </button>
-              )}
+              </div>
             </div>
             
             {/* Desktop Right Side */}
@@ -703,6 +814,17 @@ function HomePage() {
                   >
                     <Search size={16} />
                     Search & Filters
+                    {hiddenTaskCount > 0 && (
+                      <span 
+                        className="px-1.5 py-0.5 rounded-full text-xs font-semibold"
+                        style={{ 
+                          backgroundColor: 'var(--color-primary)',
+                          color: 'white'
+                        }}
+                      >
+                        {hiddenTaskCount}
+                      </span>
+                    )}
                   </button>
                   <button
                     key="new-task"
@@ -733,14 +855,36 @@ function HomePage() {
               <UserProfile />
             </div>
             
-            {/* Mobile Right Side - Hamburger Menu */}
+            {/* Mobile Right Side - Hamburger + New Button */}
             <div className="flex md:hidden items-center gap-2">
+              {/* New Task/Note Button */}
+              {currentView === 'tasks' ? (
+                <button
+                  onClick={handleNewTask}
+                  disabled={!permissions.canEdit}
+                  className="p-2 rounded-md transition-all duration-200 disabled:opacity-50"
+                  style={{ color: permissions.canEdit ? 'var(--color-primary)' : '#94a3b8' }}
+                  title={!permissions.canEdit ? 'You need EDIT permission' : 'Create task'}
+                >
+                  <Plus size={20} />
+                </button>
+              ) : (
+                <button
+                  onClick={handleNewNote}
+                  className="p-2 rounded-md transition-all duration-200"
+                  style={{ color: 'var(--color-primary)' }}
+                  title="Create note"
+                >
+                  <Plus size={20} />
+                </button>
+              )}
+              
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="p-2 rounded-md transition-colors"
                 style={{ color: 'var(--color-primary)' }}
               >
-                <Menu size={24} />
+                <Menu size={20} />
               </button>
             </div>
           </div>
@@ -799,7 +943,7 @@ function HomePage() {
                         cursor: 'pointer'
                       }}
                     >
-                      Notes
+                      Meetings
                     </button>
                   </div>
                 </div>
@@ -838,6 +982,17 @@ function HomePage() {
                   <div className="mb-6">
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--color-text-secondary)' }}>
                       Search & Filters
+                      {hiddenTaskCount > 0 && (
+                        <span 
+                          className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold"
+                          style={{ 
+                            backgroundColor: 'var(--color-primary)',
+                            color: 'white'
+                          }}
+                        >
+                          {hiddenTaskCount} hidden
+                        </span>
+                      )}
                     </label>
                     
                     {/* Toggle Search Visibility */}
@@ -876,7 +1031,7 @@ function HomePage() {
                     
                     {/* Filter Controls */}
                     <div className="space-y-3">
-                      {/* Deadline Filter */}
+                      {/* Deadline — single-select range mode */}
                       <div>
                         <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
                           Deadline
@@ -892,8 +1047,9 @@ function HomePage() {
                           }}
                           className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
                           style={{
-                            borderColor: 'var(--color-border)',
+                            borderColor: filters.deadline ? 'var(--color-primary)' : 'var(--color-border)',
                             backgroundColor: 'var(--color-surface)',
+                            color: filters.deadline ? 'var(--color-primary)' : 'var(--color-text)',
                           }}
                         >
                           <option value="">All</option>
@@ -904,83 +1060,52 @@ function HomePage() {
                           <option value="future">Future</option>
                         </select>
                       </div>
-                      
-                      {/* Status Filter */}
-                      <div>
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-                          Status
-                        </label>
-                        <select
-                          value={filters.status?.[0] || ''}
-                          onChange={(e) => setFilters({ 
-                            ...filters, 
-                            status: e.target.value ? [e.target.value as TaskStatus] : undefined 
-                          })}
-                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
-                          style={{
-                            borderColor: 'var(--color-border)',
-                            backgroundColor: 'var(--color-surface)',
-                          }}
-                        >
-                          <option value="">All</option>
-                          {statusColumns.map(option => (
-                            <option key={option.id} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      {/* Priority Filter */}
+
+                      {/* Priority — multi-select pills */}
                       <div>
                         <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
                           Priority
                         </label>
-                        <select
-                          value={filters.priority?.[0] || ''}
-                          onChange={(e) => setFilters({ 
-                            ...filters, 
-                            priority: e.target.value ? [e.target.value as Priority] : undefined 
-                          })}
-                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
-                          style={{
-                            borderColor: 'var(--color-border)',
-                            backgroundColor: 'var(--color-surface)',
-                          }}
-                        >
-                          <option value="">All</option>
-                          <option value="high">High</option>
-                          <option value="medium">Medium</option>
-                          <option value="low">Low</option>
-                        </select>
+                        <FilterPills
+                          options={PRIORITY_FILTER_OPTIONS}
+                          selected={filters.priority}
+                          onChange={(v) => setFilters({ ...filters, priority: v })}
+                          size="md"
+                        />
                       </div>
-                      
-                      {/* Owner Filter */}
-                      <div>
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-                          Owner
-                        </label>
-                        <select
-                          value={filters.owner?.[0] || ''}
-                          onChange={(e) => setFilters({ 
-                            ...filters, 
-                            owner: e.target.value ? [e.target.value] : undefined 
-                          })}
-                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
-                          style={{
-                            borderColor: 'var(--color-border)',
-                            backgroundColor: 'var(--color-surface)',
-                          }}
-                        >
-                          <option value="">All</option>
-                          {owners.map(owner => (
-                            <option key={owner} value={owner}>{owner}</option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      {/* Clear Filters Button */}
-                      {(filters.deadline || filters.status || filters.priority || filters.owner) && (
+
+                      {/* Owner — multi-select pills */}
+                      {owners.length > 0 && (
+                        <div>
+                          <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                            Owner
+                          </label>
+                          <FilterPills
+                            options={owners.map(o => ({ value: o, label: o.split('@')[0] }))}
+                            selected={filters.owner}
+                            onChange={(v) => setFilters({ ...filters, owner: v })}
+                            size="md"
+                          />
+                        </div>
+                      )}
+
+                      {/* Topic — multi-select pills, only when project has topics */}
+                      {topicOptions.length > 0 && (
+                        <div>
+                          <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                            Topic
+                          </label>
+                          <FilterPills
+                            options={topicOptions.map(t => ({ value: t.id, label: t.label, color: t.color }))}
+                            selected={filters.topic}
+                            onChange={(v) => setFilters({ ...filters, topic: v })}
+                            size="md"
+                          />
+                        </div>
+                      )}
+
+                      {/* Clear Filters */}
+                      {(filters.deadline || filters.status || filters.priority || filters.owner || filters.topic) && (
                         <button
                           onClick={() => setFilters({})}
                           className="w-full px-4 py-2 text-sm border rounded-md transition-all duration-200 font-medium"
@@ -1211,129 +1336,92 @@ function HomePage() {
               {/* Desktop Filters - Hidden on mobile */}
               {currentView === 'tasks' && (
                 <div className="hidden md:block">
-                  <div className="flex items-center gap-4">
-                    <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)', flexShrink: 0 }}>
-                      Filters:
-                    </label>
-                    <div className="flex items-center gap-4 flex-1">
-                      {/* Deadline Filter */}
-                      <div className="flex items-center gap-2 flex-1">
-                        <label className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
-                          Deadline
-                        </label>
-                        <select
-                          value={filters.deadline || ''}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setFilters({ 
-                              ...filters, 
-                              deadline: value ? (value as 'overdue' | 'today' | 'this-week' | 'this-month' | 'future') : undefined 
-                            });
-                          }}
-                          className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
-                          style={{
-                            borderColor: 'var(--color-border)',
-                            backgroundColor: 'var(--color-surface)',
-                          }}
-                        >
-                          <option value="">All</option>
-                          <option value="overdue">Overdue</option>
-                          <option value="today">Today</option>
-                          <option value="this-week">This Week</option>
-                          <option value="this-month">This Month</option>
-                          <option value="future">Future</option>
-                        </select>
-                      </div>
-                      
-                      {/* Status Filter */}
-                      <div className="flex items-center gap-2 flex-1">
-                        <label className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
-                          Status
-                        </label>
-                        <select
-                          value={filters.status?.[0] || ''}
-                          onChange={(e) => setFilters({ 
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                    {/* Deadline — single-select range mode (not multi-select) */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <label className="text-xs font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
+                        Deadline
+                      </label>
+                      <select
+                        value={filters.deadline || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFilters({ 
                             ...filters, 
-                            status: e.target.value ? [e.target.value as TaskStatus] : undefined 
-                          })}
-                          className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
-                          style={{
-                            borderColor: 'var(--color-border)',
-                            backgroundColor: 'var(--color-surface)',
-                          }}
-                        >
-                          <option value="">All</option>
-                          {statusColumns.map(option => (
-                            <option key={option.id} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      {/* Priority Filter */}
-                      <div className="flex items-center gap-2 flex-1">
-                        <label className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
-                          Priority
-                        </label>
-                        <select
-                          value={filters.priority?.[0] || ''}
-                          onChange={(e) => setFilters({ 
-                            ...filters, 
-                            priority: e.target.value ? [e.target.value as Priority] : undefined 
-                          })}
-                          className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
-                          style={{
-                            borderColor: 'var(--color-border)',
-                            backgroundColor: 'var(--color-surface)',
-                          }}
-                        >
-                          <option value="">All</option>
-                          <option value="high">High</option>
-                          <option value="medium">Medium</option>
-                          <option value="low">Low</option>
-                        </select>
-                      </div>
-                      
-                      {/* Owner Filter */}
-                      <div className="flex items-center gap-2 flex-1">
-                        <label className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
+                            deadline: value ? (value as 'overdue' | 'today' | 'this-week' | 'this-month' | 'future') : undefined 
+                          });
+                        }}
+                        className="px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
+                        style={{
+                          minWidth: '110px',
+                          borderColor: filters.deadline ? 'var(--color-primary)' : 'var(--color-border)',
+                          backgroundColor: 'var(--color-surface)',
+                          color: filters.deadline ? 'var(--color-primary)' : 'var(--color-text)',
+                        }}
+                      >
+                        <option value="">All</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="today">Today</option>
+                        <option value="this-week">This Week</option>
+                        <option value="this-month">This Month</option>
+                        <option value="future">Future</option>
+                      </select>
+                    </div>
+
+                    {/* Priority — multi-select pills */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <label className="text-xs font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
+                        Priority
+                      </label>
+                      <FilterPills
+                        options={PRIORITY_FILTER_OPTIONS}
+                        selected={filters.priority}
+                        onChange={(v) => setFilters({ ...filters, priority: v })}
+                      />
+                    </div>
+
+                    {/* Owner — multi-select pills */}
+                    {owners.length > 0 && (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <label className="text-xs font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
                           Owner
                         </label>
-                        <select
-                          value={filters.owner?.[0] || ''}
-                          onChange={(e) => setFilters({ 
-                            ...filters, 
-                            owner: e.target.value ? [e.target.value] : undefined 
-                          })}
-                          className="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 transition-all"
-                          style={{
-                            borderColor: 'var(--color-border)',
-                            backgroundColor: 'var(--color-surface)',
-                          }}
-                        >
-                          <option value="">All</option>
-                          {owners.map(owner => (
-                            <option key={owner} value={owner}>{owner}</option>
-                          ))}
-                        </select>
+                        <FilterPills
+                          options={owners.map(o => ({ value: o, label: o.split('@')[0] }))}
+                          selected={filters.owner}
+                          onChange={(v) => setFilters({ ...filters, owner: v })}
+                        />
                       </div>
-                      
-                      {/* Clear Filters Button */}
-                      {(filters.deadline || filters.status || filters.priority || filters.owner) && (
-                        <button
-                          onClick={() => setFilters({})}
-                          className="px-4 py-1.5 text-sm border rounded-md transition-all duration-200 font-medium whitespace-nowrap flex-shrink-0"
-                          style={{ 
-                            borderColor: 'var(--color-border)',
-                            color: 'var(--color-text-secondary)',
-                            backgroundColor: 'var(--color-surface)'
-                          }}
-                        >
-                          Clear Filters
-                        </button>
-                      )}
-                    </div>
+                    )}
+
+                    {/* Topic — multi-select pills, only when project has topics */}
+                    {topicOptions.length > 0 && (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <label className="text-xs font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
+                          Topic
+                        </label>
+                        <FilterPills
+                          options={topicOptions.map(t => ({ value: t.id, label: t.label, color: t.color }))}
+                          selected={filters.topic}
+                          onChange={(v) => setFilters({ ...filters, topic: v })}
+                        />
+                      </div>
+                    )}
+
+                    {/* Clear Filters */}
+                    {(filters.deadline || filters.status || filters.priority || filters.owner || filters.topic) && (
+                      <button
+                        onClick={() => setFilters({})}
+                        className="px-3 py-1.5 text-xs border rounded-md transition-all duration-200 font-medium whitespace-nowrap flex-shrink-0"
+                        style={{ 
+                          borderColor: 'var(--color-border)',
+                          color: 'var(--color-text-secondary)',
+                          backgroundColor: 'var(--color-surface)'
+                        }}
+                      >
+                        Clear Filters
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1364,6 +1452,7 @@ function HomePage() {
                     onTaskClick={handleTaskClick}
                     onQuickComplete={handleQuickComplete}
                     color={column.color}
+                    getTaskColor={getTaskColor}
                     viewMode={viewModeCompact}
                     canEdit={permissions.canEdit}
                     showOwner={showOwner}
@@ -1401,7 +1490,7 @@ function HomePage() {
                   <TaskCard 
                     task={activeTask} 
                     onClick={() => {}} 
-                    statusColor={statusColumns.find(c => c.value === activeTask.status)?.color}
+                    statusColor={getTaskColor(activeTask)}
                     viewMode={viewModeCompact}
                     showOwner={showOwner}
                     showPriority={showPriority}

@@ -37,18 +37,17 @@ function NoteEditPage() {
   const noteId = params.id as string;
   
   const [note, setNote] = useState<Note | null>(null);
-  const [previousNote, setPreviousNote] = useState<Note | null>(null);
+  const [previousNotes, setPreviousNotes] = useState<Note[]>([]);
   const [title, setTitle] = useState('');
+  const [agendaItems, setAgendaItems] = useState<string[]>([]);
   const [content, setContent] = useState('');
   const [tasks, setTasks] = useState<NoteTask[]>([]);
   const [templateId, setTemplateId] = useState('default');
   const [isSaving, setIsSaving] = useState(false);
-  const [isAttaching, setIsAttaching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
   const [calendarEvent, setCalendarEvent] = useState<CalendarEvent | null>(null);
-  const [updateGoogleDoc, setUpdateGoogleDoc] = useState(false);
-  const { showToast, updateToast } = useToast();
+  const { showToast } = useToast();
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'success' | 'warning' | 'info' }>({
     isOpen: false,
     title: '',
@@ -60,19 +59,11 @@ function NoteEditPage() {
     message: '',
     onConfirm: () => {},
   });
-  const taskInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const taskInputRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
   const { people } = usePeopleData();
 
   // Get timezone from cached settings
   const userTimezone = settings?.timezone || DEFAULT_TIMEZONE;
-
-  // Check if user is organizer of the calendar event
-  const isOrganizer = note?.calendarEventData?.attendees?.some(
-    a => a.self && a.organizer
-  ) ?? false;
-
-  // Check if Google Doc has been attached
-  const hasGoogleDocAttached = !!note?.googleDocId;
 
   // Fetch note data
   useEffect(() => {
@@ -88,13 +79,20 @@ function NoteEditPage() {
       if (res.ok) {
         const data = await res.json();
         
-        // Handle new response format with currentNote and previousNote
         const currentNote = data.currentNote || data;
-        const prevNote = data.previousNote || null;
         
         setNote(currentNote);
-        setPreviousNote(prevNote);
+        setPreviousNotes(data.previousNotes || []);
         setTitle(currentNote.title);
+        // Parse agenda: stored as JSON array string, or legacy HTML/plain text
+        try {
+          const parsed = JSON.parse(currentNote.agenda || '[]');
+          setAgendaItems(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          // Legacy: treat as plain text lines or empty
+          const lines = (currentNote.agenda || '').split('\n').filter((l: string) => l.trim() !== '');
+          setAgendaItems(lines.length > 0 ? lines : []);
+        }
         setContent(currentNote.content);
         setTasks(currentNote.tasks || []);
         setTemplateId(currentNote.templateId);
@@ -154,8 +152,15 @@ function NoteEditPage() {
       // Filter out tasks with empty titles
       const validTasks = tasks.filter(task => task.title.trim() !== '');
       
+      // Strip agenda if it contains no text
+      const nonEmptyAgendaItems = agendaItems.filter(item => item.trim() !== '');
+      const savedAgenda = nonEmptyAgendaItems.length > 0
+        ? JSON.stringify(nonEmptyAgendaItems)
+        : '';
+
       const noteData: Partial<Note> = {
         title: title.trim(),
+        agenda: savedAgenda,
         content,
         tasks: validTasks,
         templateId,
@@ -179,49 +184,7 @@ function NoteEditPage() {
         duration: 3000,
       });
 
-      // If user checked "Update Google Doc", trigger the attachment/update
-      if (updateGoogleDoc && note?.calendarEventData) {
-        setIsAttaching(true);
-        const toastId = showToast({
-          type: 'loading',
-          title: hasGoogleDocAttached ? 'Updating Google Doc' : 'Creating Google Doc',
-          message: 'Please wait...',
-          duration: 0,
-        });
-
-        try {
-          const attachRes = await authenticatedFetch(`/api/notes/${noteId}/attach-to-calendar`, {
-            method: 'POST',
-          });
-
-          if (attachRes.ok) {
-            updateToast(toastId, {
-              type: 'success',
-              title: hasGoogleDocAttached ? 'Google Doc updated' : 'Google Doc created',
-              message: hasGoogleDocAttached
-                ? 'The document has been updated with your latest changes'
-                : isOrganizer 
-                  ? 'Document created and linked to event' 
-                  : 'Document created and shared with attendees',
-              duration: 5000,
-            });
-          } else {
-            throw new Error('Attachment failed');
-          }
-        } catch (error) {
-          updateToast(toastId, {
-            type: 'error',
-            title: hasGoogleDocAttached ? 'Update failed' : 'Creation failed',
-            message: 'Note saved but could not update the Google Doc',
-            duration: 5000,
-          });
-        } finally {
-          setIsAttaching(false);
-        }
-      }
-      
       setIsEditMode(false);
-      setUpdateGoogleDoc(false); // Reset checkbox
       await fetchNote(); // Refresh data
       
       // Create actual tasks in the default project for checked tasks
@@ -500,20 +463,6 @@ function NoteEditPage() {
                         )}
                       </div>
                     </div>
-                    
-                    {/* Google Doc Badge - Outside the grid */}
-                    {note.googleDocId && note.googleDocUrl && (
-                      <a
-                        href={note.googleDocUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium hover:opacity-80 transition-opacity whitespace-nowrap"
-                        style={{ backgroundColor: '#dcfce7', color: '#166534' }}
-                        title="Open Google Doc"
-                      >
-                        📄 Google Doc
-                      </a>
-                    )}
                   </div>
                 )}
               </div>
@@ -578,16 +527,88 @@ function NoteEditPage() {
 
       {/* Content */}
       <div className="max-w-5xl mx-auto px-7 py-8">
-        <div className="space-y-8">
-          {/* Rich Text Editor */}
-          <div className="rounded-xl border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-            <TipTapEditor
-              value={content}
-              onChange={setContent}
-              placeholder="Start taking notes..."
-              disabled={!isEditMode}
-              people={people}
-            />
+        <div className="space-y-4">
+          {/* Agenda Section — hidden in view mode when empty */}
+          {(isEditMode || agendaItems.length > 0) && (
+            <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <div className="px-6 pb-4 pt-4 space-y-2">
+                {agendaItems.length === 0 && !isEditMode ? null : agendaItems.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="text-gray-400 select-none" style={{ fontSize: '0.6rem' }}>●</span>
+                    {isEditMode ? (
+                      <>
+                        <input
+                          type="text"
+                          value={item}
+                          onChange={(e) => {
+                            const updated = [...agendaItems];
+                            updated[index] = e.target.value;
+                            setAgendaItems(updated);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const updated = [...agendaItems];
+                              updated.splice(index + 1, 0, '');
+                              setAgendaItems(updated);
+                            }
+                            if (e.key === 'Backspace' && item === '' && agendaItems.length > 1) {
+                              e.preventDefault();
+                              setAgendaItems(agendaItems.filter((_, i) => i !== index));
+                            }
+                          }}
+                          placeholder={`Agenda point ${index + 1}...`}
+                          className="flex-1 px-2.5 py-1.5 border rounded-md text-sm bg-white focus:outline-none focus:ring-1"
+                          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+                        />
+                        {agendaItems.length > 1 && (
+                          <button
+                            onClick={() => setAgendaItems(agendaItems.filter((_, i) => i !== index))}
+                            className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
+                            title="Remove"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-sm py-1.5" style={{ color: 'var(--color-text)' }}>{item}</span>
+                    )}
+                  </div>
+                ))}
+                {isEditMode && agendaItems.length === 0 && (
+                  <button
+                    onClick={() => setAgendaItems([''])}
+                    className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <Plus size={12} />
+                    <span>Add agenda point</span>
+                  </button>
+                )}
+                {isEditMode && agendaItems.length > 0 && (
+                  <button
+                    onClick={() => setAgendaItems([...agendaItems, ''])}
+                    className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors pt-1"
+                  >
+                    <Plus size={12} />
+                    <span>Add point</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Notes Section */}
+          <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+            <div className="px-6 pb-5 pt-5">
+              <TipTapEditor
+                value={content}
+                onChange={setContent}
+                placeholder="Start taking notes..."
+                disabled={!isEditMode}
+                people={people}
+              />
+            </div>
           </div>
 
           {/* Tasks Section */}
@@ -595,16 +616,16 @@ function NoteEditPage() {
             {tasks.length === 0 ? (
               <div
                 onClick={() => isEditMode && addTask()}
-                className={`text-sm text-gray-500 text-center py-3 px-6 border-2 border-dashed rounded-lg m-6 flex items-center justify-center gap-2 ${isEditMode ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors' : ''}`}
+                className={`text-sm text-gray-400 text-center py-2 px-4 flex items-center justify-center gap-1.5 ${isEditMode ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
                 style={{ borderColor: 'var(--color-border)' }}
               >
                 {isEditMode ? (
                   <>
-                    <Plus size={16} className="text-gray-400" />
-                    <p>Click here to create your first task</p>
+                    <Plus size={14} className="text-gray-400" />
+                    <span>Click here to create your first task</span>
                   </>
                 ) : (
-                  <p>No tasks yet.</p>
+                  <span>No tasks yet.</span>
                 )}
               </div>
             ) : (
@@ -612,12 +633,7 @@ function NoteEditPage() {
                 <table className="w-full">
                   <thead className="sticky top-0 z-10">
                     <tr className="border-b" style={{ backgroundColor: '#f8fafc', borderColor: 'var(--color-border)' }}>
-                      {isEditMode && (
-                        <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '5%' }} title="Create task in default project">
-                          📋
-                        </th>
-                      )}
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '50%' }}>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '55%' }}>
                         Task Title
                       </th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '25%' }}>
@@ -633,33 +649,21 @@ function NoteEditPage() {
                   </thead>
                   <tbody>
                     {tasks.map((task, index) => {
-                      // Check if this task is assigned to the current user
-                      const isMyTask = user?.email && task.owner === user.email;
-                      
                       return (
                       <tr
                         key={task.id}
                         className="border-b hover:bg-gray-50 transition-colors"
                         style={{ borderColor: '#f1f5f9' }}
                       >
-                        {isEditMode && (
-                          <td className="px-4 py-2 text-center">
-                            <input
-                              type="checkbox"
-                              checked={!!(task.createInProject !== false && isMyTask)}
-                              onChange={(e) => updateTask(task.id, { createInProject: e.target.checked })}
-                              disabled={!isMyTask}
-                              className="w-4 h-4 rounded border-gray-300"
-                              title={isMyTask ? "Create this task in your default project" : "Only your own tasks can be created in projects"}
-                            />
-                          </td>
-                        )}
                         <td className="px-4 py-2">
-                          <input
+                          <textarea
                             ref={(el) => { taskInputRefs.current[task.id] = el; }}
-                            type="text"
                             value={task.title}
-                            onChange={(e) => updateTask(task.id, { title: e.target.value })}
+                            onChange={(e) => {
+                              updateTask(task.id, { title: e.target.value });
+                              e.target.style.height = 'auto';
+                              e.target.style.height = `${e.target.scrollHeight}px`;
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey && isEditMode && index === tasks.length - 1) {
                                 e.preventDefault();
@@ -668,8 +672,9 @@ function NoteEditPage() {
                             }}
                             placeholder="Task title..."
                             disabled={!isEditMode}
-                            className="dense-table-input w-full px-2.5 py-1.5 border rounded-md text-sm"
-                          />
+                            rows={1}
+                            className="dense-table-input w-full px-2.5 py-1.5 border rounded-md text-sm resize-none overflow-hidden"
+                          ></textarea>
                         </td>
                         <td className="px-4 py-2">
                           <OwnerSelector
@@ -715,7 +720,7 @@ function NoteEditPage() {
             {isEditMode && tasks.length > 0 && (
               <div
                 onClick={addTask}
-                className="border-t-2 border-dashed px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm text-gray-500"
+                className="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm text-gray-500"
                 style={{ borderColor: 'var(--color-border)' }}
               >
                 <Plus size={16} />
@@ -724,56 +729,14 @@ function NoteEditPage() {
             )}
           </div>
 
-          {/* Previous Meeting Section - Only show if there's a previous note */}
-          {previousNote && (
+          {/* Previous Meeting Section - Only show if there's at least one previous note */}
+          {previousNotes.length > 0 && (
             <PreviousMeetingSection 
-              previousNote={previousNote}
+              previousNotes={previousNotes}
               userTimezone={userTimezone}
             />
           )}
 
-          {/* Create/Update Google Doc Checkbox - Only show when editing and calendar event is linked */}
-          {isEditMode && note?.calendarEventData && (
-            <div className="rounded-xl border p-5" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={updateGoogleDoc}
-                  onChange={(e) => setUpdateGoogleDoc(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900 group-hover:text-gray-700 transition-colors">
-                    {hasGoogleDocAttached 
-                      ? 'Update existing Google Doc with latest changes'
-                      : 'Create and attach Google Doc to calendar event'}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {hasGoogleDocAttached ? (
-                      <>
-                        The Google Doc will be updated with your latest note content.
-                        {note.googleDocUrl && (
-                          <> <a 
-                            href={note.googleDocUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            View document →
-                          </a></>
-                        )}
-                      </>
-                    ) : (
-                      isOrganizer 
-                        ? 'A Google Doc will be created and linked to the calendar event description. All attendees will have comment access.'
-                        : 'A Google Doc will be created and shared with all attendees. You are not the organizer, so it cannot be added to the event description.'
-                    )}
-                  </div>
-                </div>
-              </label>
-            </div>
-          )}
         </div>
       </div>
 

@@ -9,6 +9,7 @@ import { createContext, useContext, ReactNode } from 'react';
 import { useCachedFetch, useCache } from '@/lib/cache-context';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { usePathname } from 'next/navigation';
 
 // Re-export Person from types to avoid duplicates
 import type { Person } from '@/types';
@@ -32,6 +33,11 @@ const PEOPLE_TTL = 10 * 60 * 1000; // 10 minutes (people data changes infrequent
 export function PeopleProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { invalidate } = useCache();
+  const pathname = usePathname();
+
+  // Skip the people fetch on the /quick page — it's a lightweight page
+  // that never uses people data, and the extra request slows it down on mobile.
+  const shouldFetch = !!user && pathname !== '/quick';
 
   const { data, isLoading, error, refetch } = useCachedFetch<{ people: Person[] }>(
     PEOPLE_KEY,
@@ -44,7 +50,7 @@ export function PeopleProvider({ children }: { children: ReactNode }) {
     },
     {
       ttl: PEOPLE_TTL,
-      enabled: !!user,
+      enabled: shouldFetch,
     }
   );
 

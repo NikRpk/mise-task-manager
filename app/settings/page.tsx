@@ -16,7 +16,8 @@ import { authenticatedFetch } from '@/lib/api-client';
 import { colorSchemes, useTheme, ColorScheme } from '@/lib/theme-context';
 import TipTapEditor from '@/components/TipTapEditor';
 import Toggle from '@/components/ui/Toggle';
-import { ProjectSettings, StatusOption, PriorityOption, CustomField, ProjectMember, ProjectRole } from '@/types';
+import { ColorPicker } from '@/components/ui';
+import { ProjectSettings, StatusOption, PriorityOption, TopicOption, CustomField, ProjectMember, ProjectRole } from '@/types';
 import { logger } from '@/lib/logger';
 
 interface UserSettings {
@@ -25,8 +26,8 @@ interface UserSettings {
   displayName?: string;
   timezone?: string;
   noteTemplate?: string;
-  driveFolderId?: string;
   defaultProjectId?: string;
+  feedbackWebhookUrl?: string;
   notifications?: {
     dailyTaskReminder?: {
       slack: boolean;
@@ -93,12 +94,9 @@ const SortableStatusItem = React.memo(({
         style={{ borderColor: 'var(--color-border)' }}
         placeholder="Status name"
       />
-      <input
-        type="color"
+      <ColorPicker
         value={status.color}
-        onChange={(e) => onUpdate(status.id, { color: e.target.value })}
-        className="w-12 h-10 border rounded-md cursor-pointer"
-        style={{ borderColor: 'var(--color-border)' }}
+        onChange={(color) => onUpdate(status.id, { color })}
       />
       {status.isDefault ? (
         <div className="w-10 h-10 flex items-center justify-center text-xs text-gray-400" title="Default status cannot be deleted">
@@ -172,12 +170,9 @@ const SortablePriorityItem = React.memo(({
         style={{ borderColor: 'var(--color-border)' }}
         placeholder="Priority name"
       />
-      <input
-        type="color"
+      <ColorPicker
         value={priority.color}
-        onChange={(e) => onUpdate(priority.id, { color: e.target.value })}
-        className="w-12 h-10 border rounded-md cursor-pointer"
-        style={{ borderColor: 'var(--color-border)' }}
+        onChange={(color) => onUpdate(priority.id, { color })}
       />
       {priority.isDefault ? (
         <div className="w-10 h-10 flex items-center justify-center text-xs text-gray-400" title="Default priority cannot be deleted">
@@ -198,6 +193,66 @@ const SortablePriorityItem = React.memo(({
 
 SortablePriorityItem.displayName = 'SortablePriorityItem';
 
+// Sortable Topic Item Component (defined outside to prevent re-creation)
+const SortableTopicItem = React.memo(({ 
+  topic, 
+  onUpdate, 
+  onDelete 
+}: { 
+  topic: TopicOption;
+  onUpdate: (id: string, updates: Partial<TopicOption>) => void;
+  onDelete: (id: string) => void;
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: topic.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ ...style, borderColor: 'var(--color-border)' }}
+      className="flex items-center gap-3 p-3 border rounded-lg"
+      {...attributes}
+    >
+      <div {...listeners} className="cursor-grab active:cursor-grabbing">
+        <GripVertical size={16} className="text-gray-400" />
+      </div>
+      <input
+        type="text"
+        value={topic.label}
+        onChange={(e) => onUpdate(topic.id, { label: e.target.value })}
+        className="flex-1 px-3 py-2 border rounded-md"
+        style={{ borderColor: 'var(--color-border)' }}
+        placeholder="Topic name"
+      />
+      <ColorPicker
+        value={topic.color}
+        onChange={(color) => onUpdate(topic.id, { color })}
+      />
+      <button
+        onClick={() => onDelete(topic.id)}
+        className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+        title="Delete topic"
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
+  );
+});
+
+SortableTopicItem.displayName = 'SortableTopicItem';
+
 function SettingsContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -207,13 +262,13 @@ function SettingsContent() {
   const projectId = searchParams.get('projectId');
 
   const [userSettings, setUserSettings] = useState<UserSettings>({
-    colorScheme: 'hellofresh',
+    colorScheme: 'mise',
     displayName: '',
     notifications: {},
   });
 
   const [originalUserSettings, setOriginalUserSettings] = useState<UserSettings>({
-    colorScheme: 'hellofresh',
+    colorScheme: 'mise',
     displayName: '',
     notifications: {},
   });
@@ -223,13 +278,19 @@ function SettingsContent() {
   const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
     statusOptions: [],
     priorityOptions: [],
+    topicOptions: [],
     customFields: [],
+    taskColorField: 'status',
+    topicFieldLabel: 'Topic',
   });
 
   const [originalProjectSettings, setOriginalProjectSettings] = useState<ProjectSettings>({
     statusOptions: [],
     priorityOptions: [],
+    topicOptions: [],
     customFields: [],
+    taskColorField: 'status',
+    topicFieldLabel: 'Topic',
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -268,6 +329,7 @@ function SettingsContent() {
   const [migrationSourceId, setMigrationSourceId] = useState<string>('');
   const [migrationTargetId, setMigrationTargetId] = useState<string>('');
   const [migrationTaskCount, setMigrationTaskCount] = useState(0);
+  const [migrationDeleteTasks, setMigrationDeleteTasks] = useState(false);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -536,7 +598,7 @@ function SettingsContent() {
     if (!projectId) return;
     
     try {
-      const res = await authenticatedFetch(`/api/tasks?projectId=${projectId}`);
+      const res = await authenticatedFetch(`/api/tasks?projectId=${projectId}&limit=500`);
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
@@ -544,7 +606,7 @@ function SettingsContent() {
       }
       
       const data = await res.json();
-      const tasks = data.tasks || data; // Handle both {tasks: [...]} and [...] responses
+      const tasks = data.tasks || data;
       
       interface TaskWithStatus {
         status: string;
@@ -556,14 +618,13 @@ function SettingsContent() {
       const tasksWithStatus = (tasks as TaskWithStatus[]).filter((task: TaskWithStatus) => task.status === statusValue);
       
       if (tasksWithStatus.length > 0) {
-        // Show migration dialog
         setMigrationSourceId(statusId);
         setMigrationTaskCount(tasksWithStatus.length);
+        setMigrationDeleteTasks(false);
         const firstAvailableStatus = projectSettings.statusOptions?.find(opt => opt.id !== statusId);
         setMigrationTargetId(firstAvailableStatus?.id || '');
         setShowMigrationDialog(true);
       } else {
-        // No tasks using this status, safe to delete immediately
         setConfirmDialog({
           isOpen: true,
           title: 'Delete Status',
@@ -575,19 +636,17 @@ function SettingsContent() {
               statusOptions: projectSettings.statusOptions?.filter(opt => opt.id !== statusId),
             };
             
-            // Save to database immediately
             await authenticatedFetch(`/api/projects/${projectId}/settings`, {
               method: 'PUT',
               body: JSON.stringify(updatedSettings),
             });
             
-            // Update local state
             setProjectSettings(updatedSettings);
           }
         });
       }
     } catch (error) {
-      console.error('Failed to check tasks:', error);
+      logger.error('Failed to check tasks using status', error as Error, { statusId });
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setAlertDialog({
         isOpen: true,
@@ -599,11 +658,11 @@ function SettingsContent() {
   };
 
   const confirmStatusMigration = async () => {
-    if (!projectId || !migrationTargetId) return;
+    if (!projectId) return;
+    if (!migrationDeleteTasks && !migrationTargetId) return;
     
     try {
-      // Migrate tasks to new status
-      const res = await authenticatedFetch(`/api/tasks?projectId=${projectId}`);
+      const res = await authenticatedFetch(`/api/tasks?projectId=${projectId}&limit=500`);
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
@@ -611,7 +670,7 @@ function SettingsContent() {
       }
       
       const data = await res.json();
-      const tasks = data.tasks || data; // Handle both {tasks: [...]} and [...] responses
+      const tasks = data.tasks || data;
       
       interface TaskWithStatus {
         status: string;
@@ -620,53 +679,57 @@ function SettingsContent() {
       }
       
       const sourceStatusValue = projectSettings.statusOptions?.find(opt => opt.id === migrationSourceId)?.id;
-      const targetStatusValue = projectSettings.statusOptions?.find(opt => opt.id === migrationTargetId)?.id;
-      
       const tasksToUpdate = (tasks as TaskWithStatus[]).filter((task: TaskWithStatus) => task.status === sourceStatusValue);
       
-      // Update all tasks
-      await Promise.all(
-        tasksToUpdate.map((task: TaskWithStatus) =>
-          authenticatedFetch(`/api/tasks/${task.id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ ...task, status: targetStatusValue }),
-          })
-        )
-      );
+      if (migrationDeleteTasks) {
+        await Promise.all(
+          tasksToUpdate.map((task: TaskWithStatus) =>
+            authenticatedFetch(`/api/tasks/${task.id}`, { method: 'DELETE' })
+          )
+        );
+      } else {
+        const targetStatusValue = projectSettings.statusOptions?.find(opt => opt.id === migrationTargetId)?.id;
+        await Promise.all(
+          tasksToUpdate.map((task: TaskWithStatus) =>
+            authenticatedFetch(`/api/tasks/${task.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ ...task, status: targetStatusValue }),
+            })
+          )
+        );
+      }
       
-      // Remove the status option from settings
       const updatedSettings = {
         ...projectSettings,
         statusOptions: projectSettings.statusOptions?.filter(opt => opt.id !== migrationSourceId),
       };
       
-      // Save to database immediately
       await authenticatedFetch(`/api/projects/${projectId}/settings`, {
         method: 'PUT',
         body: JSON.stringify(updatedSettings),
       });
       
-      // Update local state
       setProjectSettings(updatedSettings);
-      
       setShowMigrationDialog(false);
       setMigrationSourceId('');
       setMigrationTargetId('');
       setMigrationTaskCount(0);
+      setMigrationDeleteTasks(false);
       
+      const actionLabel = migrationDeleteTasks ? 'deleted' : 'migrated';
       setAlertDialog({
         isOpen: true,
         title: 'Success',
-        message: `Successfully migrated ${tasksToUpdate.length} task(s) and deleted the status.`,
+        message: `Successfully ${actionLabel} ${tasksToUpdate.length} task(s) and deleted the status.`,
         type: 'success',
       });
     } catch (error) {
-      console.error('Failed to migrate tasks:', error);
+      logger.error('Failed to process status migration', error as Error, { migrationSourceId, migrationTargetId });
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setAlertDialog({
         isOpen: true,
         title: 'Error',
-        message: `Failed to migrate tasks: ${errorMessage}`,
+        message: `Failed to process tasks: ${errorMessage}`,
         type: 'error',
       });
     }
@@ -754,6 +817,75 @@ function SettingsContent() {
           });
         }
       }
+    });
+  };
+
+  // Topic handlers
+  const addTopicOption = () => {
+    const id = `topic-${Date.now()}`;
+    setProjectSettings({
+      ...projectSettings,
+      topicOptions: [
+        ...(projectSettings.topicOptions || []),
+        { id, label: 'New Topic', color: '#64748b' },
+      ],
+    });
+  };
+
+  const handleTopicDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id && projectSettings.topicOptions) {
+      const oldIndex = projectSettings.topicOptions.findIndex((item) => item.id === active.id);
+      const newIndex = projectSettings.topicOptions.findIndex((item) => item.id === over.id);
+      setProjectSettings({
+        ...projectSettings,
+        topicOptions: arrayMove(projectSettings.topicOptions, oldIndex, newIndex),
+      });
+    }
+  };
+
+  const updateTopicOption = (id: string, updates: Partial<TopicOption>) => {
+    if (!projectSettings.topicOptions) return;
+    setProjectSettings({
+      ...projectSettings,
+      topicOptions: projectSettings.topicOptions.map(opt =>
+        opt.id === id ? { ...opt, ...updates } : opt
+      ),
+    });
+  };
+
+  const deleteTopicOption = (id: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Topic',
+      message: 'Are you sure you want to delete this topic? Tasks assigned to this topic will keep their assignment but the label will no longer appear.',
+      type: 'danger',
+      onConfirm: async () => {
+        if (!projectId) return;
+
+        try {
+          const updatedSettings = {
+            ...projectSettings,
+            topicOptions: projectSettings.topicOptions?.filter(opt => opt.id !== id),
+          };
+
+          await authenticatedFetch(`/api/projects/${projectId}/settings`, {
+            method: 'PUT',
+            body: JSON.stringify(updatedSettings),
+          });
+
+          setProjectSettings(updatedSettings);
+          setOriginalProjectSettings(updatedSettings);
+        } catch (error) {
+          logger.error('Failed to delete topic option', error as Error);
+          setAlertDialog({
+            isOpen: true,
+            title: 'Error',
+            message: 'Failed to delete topic. Please try again.',
+            type: 'error',
+          });
+        }
+      },
     });
   };
 
@@ -1037,22 +1169,6 @@ function SettingsContent() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
-                    Google Drive Folder ID
-                  </label>
-                  <input
-                    type="text"
-                    value={userSettings.driveFolderId || ''}
-                    onChange={(e) => setUserSettings({ ...userSettings, driveFolderId: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md font-mono text-sm"
-                    style={{ borderColor: 'var(--color-border)' }}
-                    placeholder="Optional: Folder ID for saving meeting notes"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    If set, all meeting notes will be saved in this Drive folder. Find folder ID in the URL when viewing the folder.
-                  </p>
-                </div>
-                <div>
                   <label className="block text-sm font-medium mb-2 text-gray-500">
                     Email
                   </label>
@@ -1190,7 +1306,6 @@ function SettingsContent() {
                   <p className="font-medium mb-1">Permissions needed:</p>
                   <ul className="list-disc list-inside space-y-1">
                     <li>View your calendar events</li>
-                    <li>Create files in Google Drive (for note attachments)</li>
                   </ul>
                 </div>
               )}
@@ -1345,24 +1460,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Primary Color
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.primary || '#009646'}
-                            onChange={(e) => setCustomColors({ ...customColors, primary: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.primary || '#009646'}
-                            onChange={(e) => setCustomColors({ ...customColors, primary: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#009646"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.primary || '#009646'}
+                          onChange={(color) => setCustomColors({ ...customColors, primary: color })}
+                          showHexInput
+                        />
                       </div>
 
                       {/* Secondary Color */}
@@ -1370,24 +1472,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Secondary Color
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.secondary || '#125034'}
-                            onChange={(e) => setCustomColors({ ...customColors, secondary: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.secondary || '#125034'}
-                            onChange={(e) => setCustomColors({ ...customColors, secondary: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#125034"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.secondary || '#125034'}
+                          onChange={(color) => setCustomColors({ ...customColors, secondary: color })}
+                          showHexInput
+                        />
                       </div>
 
                       {/* Success Color */}
@@ -1395,24 +1484,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Success Color
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.success || '#00a61c'}
-                            onChange={(e) => setCustomColors({ ...customColors, success: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.success || '#00a61c'}
-                            onChange={(e) => setCustomColors({ ...customColors, success: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#00a61c"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.success || '#00a61c'}
+                          onChange={(color) => setCustomColors({ ...customColors, success: color })}
+                          showHexInput
+                        />
                       </div>
 
                       {/* Warning Color */}
@@ -1420,24 +1496,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Warning Color
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.warning || '#f6c400'}
-                            onChange={(e) => setCustomColors({ ...customColors, warning: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.warning || '#f6c400'}
-                            onChange={(e) => setCustomColors({ ...customColors, warning: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#f6c400"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.warning || '#f6c400'}
+                          onChange={(color) => setCustomColors({ ...customColors, warning: color })}
+                          showHexInput
+                        />
                       </div>
 
                       {/* Error Color */}
@@ -1445,24 +1508,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Error Color
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.error || '#f30047'}
-                            onChange={(e) => setCustomColors({ ...customColors, error: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.error || '#f30047'}
-                            onChange={(e) => setCustomColors({ ...customColors, error: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#f30047"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.error || '#f30047'}
+                          onChange={(color) => setCustomColors({ ...customColors, error: color })}
+                          showHexInput
+                        />
                       </div>
 
                       {/* Background Color */}
@@ -1470,24 +1520,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Background Color
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.background || '#fffdfa'}
-                            onChange={(e) => setCustomColors({ ...customColors, background: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.background || '#fffdfa'}
-                            onChange={(e) => setCustomColors({ ...customColors, background: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#fffdfa"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.background || '#fffdfa'}
+                          onChange={(color) => setCustomColors({ ...customColors, background: color })}
+                          showHexInput
+                        />
                       </div>
 
                       {/* Surface Color */}
@@ -1495,24 +1532,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Surface Color (Cards)
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.surface || '#ffffff'}
-                            onChange={(e) => setCustomColors({ ...customColors, surface: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.surface || '#ffffff'}
-                            onChange={(e) => setCustomColors({ ...customColors, surface: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#ffffff"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.surface || '#ffffff'}
+                          onChange={(color) => setCustomColors({ ...customColors, surface: color })}
+                          showHexInput
+                        />
                       </div>
 
                       {/* Surface Muted Color */}
@@ -1520,24 +1544,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Surface Muted (Subtle backgrounds)
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.surfaceMuted || '#f8fafc'}
-                            onChange={(e) => setCustomColors({ ...customColors, surfaceMuted: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.surfaceMuted || '#f8fafc'}
-                            onChange={(e) => setCustomColors({ ...customColors, surfaceMuted: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#f8fafc"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.surfaceMuted || '#f8fafc'}
+                          onChange={(color) => setCustomColors({ ...customColors, surfaceMuted: color })}
+                          showHexInput
+                        />
                       </div>
 
                       {/* Text Color */}
@@ -1545,24 +1556,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Text Color
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.text || '#0f172a'}
-                            onChange={(e) => setCustomColors({ ...customColors, text: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.text || '#0f172a'}
-                            onChange={(e) => setCustomColors({ ...customColors, text: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#0f172a"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.text || '#0f172a'}
+                          onChange={(color) => setCustomColors({ ...customColors, text: color })}
+                          showHexInput
+                        />
                       </div>
 
                       {/* Text Secondary Color */}
@@ -1570,24 +1568,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Secondary Text Color
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.textSecondary || '#64748b'}
-                            onChange={(e) => setCustomColors({ ...customColors, textSecondary: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.textSecondary || '#64748b'}
-                            onChange={(e) => setCustomColors({ ...customColors, textSecondary: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#64748b"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.textSecondary || '#64748b'}
+                          onChange={(color) => setCustomColors({ ...customColors, textSecondary: color })}
+                          showHexInput
+                        />
                       </div>
 
                       {/* Border Color */}
@@ -1595,24 +1580,11 @@ function SettingsContent() {
                         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
                           Border Color
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColors.border || '#e2e8f0'}
-                            onChange={(e) => setCustomColors({ ...customColors, border: e.target.value })}
-                            className="w-12 h-10 border rounded-md cursor-pointer"
-                            style={{ borderColor: 'var(--color-border)' }}
-                          />
-                          <input
-                            type="text"
-                            value={customColors.border || '#e2e8f0'}
-                            onChange={(e) => setCustomColors({ ...customColors, border: e.target.value })}
-                            className="flex-1 px-3 py-2 border rounded-md font-mono text-sm"
-                            style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="#e2e8f0"
-                            pattern="^#[0-9A-Fa-f]{6}$"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={customColors.border || '#e2e8f0'}
+                          onChange={(color) => setCustomColors({ ...customColors, border: color })}
+                          showHexInput
+                        />
                       </div>
                     </div>
 
@@ -1846,6 +1818,33 @@ function SettingsContent() {
               </div>
             </div>
 
+            {/* Feedback Webhook */}
+            <div className="rounded-lg shadow-sm border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <h3 className="text-lg font-semibold mb-1" style={{ color: 'var(--color-text)' }}>
+                Feedback Webhook
+              </h3>
+              <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>
+                Slack Workflow Builder webhook URL where bug reports and ideas are sent. Overrides the server default if set.
+              </p>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                  Webhook URL
+                </label>
+                <input
+                  type="url"
+                  value={userSettings.feedbackWebhookUrl || ''}
+                  onChange={(e) => setUserSettings({ ...userSettings, feedbackWebhookUrl: e.target.value })}
+                  placeholder="https://hooks.slack.com/triggers/..."
+                  className="w-full px-3 py-2 border rounded-md text-sm font-mono"
+                  style={{
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text)',
+                    backgroundColor: 'var(--color-surface)',
+                  }}
+                />
+              </div>
+            </div>
+
             {/* Slack Message Templates */}
             <div className="rounded-lg shadow-sm border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
               <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>
@@ -1926,7 +1925,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 
 {{#if todayTasks}}
 ---
-*📅 DUE TODAY ({{todayCount}} task{{#unless singleToday}}s{{/unless}})*
+*🟢 DUE TODAY ({{todayCount}} task{{#unless singleToday}}s{{/unless}})*
 {{#each todayTasks}}
 - {{title}}
 {{/each}}
@@ -1934,7 +1933,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 
 {{#if tomorrowTasks}}
 ---
-*📆 DUE TOMORROW ({{tomorrowCount}} task{{#unless singleTomorrow}}s{{/unless}})*
+*⚪ DUE TOMORROW ({{tomorrowCount}} task{{#unless singleTomorrow}}s{{/unless}})*
 {{#each tomorrowTasks}}
 - {{title}}
 {{/each}}
@@ -1988,7 +1987,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
-                    Default Note Template
+                    Default Notes Template
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
                     Edit the default template used for meeting notes
@@ -2070,7 +2069,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
                       value={projectName}
                       onChange={(e) => setProjectName(e.target.value)}
                       className="w-full px-3 py-2 border rounded-md"
-                      style={{ borderColor: 'var(--color-border)' }}
+                      style={{ borderColor: 'var(--color-border)', height: '38px' }}
                       placeholder="Enter project name"
                     />
                     <p className="text-xs text-gray-500 mt-1">
@@ -2086,8 +2085,8 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
                       type="text"
                       value={projectIcon}
                       onChange={(e) => setProjectIcon(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md text-2xl text-center"
-                      style={{ borderColor: 'var(--color-border)' }}
+                      className="w-full px-3 py-2 border rounded-md text-center leading-none"
+                      style={{ borderColor: 'var(--color-border)', fontSize: '1.25rem', height: '38px' }}
                       placeholder="📋"
                       maxLength={2}
                     />
@@ -2157,6 +2156,85 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
                       </>
                     )}
                   </button>
+                </div>
+
+                {/* Task Card Colour Field */}
+                <div className="pt-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                  <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--color-text)' }}>
+                    Task Card Colour
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Choose which field determines the coloured left border on task cards in the Kanban board.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {(['status', 'topic', 'priority'] as const).map((field) => {
+                      const isSelected = (projectSettings.taskColorField || 'status') === field;
+                      const labels: Record<string, string> = {
+                        status: 'Status',
+                        topic: 'Topic',
+                        priority: 'Priority',
+                      };
+                      const descriptions: Record<string, string> = {
+                        status: 'Colour matches the task\'s status column',
+                        topic: 'Colour reflects the task\'s topic',
+                        priority: 'Colour reflects high / medium / low priority',
+                      };
+                      return (
+                        <button
+                          key={field}
+                          onClick={() => setProjectSettings({ ...projectSettings, taskColorField: field })}
+                          className="flex-1 p-4 rounded-lg border-2 text-left transition-all"
+                          style={{
+                            borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                            backgroundColor: isSelected ? 'rgba(0, 150, 70, 0.04)' : 'var(--color-surface)',
+                          }}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: isSelected ? 'var(--color-primary)' : '#cbd5e1' }}
+                            />
+                            <span className="text-sm font-semibold" style={{ color: isSelected ? 'var(--color-primary)' : 'var(--color-text)' }}>
+                              {labels[field]}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {descriptions[field]}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-end mt-4">
+                    <button
+                      onClick={saveProjectSettings}
+                      disabled={isSaving || !hasProjectChanges}
+                      className="px-4 py-2 text-sm rounded-md transition-all flex items-center gap-2 font-medium disabled:cursor-not-allowed"
+                      style={{
+                        backgroundColor: saveSuccess ? '#10b981' : (hasProjectChanges ? 'var(--color-primary)' : 'white'),
+                        color: saveSuccess ? 'white' : (hasProjectChanges ? 'white' : '#94a3b8'),
+                        border: `1px solid ${saveSuccess ? '#10b981' : (hasProjectChanges ? 'var(--color-primary)' : 'var(--color-border)')}`,
+                        opacity: (!hasProjectChanges && !saveSuccess) ? 0.6 : 1,
+                      }}
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: hasProjectChanges ? 'white' : 'var(--color-primary)' }}></div>
+                          Saving...
+                        </>
+                      ) : saveSuccess ? (
+                        <>
+                          <Check size={16} />
+                          Saved!
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          Save
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Danger Zone */}
@@ -2330,34 +2408,69 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>
-                        Migrate Tasks
+                        Delete Status
                       </h3>
-                      <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="mb-5 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                         <Info size={18} className="inline text-yellow-600 mr-2" />
                         <span className="text-sm text-yellow-800">
-                          <strong>{migrationTaskCount} task(s)</strong> are currently using this status. 
-                          Please select a status to move them to before deletion.
+                          <strong>{migrationTaskCount} task(s)</strong> are using this status. Choose what to do with them before deleting.
                         </span>
                       </div>
-                      <div className="mb-6">
-                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
-                          Move tasks to:
-                        </label>
-                        <select
-                          value={migrationTargetId}
-                          onChange={(e) => setMigrationTargetId(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-md"
-                          style={{ borderColor: 'var(--color-border)' }}
+
+                      {/* Toggle: migrate vs delete */}
+                      <div className="mb-5 flex rounded-md border overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+                        <button
+                          type="button"
+                          onClick={() => setMigrationDeleteTasks(false)}
+                          className="flex-1 px-3 py-2 text-sm font-medium transition-colors"
+                          style={!migrationDeleteTasks
+                            ? { backgroundColor: 'var(--color-primary)', color: '#fff' }
+                            : { backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)' }
+                          }
                         >
-                          {(projectSettings.statusOptions || [])
-                            .filter(opt => opt.id !== migrationSourceId)
-                            .map(opt => (
-                              <option key={opt.id} value={opt.id}>
-                                {opt.label}
-                              </option>
-                            ))}
-                        </select>
+                          Move to another status
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMigrationDeleteTasks(true)}
+                          className="flex-1 px-3 py-2 text-sm font-medium transition-colors"
+                          style={migrationDeleteTasks
+                            ? { backgroundColor: 'var(--color-error)', color: '#fff' }
+                            : { backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)' }
+                          }
+                        >
+                          Delete all tasks
+                        </button>
                       </div>
+
+                      {!migrationDeleteTasks && (
+                        <div className="mb-6">
+                          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
+                            Move tasks to:
+                          </label>
+                          <select
+                            value={migrationTargetId}
+                            onChange={(e) => setMigrationTargetId(e.target.value)}
+                            className="w-full px-3 py-2 border rounded-md"
+                            style={{ borderColor: 'var(--color-border)' }}
+                          >
+                            {(projectSettings.statusOptions || [])
+                              .filter(opt => opt.id !== migrationSourceId)
+                              .map(opt => (
+                                <option key={opt.id} value={opt.id}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {migrationDeleteTasks && (
+                        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+                          This will permanently delete all {migrationTaskCount} task(s). This cannot be undone.
+                        </div>
+                      )}
+
                       <div className="flex gap-3 justify-end">
                         <button
                           onClick={() => setShowMigrationDialog(false)}
@@ -2371,11 +2484,11 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
                         </button>
                         <button
                           onClick={confirmStatusMigration}
-                          disabled={!migrationTargetId}
+                          disabled={!migrationDeleteTasks && !migrationTargetId}
                           className="px-4 py-2 text-sm rounded-md transition-colors text-white disabled:opacity-50"
-                          style={{ backgroundColor: 'var(--color-primary)' }}
+                          style={{ backgroundColor: migrationDeleteTasks ? 'var(--color-error)' : 'var(--color-primary)' }}
                         >
-                          Migrate & Delete
+                          {migrationDeleteTasks ? 'Delete Tasks & Status' : 'Migrate & Delete Status'}
                         </button>
                       </div>
                     </div>
@@ -2578,6 +2691,90 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
           </div>
         );
 
+      case 'project-topics':
+        return (
+          <div className="space-y-6">
+            <div className="rounded-lg shadow-sm border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+                    Topic Options
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {projectName && `Configure topic categories for ${projectName}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={addTopicOption}
+                    className="px-3 py-2 text-sm rounded-md flex items-center gap-2 font-medium text-white"
+                    style={{ backgroundColor: 'var(--color-primary)' }}
+                  >
+                    <Plus size={16} />
+                    Add Topic
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving || !hasChanges}
+                    className="px-4 py-2 text-sm rounded-md transition-all flex items-center gap-2 font-medium disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: saveSuccess ? '#10b981' : (hasChanges ? 'var(--color-primary)' : 'white'),
+                      color: saveSuccess ? 'white' : (hasChanges ? 'white' : '#94a3b8'),
+                      border: `1px solid ${saveSuccess ? '#10b981' : (hasChanges ? 'var(--color-primary)' : 'var(--color-border)')}`,
+                      opacity: (!hasChanges && !saveSuccess) ? 0.6 : 1,
+                    }}
+                  >
+                    {isSaving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: hasChanges ? 'white' : 'var(--color-primary)' }}></div>
+                        Saving...
+                      </>
+                    ) : saveSuccess ? (
+                      <>
+                        <Check size={16} />
+                        Saved!
+                      </>
+                    ) : (
+                      <>
+                        <Save size={16} />
+                        Save
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleTopicDragEnd}
+              >
+                <SortableContext
+                  items={projectSettings.topicOptions?.map(t => t.id) || []}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {(projectSettings.topicOptions || []).length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-8">
+                        No topics yet. Add options to categorise your tasks.
+                      </p>
+                    ) : (
+                      projectSettings.topicOptions?.map((topic) => (
+                        <SortableTopicItem
+                          key={topic.id}
+                          topic={topic}
+                          onUpdate={updateTopicOption}
+                          onDelete={deleteTopicOption}
+                        />
+                      ))
+                    )}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </div>
+          </div>
+        );
+
       case 'project-custom-fields':
         return (
           <div className="space-y-6">
@@ -2688,11 +2885,10 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
                             Options (one per line or comma-separated)
                           </label>
                           <textarea
-                            value={field.options?.join(', ') || ''}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              // Split by comma or newline, trim, and filter empty
-                              const options = value
+                            key={field.id}
+                            defaultValue={field.options?.join('\n') || ''}
+                            onBlur={(e) => {
+                              const options = e.target.value
                                 .split(/[,\n]/)
                                 .map(o => o.trim())
                                 .filter(Boolean);
@@ -2700,11 +2896,11 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
                             }}
                             className="w-full px-3 py-2 border rounded-md text-sm"
                             style={{ borderColor: 'var(--color-border)' }}
-                            placeholder="Option 1, Option 2, Option 3&#10;or one per line"
+                            placeholder="Option 1&#10;Option 2&#10;Option 3"
                             rows={3}
                           />
                           <p className="text-xs text-gray-500 mt-1">
-                            Separate options with commas or new lines
+                            One option per line, or separate with commas
                           </p>
                         </div>
                       )}
@@ -2722,7 +2918,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
   };
 
   return (
-    <SettingsLayout activeSection={section as 'profile' | 'appearance' | 'notifications' | 'note-templates' | 'project-details' | 'project-status' | 'project-priority' | 'project-custom-fields' | 'project-members'}>
+    <SettingsLayout activeSection={section as 'profile' | 'appearance' | 'notifications' | 'note-templates' | 'project-details' | 'project-status' | 'project-priority' | 'project-topics' | 'project-custom-fields' | 'project-members'}>
       {renderContent()}
       
       {/* Alert Dialog */}

@@ -84,7 +84,14 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
     };
 
     // Handle date selection
-    const handleDateSelect = (date: Date) => {
+    const handleDateSelect = (date: Date, isCurrentMonth: boolean) => {
+      // If clicking a date from previous/next month, switch to that month first
+      if (!isCurrentMonth) {
+        setCurrentMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+        // Don't close calendar or select date yet, just switch the month view
+        return;
+      }
+      
       setSelectedDate(date);
       setShowCalendar(false);
       if (onChange) {
@@ -92,7 +99,7 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
       }
     };
 
-    // Generate calendar days
+    // Generate calendar days including previous and next month dates
     const generateCalendarDays = () => {
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth();
@@ -104,16 +111,34 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
       let startingDayOfWeek = firstDay.getDay();
       startingDayOfWeek = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
 
-      const days: (Date | null)[] = [];
+      const days: { date: Date; isCurrentMonth: boolean }[] = [];
 
-      // Add empty slots for days before the month starts
-      for (let i = 0; i < startingDayOfWeek; i++) {
-        days.push(null);
+      // Add dates from previous month
+      const prevMonth = new Date(year, month, 0); // Last day of previous month
+      const daysInPrevMonth = prevMonth.getDate();
+      for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+        days.push({
+          date: new Date(year, month - 1, daysInPrevMonth - i),
+          isCurrentMonth: false
+        });
       }
 
-      // Add all days of the month
+      // Add all days of current month
       for (let day = 1; day <= daysInMonth; day++) {
-        days.push(new Date(year, month, day));
+        days.push({
+          date: new Date(year, month, day),
+          isCurrentMonth: true
+        });
+      }
+
+      // Add dates from next month to complete the grid (5 rows minimum, 6 only if needed)
+      const minCells = days.length <= 35 ? 35 : 42;
+      const remainingCells = minCells - days.length;
+      for (let day = 1; day <= remainingCells; day++) {
+        days.push({
+          date: new Date(year, month + 1, day),
+          isCurrentMonth: false
+        });
       }
 
       return days;
@@ -163,7 +188,7 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
           {/* Input Container - Clickable */}
           <div
             onClick={handleContainerClick}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-all ${className}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-all ${fullWidth ? 'w-full' : ''} ${className}`}
             style={{
               border: `1px solid ${error ? '#f30047' : 'var(--color-border)'}`,
               backgroundColor: disabled ? '#f1f5f9' : 'var(--color-surface)',
@@ -202,19 +227,19 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
           {/* Custom Calendar Popup */}
           {showCalendar && (
             <div
-              className="absolute z-50 mt-2 bg-white rounded-lg shadow-xl border"
+              className="absolute z-50 mt-1 bg-white rounded-lg shadow-xl border"
               style={{
                 borderColor: 'var(--color-border)',
-                width: '280px',
+                width: '100%',
                 left: 0,
               }}
             >
               {/* Calendar Header */}
-              <div className="flex items-center justify-between p-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center justify-between px-3 py-1.5 border-b" style={{ borderColor: 'var(--color-border)' }}>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); previousMonth(); }}
-                  className="p-2 rounded hover:bg-gray-100 transition-colors text-lg font-semibold"
+                  className="p-1.5 rounded hover:bg-gray-100 transition-colors text-lg font-semibold"
                   style={{ color: 'var(--color-text)' }}
                 >
                   ‹
@@ -225,7 +250,7 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); nextMonth(); }}
-                  className="p-2 rounded hover:bg-gray-100 transition-colors text-lg font-semibold"
+                  className="p-1.5 rounded hover:bg-gray-100 transition-colors text-lg font-semibold"
                   style={{ color: 'var(--color-text)' }}
                 >
                   ›
@@ -233,23 +258,20 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
               </div>
 
               {/* Calendar Grid */}
-              <div className="p-3">
+              <div className="px-2 py-1">
                 {/* Day names */}
-                <div className="grid grid-cols-7 gap-1 mb-2">
+                <div className="grid grid-cols-7 gap-0.5 mb-0.5">
                   {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(day => (
-                    <div key={day} className="text-center text-xs font-medium p-1" style={{ color: 'var(--color-text-secondary)' }}>
+                    <div key={day} className="text-center text-xs font-medium py-0.5" style={{ color: 'var(--color-text-secondary)' }}>
                       {day}
                     </div>
                   ))}
                 </div>
 
                 {/* Calendar days */}
-                <div className="grid grid-cols-7 gap-1">
-                  {generateCalendarDays().map((date, index) => {
-                    if (!date) {
-                      return <div key={`empty-${index}`} className="p-2" />;
-                    }
-
+                <div className="grid grid-cols-7 gap-0.5">
+                  {generateCalendarDays().map((item, index) => {
+                    const { date, isCurrentMonth } = item;
                     const selected = isDateSelected(date);
                     const today = isToday(date);
 
@@ -259,14 +281,27 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDateSelect(date);
+                          handleDateSelect(date, isCurrentMonth);
                         }}
-                        className="p-2 text-sm rounded-md transition-all hover:scale-105"
+                        className="flex items-center justify-center text-sm rounded transition-all"
                         style={{
+                          minHeight: '26px',
                           backgroundColor: selected ? 'var(--color-primary)' : today ? 'rgba(0, 150, 70, 0.1)' : 'transparent',
-                          color: selected ? 'white' : 'var(--color-text)',
+                          color: selected ? 'white' : isCurrentMonth ? 'var(--color-text)' : '#94a3b8',
                           fontWeight: selected || today ? '600' : '400',
+                          opacity: isCurrentMonth ? 1 : 0.6,
                         }}
+                        onMouseEnter={(e) => {
+                          if (!selected) {
+                            e.currentTarget.style.backgroundColor = isCurrentMonth ? 'rgba(0, 150, 70, 0.1)' : 'rgba(148, 163, 184, 0.1)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!selected) {
+                            e.currentTarget.style.backgroundColor = today ? 'rgba(0, 150, 70, 0.1)' : 'transparent';
+                          }
+                        }}
+                        title={!isCurrentMonth ? 'Click to switch to this month' : undefined}
                       >
                         {date.getDate()}
                       </button>
@@ -276,14 +311,19 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2 p-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex gap-2 px-3 py-1.5 border-t" style={{ borderColor: 'var(--color-border)' }}>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDateSelect(new Date());
+                    const today = new Date();
+                    setSelectedDate(today);
+                    setShowCalendar(false);
+                    if (onChange) {
+                      onChange(today.toISOString());
+                    }
                   }}
-                  className="flex-1 px-3 py-2 text-sm font-medium rounded-md transition-all hover:opacity-90"
+                  className="flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all hover:opacity-90"
                   style={{
                     backgroundColor: 'var(--color-primary)',
                     color: 'white',
@@ -299,7 +339,7 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
                     setShowCalendar(false);
                     if (onChange) onChange(null);
                   }}
-                  className="flex-1 px-3 py-2 text-sm font-medium rounded-md transition-all hover:bg-gray-50"
+                  className="flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all hover:bg-gray-50"
                   style={{
                     border: '1px solid var(--color-border)',
                     backgroundColor: 'transparent',

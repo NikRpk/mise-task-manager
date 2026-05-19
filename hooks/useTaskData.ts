@@ -3,7 +3,7 @@
  * Extracted from app/page.tsx to improve maintainability
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Task, TaskStatus, StatusHistoryEntry } from '@/types';
 import { authenticatedFetch } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
@@ -57,12 +57,17 @@ export function useTaskData(
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Tracks task IDs currently being updated to prevent double-clicks / race conditions
+  const inFlightRef = useRef<Set<string>>(new Set());
+
   const fetchTasks = useCallback(async () => {
     if (!projectId) return;
 
     try {
       setLoading(true);
-      const res = await authenticatedFetch(`/api/tasks?projectId=${projectId}`);
+      // Use a high limit to load all tasks — the board must show all tasks so
+      // nothing is silently hidden from the user (e.g. old overdue ones).
+      const res = await authenticatedFetch(`/api/tasks?projectId=${projectId}&limit=500`);
       const data = await res.json();
       
       // Handle both old format (array) and new format (object with tasks array)
@@ -81,6 +86,10 @@ export function useTaskData(
   const updateTaskStatus = useCallback(async (taskId: string, newStatus: TaskStatus) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task || task.status === newStatus) return;
+
+    // Prevent double-click / race conditions — only one in-flight update per task at a time
+    if (inFlightRef.current.has(taskId)) return;
+    inFlightRef.current.add(taskId);
 
     const originalStatus = task.status;
 
@@ -118,72 +127,47 @@ export function useTaskData(
         }),
       });
       
-      // Handle recurring tasks - create new instance when marked as done
-      console.log('[Recurring Task Check]', {
-        newStatus,
-        isDone: newStatus === 'done',
-        isRecurring: task.isRecurring,
-        recurrenceInterval: task.recurrenceInterval,
-        recurrenceUnit: task.recurrenceUnit,
-        deadline: task.deadline,
-        taskTitle: task.title,
-        hasDeadline: !!task.deadline,
-      });
-      
       if (newStatus === 'done' && task.isRecurring && task.recurrenceInterval && task.recurrenceUnit && task.deadline) {
-        console.log('[Recurring Task] Creating new instance for task:', task.title || task.description);
+        logger.info('Creating recurring task instance', {
+          taskId: task.id,
+          taskTitle: task.title,
+        });
+
         const newDeadline = calculateNextDeadline(
           task.deadline,
           task.recurrenceInterval,
           task.recurrenceUnit
         );
         
-        console.log('[Recurring Task] Calculated new deadline:', newDeadline);
-        
-        // Create new recurring task instance
         const newRecurringTask: Partial<Task> = {
           ...task,
-          id: undefined, // Let backend generate new ID
+          id: undefined,
           status: 'todo',
           deadline: newDeadline,
           parentRecurringTaskId: task.id,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          statusHistory: [], // Start fresh status history
-          comments: [], // Start fresh comments
-          subTasks: task.subTasks?.map(st => ({ ...st, completed: false })) || [], // Reset subtasks
+          statusHistory: [],
+          comments: [],
+          subTasks: task.subTasks?.map(st => ({ ...st, completed: false })) || [],
         };
         
-        console.log('[Recurring Task] New task payload:', {
-          title: newRecurringTask.title,
-          isRecurring: newRecurringTask.isRecurring,
-          recurrenceInterval: newRecurringTask.recurrenceInterval,
-          recurrenceUnit: newRecurringTask.recurrenceUnit,
-          deadline: newRecurringTask.deadline,
-          parentRecurringTaskId: newRecurringTask.parentRecurringTaskId,
-        });
-        
-        // Create the new task
         const response = await authenticatedFetch('/api/tasks', {
           method: 'POST',
           body: JSON.stringify(newRecurringTask),
         });
         
-        console.log('[Recurring Task] API response:', response.status, response.ok);
-        
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('[Recurring Task] Failed to create new instance:', errorText);
           logger.error('Failed to create recurring task instance', new Error(errorText), {
             taskId: task.id,
             taskTitle: task.title,
           });
-        } else {
-          console.log('[Recurring Task] Successfully created new instance');
         }
         
-        // Refresh tasks to show the new recurring instance
-        await fetchTasks();
+        // The real-time Firestore listener will call fetchTasks once the new
+        // document lands — no manual fetchTasks() call needed here, which would
+        // race with the listener and could cause a duplicate to flash briefly.
       }
     } catch (error) {
       logger.error('Failed to update task status', error as Error, {
@@ -201,29 +185,19 @@ export function useTaskData(
       );
       
       throw error; // Re-throw so caller can show error
+    } finally {
+      inFlightRef.current.delete(taskId);
     }
-  }, [tasks, userId, fetchTasks]);
+  }, [tasks, userId]);
 
   const saveTask = useCallback(async (taskData: Partial<Task>) => {
     try {
-      console.log('[useTaskData] saveTask called:', {
-        isNew: !taskData.id,
-        taskId: taskData.id,
-        title: taskData.title,
-        projectId: taskData.projectId,
-      });
-      
-      // Determine if update or create based on presence of id
       if (taskData.id) {
-        // Update existing task
-        console.log('[useTaskData] Updating existing task');
         await authenticatedFetch(`/api/tasks/${taskData.id}`, {
           method: 'PUT',
           body: JSON.stringify(taskData),
         });
       } else {
-        // Create new task
-        console.log('[useTaskData] Creating new task');
         const response = await authenticatedFetch('/api/tasks', {
           method: 'POST',
           body: JSON.stringify(taskData),
@@ -231,16 +205,11 @@ export function useTaskData(
         
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('[useTaskData] Failed to create task:', errorText);
           throw new Error(`Failed to create task: ${errorText}`);
         }
-        
-        console.log('[useTaskData] Task created successfully, refreshing list...');
       }
       
-      // Refresh tasks after save
       await fetchTasks();
-      console.log('[useTaskData] Tasks refreshed');
     } catch (error) {
       logger.error('Failed to save task', error as Error, {
         isUpdate: !!taskData.id,

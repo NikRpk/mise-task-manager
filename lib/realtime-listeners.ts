@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { useCache } from './cache-context';
@@ -18,6 +18,7 @@ interface RealtimeListenersOptions {
   userId: string | undefined;
   selectedProjectId: string | null;
   enabled?: boolean;
+  onTasksChanged?: () => void;
 }
 
 /**
@@ -28,8 +29,19 @@ export function useRealtimeListeners({
   userId,
   selectedProjectId,
   enabled = true,
+  onTasksChanged,
 }: RealtimeListenersOptions) {
   const cache = useCache();
+
+  // Stable ref for cache so snapshot closures always use the latest version
+  // without needing cache in useEffect dependency arrays (which would cause
+  // re-subscription loops since CacheProvider creates a new context value object on every render)
+  const cacheRef = useRef(cache);
+  useEffect(() => { cacheRef.current = cache; }, [cache]);
+
+  // Stable ref so the snapshot closure always calls the latest callback
+  const onTasksChangedRef = useRef(onTasksChanged);
+  useEffect(() => { onTasksChangedRef.current = onTasksChanged; }, [onTasksChanged]);
 
   // Listen to notes changes
   useEffect(() => {
@@ -49,7 +61,7 @@ export function useRealtimeListeners({
           q,
           (snapshot) => {
             if (!snapshot.metadata.hasPendingWrites) {
-              cache.invalidate('user-notes');
+              cacheRef.current.invalidate('user-notes');
             }
           },
           (error) => {
@@ -86,7 +98,7 @@ export function useRealtimeListeners({
       teardownListener();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [userId, cache, enabled]);
+  }, [userId, enabled]);
 
   // Listen to tasks changes
   useEffect(() => {
@@ -106,7 +118,8 @@ export function useRealtimeListeners({
           q,
           (snapshot) => {
             if (!snapshot.metadata.hasPendingWrites) {
-              cache.invalidatePattern(new RegExp(`^project-${selectedProjectId}-`));
+              cacheRef.current.invalidatePattern(new RegExp(`^project-${selectedProjectId}-`));
+              onTasksChangedRef.current?.();
             }
           },
           (error) => {
@@ -145,7 +158,7 @@ export function useRealtimeListeners({
       teardownListener();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [userId, selectedProjectId, cache, enabled]);
+  }, [userId, selectedProjectId, enabled]);
 
   // Listen to people directory changes
   useEffect(() => {
@@ -164,7 +177,7 @@ export function useRealtimeListeners({
           peopleRef,
           (snapshot) => {
             if (!snapshot.metadata.hasPendingWrites) {
-              cache.invalidate('people-directory');
+              cacheRef.current.invalidate('people-directory');
             }
           },
           (error) => {
@@ -201,5 +214,5 @@ export function useRealtimeListeners({
       teardownListener();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [userId, cache, enabled]);
+  }, [userId, enabled]);
 }

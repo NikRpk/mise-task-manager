@@ -9,8 +9,8 @@ import { adminDb } from '@/lib/firebase-admin';
 import { handleApiError, successResponse } from '@/lib/api-errors';
 import { logger } from '@/lib/logger';
 import { sendDailyTaskReminder } from '@/lib/slack-client';
+import { groupTasksByDeadline } from '@/lib/reminders';
 import { Task, UserSettings } from '@/types';
-import { startOfDay, addDays, isBefore, isSameDay, parseISO } from 'date-fns';
 
 interface NotificationResult {
   userId: string;
@@ -20,55 +20,12 @@ interface NotificationResult {
 }
 
 /**
- * Filters tasks by deadline status
- */
-function groupTasksByDeadline(tasks: Task[]): {
-  overdue: Task[];
-  today: Task[];
-  tomorrow: Task[];
-} {
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
-
-  const overdue = tasks.filter(
-    task =>
-      task.deadline &&
-      isBefore(parseISO(task.deadline), today) &&
-      task.status !== 'done'
-  );
-
-  const todayTasks = tasks.filter(
-    task =>
-      task.deadline &&
-      isSameDay(parseISO(task.deadline), today) &&
-      task.status !== 'done'
-  );
-
-  const tomorrowTasks = tasks.filter(
-    task =>
-      task.deadline &&
-      isSameDay(parseISO(task.deadline), tomorrow) &&
-      task.status !== 'done'
-  );
-
-  return {
-    overdue,
-    today: todayTasks,
-    tomorrow: tomorrowTasks,
-  };
-}
-
-/**
  * POST /api/cron/daily-reminders
  * Sends daily task reminders to all users who have enabled them
  */
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== DAILY REMINDERS CRON START ===');
-    
     const schedulerHeader = request.headers.get('X-CloudScheduler-JobName');
-    
-    console.log('Scheduler header:', schedulerHeader);
     
     if (schedulerHeader !== 'daily-task-reminders') {
       logger.warn('Unauthorized cron request', { 
@@ -84,53 +41,29 @@ export async function POST(request: NextRequest) {
 
     const results: NotificationResult[] = [];
 
-    console.log('Fetching userSettings collection...');
     const usersSnapshot = await adminDb.collection('userSettings').get();
-    console.log('UserSettings collection size:', usersSnapshot.size);
-    
-    logger.info('Checking user settings', { totalUsers: usersSnapshot.size });
-    
-    console.log('Starting loop through users...');
-
-    console.log('Starting loop through users...');
+    logger.info('Processing daily reminders', { totalUsers: usersSnapshot.size });
 
     for (const userDoc of usersSnapshot.docs) {
       const userId = userDoc.id;
-      console.log(`Processing user ${userId}...`);
       const settings = userDoc.data() as UserSettings;
-      console.log(`User ${userId} settings:`, JSON.stringify(settings.notifications?.dailyTaskReminder || null));
 
       const dailyReminderSettings = settings.notifications?.dailyTaskReminder;
       
-      logger.info('User settings check', {
-        userId,
-        hasEmail: !!settings.email,
-        hasNotifications: !!settings.notifications,
-        hasDailyTaskReminder: !!dailyReminderSettings,
-        slackEnabled: dailyReminderSettings?.slack,
-      });
-      
       if (!dailyReminderSettings || !dailyReminderSettings.slack) {
-        console.log(`Skipping user ${userId} - slack not enabled`);
-        logger.info('Skipping user - daily reminder not enabled', { userId });
         continue;
       }
 
       if (!settings.email) {
-        console.log(`Skipping user ${userId} - no email`);
         logger.warn('Skipping user - no email in settings', { userId });
         continue;
       }
-
-      console.log(`User ${userId} passed all checks! Processing...`);
 
       try {
         const userEmail = settings.email;
         const userName = settings.displayName || 'User';
 
-        console.log(`Fetching projects for user ${userId}...`);
         const projectsSnapshot = await adminDb.collection('projects').get();
-        console.log(`Found ${projectsSnapshot.size} projects total`);
         const allTasks: Task[] = [];
         const projectNames = new Map<string, string>();
 
@@ -150,15 +83,11 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        console.log(`User ${userId} is member of ${userProjectIds.size} projects`);
-
         // Query tasks from top-level tasks collection where owner is user's email
         const tasksSnapshot = await adminDb
           .collection('tasks')
           .where('owner', '==', userEmail)
           .get();
-
-        console.log(`Found ${tasksSnapshot.size} tasks for user ${userId}`);
 
         // Filter tasks to only include those in projects where user is a member
         tasksSnapshot.docs.forEach(taskDoc => {
@@ -168,18 +97,13 @@ export async function POST(request: NextRequest) {
           }
         });
 
-        console.log(`User ${userId} has ${allTasks.length} total tasks in their projects`);
-
         const groupedTasks = groupTasksByDeadline(allTasks);
         const totalRelevantTasks =
           groupedTasks.overdue.length +
           groupedTasks.today.length +
           groupedTasks.tomorrow.length;
 
-        console.log(`User ${userId} has ${totalRelevantTasks} relevant tasks (overdue: ${groupedTasks.overdue.length}, today: ${groupedTasks.today.length}, tomorrow: ${groupedTasks.tomorrow.length})`);
-
         if (totalRelevantTasks === 0) {
-          console.log(`Skipping user ${userId} - no relevant tasks`);
           logger.info('No relevant tasks for user', { userId, userEmail });
           continue;
         }
@@ -203,19 +127,18 @@ export async function POST(request: NextRequest) {
         );
 
         results.push(result);
-        console.log(`Successfully processed user ${userId}`);
         logger.info('Daily reminder processed', {
           userId,
           userEmail,
           tasksCount: totalRelevantTasks,
+          overdue: groupedTasks.overdue.length,
+          today: groupedTasks.today.length,
+          tomorrow: groupedTasks.tomorrow.length,
         });
       } catch (error) {
-        console.error(`Error processing user ${userId}:`, error);
         logger.error('Failed to process user reminder', error as Error, { userId });
       }
     }
-
-    console.log(`Finished processing all users. Total processed: ${results.length}`);
 
     logger.apiResponse('POST', '/api/cron/daily-reminders', 200, undefined, {
       totalUsers: results.length,

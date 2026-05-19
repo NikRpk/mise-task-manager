@@ -60,10 +60,37 @@ export function CommentsSection({
         Comments
       </label>
       
+      {/* Add New Comment */}
+      <div className="flex gap-2 mb-3">
+        <textarea
+          value={newComment}
+          onChange={(e) => onNewCommentChange(e.target.value)}
+          onKeyDown={handleKeyPress}
+          className="flex-1 px-3 py-2 border rounded-md text-sm resize-none"
+          style={{
+            borderColor: 'var(--color-border)',
+          }}
+          placeholder="Add a comment... (Ctrl/Cmd + Enter to post)"
+          rows={2}
+        />
+        <button
+          type="button"
+          onClick={onAddComment}
+          className="px-4 py-2 rounded-md transition-colors flex items-center gap-2"
+          style={{
+            backgroundColor: 'var(--color-primary)',
+            color: '#ffffff',
+          }}
+          disabled={!newComment.trim()}
+        >
+          <Send size={16} />
+        </button>
+      </div>
+
       {/* Existing Comments */}
-      <div className="space-y-3 mb-3 max-h-60 overflow-y-auto">
+      <div className="space-y-3 max-h-60 overflow-y-auto">
         {comments && comments.length > 0 ? (
-          comments.map((comment) => (
+          [...comments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((comment) => (
             <div
               key={comment.id}
               className="p-3 rounded-lg border"
@@ -158,33 +185,6 @@ export function CommentsSection({
             No comments yet
           </p>
         )}
-      </div>
-
-      {/* Add New Comment */}
-      <div className="flex gap-2">
-        <textarea
-          value={newComment}
-          onChange={(e) => onNewCommentChange(e.target.value)}
-          onKeyDown={handleKeyPress}
-          className="flex-1 px-3 py-2 border rounded-md text-sm resize-none"
-          style={{
-            borderColor: 'var(--color-border)',
-          }}
-          placeholder="Add a comment... (Ctrl/Cmd + Enter to post)"
-          rows={2}
-        />
-        <button
-          type="button"
-          onClick={onAddComment}
-          className="px-4 py-2 rounded-md transition-colors flex items-center gap-2"
-          style={{
-            backgroundColor: 'var(--color-primary)',
-            color: '#ffffff',
-          }}
-          disabled={!newComment.trim()}
-        >
-          <Send size={16} />
-        </button>
       </div>
     </div>
   );

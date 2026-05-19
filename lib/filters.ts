@@ -19,12 +19,18 @@ export function filterTasks(tasks: Task[], filters: FilterOptions): Task[] {
           if (deadline >= now || task.status === 'done') return false;
           break;
         case 'today':
+          // Include overdue tasks (not done) + tasks due today
+          if (task.status !== 'done' && deadline < today) break;
           if (deadline < today || deadline >= tomorrow) return false;
           break;
         case 'this-week':
+          // Include overdue tasks (not done) + tasks due within the week
+          if (task.status !== 'done' && deadline < today) break;
           if (deadline < today || deadline >= weekFromNow) return false;
           break;
         case 'this-month':
+          // Include overdue tasks (not done) + tasks due within the month
+          if (task.status !== 'done' && deadline < today) break;
           if (deadline < today || deadline >= monthFromNow) return false;
           break;
         case 'future':
@@ -46,6 +52,11 @@ export function filterTasks(tasks: Task[], filters: FilterOptions): Task[] {
     // Priority filter
     if (filters.priority && filters.priority.length > 0) {
       if (!filters.priority.includes(task.priority)) return false;
+    }
+
+    // Topic filter
+    if (filters.topic && filters.topic.length > 0) {
+      if (!task.topicId || !filters.topic.includes(task.topicId)) return false;
     }
 
     return true;

@@ -25,17 +25,16 @@ export default function QuickTaskPage() {
     }
   }, [user, authLoading, router]);
 
-  // Fetch default project
+  // Fetch default project once auth is resolved
   useEffect(() => {
     const fetchProjects = async () => {
       if (!user) return;
-      
+
       try {
         const res = await authenticatedFetch('/api/projects');
         const projects = await res.json();
-        
-        // Use first project or personal project
-        const personalProject = projects.find((p: { name: string }) => 
+
+        const personalProject = projects.find((p: { name: string }) =>
           p.name.toLowerCase().includes('personal')
         );
         setDefaultProjectId(personalProject?.id || projects[0]?.id || '');
@@ -52,12 +51,12 @@ export default function QuickTaskPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!title.trim() || !defaultProjectId) return;
-    
+
     setCreating(true);
     setError('');
-    
+
     try {
       const response = await authenticatedFetch('/api/tasks', {
         method: 'POST',
@@ -74,21 +73,20 @@ export default function QuickTaskPage() {
           updatedAt: new Date().toISOString(),
         }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         throw new Error(errorData.error || 'Failed to create task');
       }
-      
+
       setSuccess(true);
       setTitle('');
       setDeadline('');
-      
-      // Show success for 1 second, then reset
+
       setTimeout(() => {
         setSuccess(false);
       }, 1500);
-      
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create task. Please try again.';
       setError(errorMessage);
@@ -100,18 +98,6 @@ export default function QuickTaskPage() {
       setCreating(false);
     }
   };
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin" size={32} />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null; // Will redirect
-  }
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--color-background)' }}>
@@ -171,7 +157,7 @@ export default function QuickTaskPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={!title.trim() || creating || !defaultProjectId}
+              disabled={!title.trim() || creating || !defaultProjectId || authLoading}
               className="w-full py-4 px-6 rounded-lg text-white text-lg font-medium disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
               style={{ backgroundColor: 'var(--color-primary)' }}
             >

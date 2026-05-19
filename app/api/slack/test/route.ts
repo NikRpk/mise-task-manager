@@ -3,10 +3,13 @@
  * GET /api/slack/test
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { testSlackConnection } from '@/lib/slack-client';
+import { withAuth } from '@/lib/auth-middleware';
 
-export async function GET() {
-  const result = await testSlackConnection();
-  return NextResponse.json(result);
+export async function GET(request: NextRequest) {
+  return withAuth(request, async () => {
+    const result = await testSlackConnection();
+    return Response.json(result);
+  });
 }

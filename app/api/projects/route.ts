@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { adminDb } from '@/lib/firebase-admin';
-import { DEFAULT_PROJECT_ICON, DEFAULT_STATUS_OPTIONS, DEFAULT_PRIORITY_OPTIONS } from '@/lib/constants';
+import { DEFAULT_PROJECT_ICON, DEFAULT_STATUS_OPTIONS, DEFAULT_PRIORITY_OPTIONS, DEFAULT_TOPIC_OPTIONS } from '@/lib/constants';
 import { handleApiError, successResponse } from '@/lib/api-errors';
 import { ValidationError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
         settings: {
           statusOptions: DEFAULT_STATUS_OPTIONS,
           priorityOptions: DEFAULT_PRIORITY_OPTIONS,
+          topicOptions: DEFAULT_TOPIC_OPTIONS,
           customFields: [],
         },
       };

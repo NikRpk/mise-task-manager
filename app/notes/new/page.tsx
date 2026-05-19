@@ -36,16 +36,15 @@ function NewNotePage() {
   const { settings } = useUserSettings();
   
   const [title, setTitle] = useState('');
+  const [agendaItems, setAgendaItems] = useState<string[]>(['', '', '']);
   const [content, setContent] = useState('');
   const [tasks, setTasks] = useState<NoteTask[]>([]);
   const [templateId, setTemplateId] = useState('default');
   const [isSaving, setIsSaving] = useState(false);
-  const [isAttaching, setIsAttaching] = useState(false);
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [showCalendarSelector, setShowCalendarSelector] = useState(false);
-  const [createGoogleDoc, setCreateGoogleDoc] = useState(true); // Default: checked
   const [sendToSlack, setSendToSlack] = useState(true); // Default: checked
-  const [previousNote, setPreviousNote] = useState<Note | null>(null);
+  const [previousNotes, setPreviousNotes] = useState<Note[]>([]);
   const [isLoadingPrevious, setIsLoadingPrevious] = useState(false);
   const { showToast, updateToast } = useToast();
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; type: 'error' | 'success' | 'warning' | 'info' }>({
@@ -54,42 +53,18 @@ function NewNotePage() {
     message: '',
     type: 'info',
   });
-  const taskInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const taskInputRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
   const { people } = usePeopleData();
 
   // Get timezone from cached settings
   const userTimezone = settings?.timezone || DEFAULT_TIMEZONE;
 
-  // Check if user is organizer of selected event
-  const isOrganizer = selectedCalendarEvent?.attendees?.some(
-    a => a.self && a.organizer
-  ) ?? false;
-
-  // Load template from settings on mount
+  // Load notes template from settings on mount
   useEffect(() => {
     if (settings?.noteTemplate && typeof settings.noteTemplate === 'string') {
       setContent(settings.noteTemplate);
     } else {
-      // Use default template
-      setContent(`<h2>Agenda</h2>
-<ul>
-  <li></li>
-</ul>
-
-<h2>Discussion & Notes</h2>
-<ul>
-  <li></li>
-</ul>
-
-<h2>Decisions Made</h2>
-<ul>
-  <li></li>
-</ul>
-
-<h2>Action Items</h2>
-<ul>
-  <li></li>
-</ul>`);
+      setContent('<ul><li><p></p></li></ul>');
     }
   }, [settings]);
 
@@ -106,6 +81,45 @@ function NewNotePage() {
       eventId: event?.id,
       summary: event?.summary 
     });
+    
+    if (event) {
+      // Check if a note already exists for this calendar event
+      try {
+        const res = await authenticatedFetch(`/api/notes?calendarEventId=${encodeURIComponent(event.id)}`);
+        
+        if (res.ok) {
+          const data = await res.json();
+          const existingNotes = data.notes || [];
+          
+          // If a note exists for this event, redirect to it
+          if (existingNotes.length > 0) {
+            const existingNote = existingNotes[0];
+            logger.debug('Found existing note for calendar event, redirecting', {
+              noteId: existingNote.id,
+              eventId: event.id,
+            });
+            
+            showToast({
+              type: 'info',
+              title: 'Note already exists',
+              message: 'Opening existing note for this meeting',
+              duration: 3000,
+            });
+            
+            // Redirect to existing note
+            router.push(`/notes/${existingNote.id}`);
+            return;
+          }
+        }
+      } catch (error) {
+        logger.error('Error checking for existing note', error as Error, {
+          eventId: event.id,
+          userId: user?.uid,
+        });
+        // Continue with note creation if check fails
+      }
+    }
+    
     setSelectedCalendarEvent(event);
     setShowCalendarSelector(false);
     if (event) {
@@ -128,8 +142,8 @@ function NewNotePage() {
           
           if (res.ok) {
             const data = await res.json();
-            logger.debug('Previous note data fetched', { hasPreviousNote: !!data.previousNote });
-            setPreviousNote(data.previousNote);
+            logger.debug('Previous notes fetched', { count: data.previousNotes?.length ?? 0 });
+            setPreviousNotes(data.previousNotes || []);
           }
         } catch (error) {
           logger.error('Error fetching previous note for recurring event', error as Error, {
@@ -143,7 +157,7 @@ function NewNotePage() {
         }
       } else {
         // Not a recurring event, clear previous note
-        setPreviousNote(null);
+        setPreviousNotes([]);
       }
     }
   };
@@ -174,8 +188,15 @@ function NewNotePage() {
       // Filter out tasks with empty titles
       const validTasks = tasks.filter(task => task.title.trim() !== '');
 
+      // Strip agenda if the user left all items empty
+      const nonEmptyAgendaItems = agendaItems.filter(item => item.trim() !== '');
+      const savedAgenda = nonEmptyAgendaItems.length > 0
+        ? JSON.stringify(nonEmptyAgendaItems)
+        : '';
+
       const noteData: Partial<Note> = {
         title: title.trim(),
+        agenda: savedAgenda,
         content,
         tasks: validTasks,
         templateId,
@@ -262,47 +283,7 @@ function NewNotePage() {
       }
 
       // Auto-attach to calendar if event is selected AND user wants to create doc
-      if (selectedCalendarEvent && createGoogleDoc) {
-        setIsAttaching(true);
-        const toastId = showToast({
-          type: 'loading',
-          title: 'Attaching to calendar',
-          message: 'Creating Google Doc...',
-          duration: 0, // Don't auto-dismiss
-        });
-
-        // Fire and forget - run in background
-        authenticatedFetch(`/api/notes/${newNote.id}/attach-to-calendar`, {
-          method: 'POST',
-        }).then(attachRes => {
-          if (attachRes.ok) {
-            updateToast(toastId, {
-              type: 'success',
-              title: 'Attached to calendar',
-              message: isOrganizer 
-                ? 'Google Doc created and linked to event' 
-                : 'Google Doc created and shared with attendees',
-              duration: 5000,
-            });
-          } else {
-            updateToast(toastId, {
-              type: 'error',
-              title: 'Attachment failed',
-              message: 'Note saved but could not attach to calendar',
-              duration: 5000,
-            });
-          }
-          setIsAttaching(false);
-        }).catch(() => {
-          updateToast(toastId, {
-            type: 'error',
-            title: 'Attachment failed',
-            message: 'Note saved but could not attach to calendar',
-            duration: 5000,
-          });
-          setIsAttaching(false);
-        });
-      }
+      // (Google Doc creation removed - using in-app note URL instead)
       
       // Send Slack notifications if enabled and calendar event is selected
       if (selectedCalendarEvent && sendToSlack && selectedCalendarEvent.attendees) {
@@ -580,16 +561,70 @@ function NewNotePage() {
 
       {/* Content */}
       <div className="max-w-5xl mx-auto px-7 py-8">
-        <div className="space-y-8">
-          {/* Rich Text Editor */}
-          <div className="rounded-xl border p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-            <TipTapEditor
-              value={content}
-              onChange={setContent}
-              placeholder="Start taking notes..."
-              disabled={false}
-              people={people}
-            />
+        <div className="space-y-4">
+          {/* Agenda Section */}
+          <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+            <div className="px-6 pb-4 pt-4 space-y-2">
+              {agendaItems.map((item, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <span className="text-gray-400 select-none" style={{ fontSize: '0.6rem' }}>●</span>
+                  <input
+                    type="text"
+                    value={item}
+                    onChange={(e) => {
+                      const updated = [...agendaItems];
+                      updated[index] = e.target.value;
+                      setAgendaItems(updated);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const updated = [...agendaItems];
+                        updated.splice(index + 1, 0, '');
+                        setAgendaItems(updated);
+                      }
+                      if (e.key === 'Backspace' && item === '' && agendaItems.length > 1) {
+                        e.preventDefault();
+                        const updated = agendaItems.filter((_, i) => i !== index);
+                        setAgendaItems(updated);
+                      }
+                    }}
+                    placeholder={`Agenda point ${index + 1}...`}
+                    className="flex-1 px-2.5 py-1.5 border rounded-md text-sm bg-white focus:outline-none focus:ring-1"
+                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+                  />
+                  {agendaItems.length > 1 && (
+                    <button
+                      onClick={() => setAgendaItems(agendaItems.filter((_, i) => i !== index))}
+                      className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
+                      title="Remove"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => setAgendaItems([...agendaItems, ''])}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors pt-1"
+              >
+                <Plus size={12} />
+                <span>Add point</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Notes Section */}
+          <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+            <div className="px-6 pb-5 pt-5">
+              <TipTapEditor
+                value={content}
+                onChange={setContent}
+                placeholder="Start taking notes..."
+                disabled={false}
+                people={people}
+              />
+            </div>
           </div>
 
           {/* Tasks Section */}
@@ -597,21 +632,18 @@ function NewNotePage() {
             {tasks.length === 0 ? (
               <div
                 onClick={addTask}
-                className="text-sm text-gray-500 text-center py-3 px-6 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors m-6 flex items-center justify-center gap-2"
+                className="text-sm text-gray-400 text-center py-2 px-4 cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
                 style={{ borderColor: 'var(--color-border)' }}
               >
-                <Plus size={16} className="text-gray-400" />
-                <p>Click here to create your first task</p>
+                <Plus size={14} className="text-gray-400" />
+                <span>Click here to create your first task</span>
               </div>
             ) : (
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="w-full">
                   <thead className="sticky top-0 z-10">
                     <tr className="border-b" style={{ backgroundColor: '#f8fafc', borderColor: 'var(--color-border)' }}>
-                      <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '5%' }} title="Create task in default project">
-                        📋
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '50%' }}>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '55%' }}>
                         Task Title
                       </th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748b', width: '25%' }}>
@@ -634,22 +666,15 @@ function NewNotePage() {
                         className="border-b hover:bg-gray-50 transition-colors"
                         style={{ borderColor: '#f1f5f9' }}
                       >
-                        <td className="px-4 py-2 text-center">
-                          <input
-                            type="checkbox"
-                            checked={!!(task.createInProject !== false && isMyTask)}
-                            onChange={(e) => updateTask(task.id, { createInProject: e.target.checked })}
-                            disabled={!isMyTask}
-                            className="w-4 h-4 rounded border-gray-300"
-                            title={isMyTask ? "Create this task in your default project" : "Only your own tasks can be created in projects"}
-                          />
-                        </td>
                         <td className="px-4 py-2">
-                          <input
+                          <textarea
                             ref={(el) => { taskInputRefs.current[task.id] = el; }}
-                            type="text"
                             value={task.title}
-                            onChange={(e) => updateTask(task.id, { title: e.target.value })}
+                            onChange={(e) => {
+                              updateTask(task.id, { title: e.target.value });
+                              e.target.style.height = 'auto';
+                              e.target.style.height = `${e.target.scrollHeight}px`;
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey && index === tasks.length - 1) {
                                 e.preventDefault();
@@ -657,8 +682,9 @@ function NewNotePage() {
                               }
                             }}
                             placeholder="Task title..."
-                            className="dense-table-input w-full px-2.5 py-1.5 border rounded-md text-sm"
-                          />
+                            rows={1}
+                            className="dense-table-input w-full px-2.5 py-1.5 border rounded-md text-sm resize-none overflow-hidden"
+                          ></textarea>
                         </td>
                         <td className="px-4 py-2">
                           <OwnerSelector
@@ -700,7 +726,7 @@ function NewNotePage() {
             {tasks.length > 0 && (
               <div
                 onClick={addTask}
-                className="border-t-2 border-dashed px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm text-gray-500"
+                className="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm text-gray-500"
                 style={{ borderColor: 'var(--color-border)' }}
               >
                 <Plus size={16} />
@@ -709,45 +735,26 @@ function NewNotePage() {
             )}
           </div>
 
-          {/* Previous Meeting Section - Show loading state or previous note */}
-          {selectedCalendarEvent && (isLoadingPrevious || previousNote) && (
-            <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: '#f8fafc', borderColor: 'var(--color-border)' }}>
-              {isLoadingPrevious ? (
+          {/* Previous Meeting Section - Show loading state or previous notes */}
+          {selectedCalendarEvent && (isLoadingPrevious || previousNotes.length > 0) && (
+            isLoadingPrevious ? (
+              <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
                 <div className="px-6 py-8 flex flex-col items-center justify-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 mb-3" style={{ borderColor: 'var(--color-primary)' }}></div>
                   <p className="text-sm text-gray-600">Loading previous meeting notes...</p>
                 </div>
-              ) : previousNote ? (
-                <PreviousMeetingSection 
-                  previousNote={previousNote}
-                  userTimezone={userTimezone}
-                />
-              ) : null}
-            </div>
+              </div>
+            ) : (
+              <PreviousMeetingSection
+                previousNotes={previousNotes}
+                userTimezone={userTimezone}
+              />
+            )
           )}
 
-          {/* Create Google Doc Checkbox - Only show when calendar event is selected */}
+          {/* Slack Checkbox - Only show when calendar event is selected */}
           {selectedCalendarEvent && (
-            <div className="rounded-xl border p-5 space-y-4" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={createGoogleDoc}
-                  onChange={(e) => setCreateGoogleDoc(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900 group-hover:text-gray-700 transition-colors">
-                    Create and attach Google Doc to calendar event
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {isOrganizer 
-                      ? 'A Google Doc will be created and linked to the calendar event description. All attendees will have comment access.'
-                      : 'A Google Doc will be created and shared with all attendees. You are not the organizer, so it cannot be added to the event description.'}
-                  </div>
-                </div>
-              </label>
-              
+            <div className="rounded-xl border p-5" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
               <label className="flex items-start gap-3 cursor-pointer group">
                 <input
                   type="checkbox"

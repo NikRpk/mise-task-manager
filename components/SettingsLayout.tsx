@@ -8,7 +8,7 @@ import { logger } from '@/lib/logger';
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
-  activeSection: 'profile' | 'appearance' | 'notifications' | 'note-templates' | 'project-details' | 'project-status' | 'project-priority' | 'project-custom-fields' | 'project-members';
+  activeSection: 'profile' | 'appearance' | 'notifications' | 'note-templates' | 'project-details' | 'project-status' | 'project-priority' | 'project-topics' | 'project-custom-fields' | 'project-members';
 }
 
 export default function SettingsLayout({ children, activeSection }: SettingsLayoutProps) {
@@ -61,6 +61,7 @@ export default function SettingsLayout({ children, activeSection }: SettingsLayo
     { id: 'project-details', label: 'Project Details', icon: SettingsIcon },
     { id: 'project-status', label: 'Status Options', icon: Sliders },
     { id: 'project-priority', label: 'Priority Options', icon: Sliders },
+    { id: 'project-topics', label: 'Topic Options', icon: Sliders },
     { id: 'project-custom-fields', label: 'Custom Fields', icon: Sliders },
     { id: 'project-members', label: 'Members', icon: Users },
   ];

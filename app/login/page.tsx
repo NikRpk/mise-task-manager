@@ -63,6 +63,11 @@ export default function LoginPage() {
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm">{error}</p>
+              {error.toLowerCase().includes('popup') && (
+                <p className="text-red-500 text-xs mt-2">
+                  If the sign-in popup was blocked, allow popups for this site in your browser settings and try again.
+                </p>
+              )}
             </div>
           )}
 

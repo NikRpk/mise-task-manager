@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Plus, Trash2, Send, Edit2, Check, Share2, MoreVertical } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
-import { Task, SubTask, TaskStatus, Priority, Comment, CustomField, StatusOption, PriorityOption } from '@/types';
+import { Task, SubTask, TaskStatus, Priority, Comment, CustomField, StatusOption, PriorityOption, TopicOption } from '@/types';
 import TipTapEditor from './TipTapEditor';
 import AlertDialog from './AlertDialog';
 import InputDialog from './InputDialog';
@@ -57,6 +57,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
 
   const [statusOptions, setStatusOptions] = useState<StatusOption[]>([]);
   const [priorityOptions, setPriorityOptions] = useState<PriorityOption[]>([]);
+  const [topicOptions, setTopicOptions] = useState<TopicOption[]>([]);
+  const topicFieldLabel = 'Topic';
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [showShareToast, setShowShareToast] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -65,6 +67,8 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState(false);
   const [unsavedTaskConfirmDialog, setUnsavedTaskConfirmDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [openToolbarField, setOpenToolbarField] = useState<'status' | 'topic' | 'priority' | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   
   // Input dialog states
   const [inputDialog, setInputDialog] = useState<{ isOpen: boolean; title: string; placeholder: string; defaultValue: string; onConfirm: (value: string) => void }>({
@@ -154,14 +158,6 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
   const debouncedSave = useRef(
     debounce((...args: unknown[]) => {
       const data = args[0] as Partial<Task>;
-      console.log('[TaskModal] Auto-saving task:', {
-        id: data.id,
-        title: data.title,
-        isRecurring: data.isRecurring,
-        recurrenceInterval: data.recurrenceInterval,
-        recurrenceUnit: data.recurrenceUnit,
-        deadline: data.deadline,
-      });
       saveTaskToServer(data);
     }, AUTO_SAVE_DELAY_MS)
   ).current;
@@ -195,6 +191,10 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
           if (data.priorityOptions && Array.isArray(data.priorityOptions)) {
             setPriorityOptions(data.priorityOptions);
           }
+          if (data.topicOptions && Array.isArray(data.topicOptions)) {
+            setTopicOptions(data.topicOptions);
+          }
+
           if (data.customFields && Array.isArray(data.customFields)) {
             setCustomFields(data.customFields);
           }
@@ -216,18 +216,11 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
             { id: 'high', label: 'High', color: '#f30047' },
           ]);
           setCustomFields([]);
+          setTopicOptions([]);
         });
     }
 
     if (task) {
-      console.log('[TaskModal] Loading task into form:', {
-        id: task.id,
-        title: task.title,
-        isRecurring: task.isRecurring,
-        recurrenceInterval: task.recurrenceInterval,
-        recurrenceUnit: task.recurrenceUnit,
-        deadline: task.deadline,
-      });
       setFormData(task);
     } else {
       // For new tasks, use the default project ID
@@ -282,6 +275,10 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
           setShowMobileMenu(false);
         }
       }
+      // Close toolbar dropdown when clicking outside
+      if (openToolbarField && toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) {
+        setOpenToolbarField(null);
+      }
     };
 
     if (isOpen) {
@@ -292,7 +289,7 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [isOpen, isEditingTitle, alertDialog.isOpen, inputDialog.isOpen, deleteConfirmDialog, unsavedTaskConfirmDialog, showMobileMenu]);
+  }, [isOpen, isEditingTitle, alertDialog.isOpen, inputDialog.isOpen, deleteConfirmDialog, unsavedTaskConfirmDialog, showMobileMenu, openToolbarField]);
 
   // Update formData and trigger auto-save
   const updateFormData = (updates: Partial<Task>) => {
@@ -648,33 +645,27 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
       
       {/* Scrollable modal container */}
       <div
-        className="fixed inset-0 z-[101] md:flex md:items-center md:justify-center md:p-4 overflow-y-scroll"
+        className="fixed inset-0 z-[101] md:flex md:items-center md:justify-center md:p-4 overflow-y-auto"
         onClick={handleClose}
       >
         <div
-          className="bg-surface md:rounded-lg w-full max-w-7xl md:max-h-[90vh] min-h-screen md:min-h-0 overflow-y-scroll md:my-auto"
+          className="bg-surface md:rounded-lg w-full max-w-7xl md:max-h-[90vh] min-h-screen md:min-h-0 overflow-y-auto md:my-auto"
           onClick={(e) => e.stopPropagation()}
           style={{ 
             border: '1px solid #e2e8f0',
           }}
         >
         <div
-          className="sticky top-0 bg-surface md:px-8 px-4 py-3 md:py-2 z-10"
+          className="sticky top-0 bg-surface md:pl-8 md:pr-3 px-4 py-3 md:py-2 z-10"
           style={{ borderBottom: '2px solid #e2e8f0' }}
         >
-          {/* Close button - absolutely positioned in top right */}
-          <button
-            onClick={handleClose}
-            type="button"
-            className="absolute top-3 md:top-2 right-3 md:right-2 p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 hover:shadow-md transition-all cursor-pointer z-20"
-            style={{ color: 'var(--color-text-secondary)' }}
-            title="Close"
-          >
-            <X size={20} />
-          </button>
-
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center pr-12 gap-3 md:gap-0">
-            <div className="flex-1">
+          {/* One header row for both modal states:
+              [ title group ][ action group ][ close cell ]
+              - title group: title + meta
+              - action group: state-specific buttons (Share/Delete/Days or Cancel/Create)
+              - close cell: X, always present, always last */}
+          <div className="flex items-center gap-3 md:gap-6">
+            <div className="flex-1 min-w-0">
               {task ? (
                 isEditingTitle ? (
                   <input
@@ -699,12 +690,12 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                       }
                     }}
                     autoFocus
-                    className="text-base font-semibold mb-1 px-2 py-1 border-0 focus:outline-none w-full"
+                    className="text-base font-semibold px-2 py-1 border-0 focus:outline-none w-full"
                     style={{ color: 'var(--color-text)', background: '#f8fafc', borderRadius: '4px' }}
                   />
                 ) : (
                   <h2 
-                    className="text-base font-semibold mb-1 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded inline-block break-words max-w-full" 
+                    className="text-base font-semibold cursor-pointer hover:bg-gray-50 px-2 py-1 rounded inline-block break-words max-w-full" 
                     style={{ color: 'var(--color-text)' }}
                     onClick={() => {
                       setEditingTitle(formData.title || '');
@@ -716,175 +707,162 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                   </h2>
                 )
               ) : (
-                <h2 className="text-base font-semibold mb-1" style={{ color: 'var(--color-text)' }}>
+                <h2 className="text-base font-semibold" style={{ color: 'var(--color-text)' }}>
                   Create Task
                 </h2>
               )}
-              {task && (
-                <div className="md:flex md:flex-row md:gap-3 hidden text-xs px-2" style={{ color: 'var(--color-text-secondary)' }}>
-                  <div className="flex gap-3">
-                    <span>Created {task.createdAt ? new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}</span>
-                    <span>•</span>
-                    <span>Last updated {task.updatedAt ? new Date(task.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' }) : 'N/A'}</span>
+            </div>
+            {/* Action group — buttons change based on modal state (new vs existing task) */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {task ? (
+                <>
+                  {/* Desktop: Share + Delete + Days counter */}
+                  <div className="hidden md:flex md:items-center gap-3 md:gap-6">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleShare}
+                        type="button"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors hover:bg-gray-100 text-sm"
+                        style={{ color: 'var(--color-primary)' }}
+                        title="Share task"
+                      >
+                        <Share2 size={16} />
+                        <span className="font-medium">Share</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDeleteConfirmDialog(true);
+                        }}
+                        type="button"
+                        disabled={isDeleting}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        style={{ color: '#f30047' }}
+                        title="Delete task"
+                      >
+                        <Trash2 size={16} />
+                        <span className="font-medium">
+                          {isDeleting ? 'Deleting...' : 'Delete'}
+                        </span>
+                      </button>
+                    </div>
+                    {/* Deadline pill — only rendered when a deadline exists. */}
+                    {(() => {
+                      const hasDeadline = !!formData.deadline;
+                      if (!hasDeadline) return null;
+                      const daysRemaining = Math.ceil(
+                        (new Date(formData.deadline!).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                      );
+                      const isOverdue = daysRemaining < 0;
+                      const isToday = daysRemaining === 0;
+                      const absDays = Math.abs(daysRemaining);
+                      const dayWord = absDays === 1 ? 'day' : 'days';
+                      const label = isToday
+                        ? 'Due today'
+                        : isOverdue
+                          ? `${absDays} ${dayWord} overdue`
+                          : `${absDays} ${dayWord} left`;
+                      return (
+                        <span
+                          className="inline-flex items-center px-3 py-1.5 rounded-md border text-sm font-semibold whitespace-nowrap"
+                          style={{
+                            borderColor: isOverdue ? '#fecaca' : 'var(--color-border)',
+                            backgroundColor: isOverdue ? '#fef2f2' : 'transparent',
+                            color: isOverdue ? '#f30047' : 'var(--color-text-secondary)',
+                          }}
+                        >
+                          {label}
+                        </span>
+                      );
+                    })()}
                   </div>
-                  {/* Save Status Indicator */}
-                  {isSaving && (
-                    <div className="flex items-center gap-1">
-                      <span>•</span>
-                      <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-primary)' }}>
-                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Saving...
-                      </span>
-                    </div>
-                  )}
-                  {saveError && (
-                    <div className="flex items-center gap-1">
-                      <span>•</span>
-                      <span className="text-xs" style={{ color: '#f30047' }} title={saveError}>
-                        ⚠️ Save failed
-                      </span>
-                    </div>
-                  )}
-                </div>
+
+                  {/* Mobile: ⋮ menu trigger (same flex cell, no absolute positioning) */}
+                  <div className="md:hidden relative">
+                    <button
+                      onClick={() => setShowMobileMenu(!showMobileMenu)}
+                      type="button"
+                      className="p-2 rounded-lg transition-colors hover:bg-gray-100"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                      title="More options"
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+                    {showMobileMenu && (
+                      <div
+                        data-mobile-menu
+                        className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border z-30 overflow-hidden"
+                        style={{ borderColor: 'var(--color-border)', minWidth: '160px' }}
+                      >
+                        <button
+                          onClick={() => {
+                            handleShare();
+                            setShowMobileMenu(false);
+                          }}
+                          type="button"
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-gray-50"
+                          style={{ color: 'var(--color-text)' }}
+                        >
+                          <Share2 size={16} style={{ color: 'var(--color-primary)' }} />
+                          <span>Share</span>
+                        </button>
+                        <div style={{ borderTop: '1px solid #e2e8f0' }} />
+                        <button
+                          onClick={() => {
+                            setDeleteConfirmDialog(true);
+                            setShowMobileMenu(false);
+                          }}
+                          type="button"
+                          disabled={isDeleting}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-red-50 disabled:opacity-50"
+                          style={{ color: '#f30047' }}
+                        >
+                          <Trash2 size={16} />
+                          <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 rounded-md transition-colors text-sm font-medium"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      borderColor: 'var(--color-border)',
+                      color: 'var(--color-text)',
+                      borderWidth: '1px',
+                      borderStyle: 'solid',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    onClick={handleSubmit}
+                    className="px-4 py-2 text-white rounded-md transition-opacity hover:opacity-90 text-sm font-medium"
+                    style={{ backgroundColor: 'var(--color-primary)' }}
+                  >
+                    Create Task
+                  </button>
+                </>
               )}
             </div>
-            {task ? (
-              <>
-                {/* Desktop Actions */}
-                <div className="hidden md:flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handleShare}
-                      type="button"
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors hover:bg-gray-100 text-sm"
-                      style={{ color: 'var(--color-primary)' }}
-                      title="Share task"
-                    >
-                      <Share2 size={16} />
-                      <span className="font-medium">Share</span>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDeleteConfirmDialog(true);
-                      }}
-                      type="button"
-                      disabled={isDeleting}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                      style={{ color: '#f30047' }}
-                      title="Delete task"
-                    >
-                      <Trash2 size={16} />
-                      <span className="font-medium">
-                        {isDeleting ? 'Deleting...' : 'Delete'}
-                      </span>
-                    </button>
-                  </div>
-                  {/* Days Left/Overdue - Only show on desktop if there's a deadline */}
-                  {formData.deadline && (() => {
-                    const daysRemaining = Math.ceil((new Date(formData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                    const isOverdue = daysRemaining < 0;
-                    const daysCount = Math.abs(daysRemaining);
-                    
-                    return (
-                      <div className="text-center px-4 py-2 bg-surface border rounded-lg w-fit" style={{ borderColor: isOverdue ? '#fecaca' : 'var(--color-border)', backgroundColor: isOverdue ? '#fef2f2' : undefined }}>
-                        {isOverdue ? (
-                          <>
-                            <div className="text-[10px] uppercase tracking-wide font-semibold mb-0.5" style={{ color: '#f30047' }}>Overdue</div>
-                            <div className="text-sm font-bold" style={{ color: '#f30047' }}>
-                              {daysCount} day{daysCount !== 1 ? 's' : ''}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                              {daysCount}d
-                            </div>
-                            <div className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>Left</div>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-                
-                {/* Mobile Menu Button */}
-                <button
-                  onClick={() => setShowMobileMenu(!showMobileMenu)}
-                  type="button"
-                  className="md:hidden absolute top-3 right-14 p-2 rounded-lg transition-colors"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                  title="More options"
-                >
-                  <MoreVertical size={20} />
-                </button>
-                
-                {/* Mobile Dropdown Menu */}
-                {showMobileMenu && (
-                  <div 
-                    data-mobile-menu
-                    className="md:hidden absolute top-14 right-4 bg-white rounded-lg shadow-xl border z-30 overflow-hidden"
-                    style={{ borderColor: 'var(--color-border)', minWidth: '160px' }}
-                  >
-                    <button
-                      onClick={() => {
-                        handleShare();
-                        setShowMobileMenu(false);
-                      }}
-                      type="button"
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-gray-50"
-                      style={{ color: 'var(--color-text)' }}
-                    >
-                      <Share2 size={16} style={{ color: 'var(--color-primary)' }} />
-                      <span>Share</span>
-                    </button>
-                    <div style={{ borderTop: '1px solid #e2e8f0' }} />
-                    <button
-                      onClick={() => {
-                        setDeleteConfirmDialog(true);
-                        setShowMobileMenu(false);
-                      }}
-                      type="button"
-                      disabled={isDeleting}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-red-50 disabled:opacity-50"
-                      style={{ color: '#f30047' }}
-                    >
-                      <Trash2 size={16} />
-                      <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 md:flex-none px-4 py-2 rounded-md transition-colors text-sm font-medium"
-                  style={{
-                    backgroundColor: 'var(--color-surface)',
-                    borderColor: 'var(--color-border)',
-                    color: 'var(--color-text)',
-                    borderWidth: '1px',
-                    borderStyle: 'solid',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  onClick={handleSubmit}
-                  className="flex-1 md:flex-none px-4 py-2 text-white rounded-md transition-opacity hover:opacity-90 text-sm font-medium"
-                  style={{ backgroundColor: 'var(--color-primary)' }}
-                >
-                  Create Task
-                </button>
-              </div>
-            )}
+
+            {/* Close cell — always present, always last, self-contained */}
+            <button
+              onClick={handleClose}
+              type="button"
+              className="p-2 rounded-lg transition-all hover:bg-gray-100 hover:shadow-sm flex-shrink-0"
+              style={{ color: 'var(--color-text-secondary)' }}
+              title="Close"
+            >
+              <X size={20} />
+            </button>
           </div>
         </div>
 
@@ -1100,10 +1078,42 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                   Comments
                 </label>
                 
+                {/* Add New Comment */}
+                <div className="flex gap-2 mb-3">
+                  <textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        addComment();
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 border rounded-md text-sm resize-none"
+                    style={{
+                      borderColor: 'var(--color-border)',
+                    }}
+                    placeholder="Add a comment... (Ctrl/Cmd + Enter to post)"
+                    rows={2}
+                  />
+                  <button
+                    type="button"
+                    onClick={addComment}
+                    className="px-4 py-2 rounded-md transition-colors flex items-center gap-2"
+                    style={{
+                      backgroundColor: 'var(--color-primary)',
+                      color: '#ffffff',
+                    }}
+                    disabled={!newComment.trim()}
+                  >
+                    <Send size={16} />
+                  </button>
+                </div>
+
                 {/* Existing Comments */}
-                <div className="space-y-3 mb-3 max-h-60 overflow-y-auto">
+                <div className="space-y-3 max-h-60 overflow-y-auto">
                   {formData.comments && formData.comments.length > 0 ? (
-                    formData.comments.map((comment) => (
+                    [...formData.comments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((comment) => (
                       <div
                         key={comment.id}
                         className="p-3 rounded-lg border"
@@ -1199,38 +1209,6 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                     </p>
                   )}
                 </div>
-
-                {/* Add New Comment */}
-                <div className="flex gap-2">
-                  <textarea
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                        e.preventDefault();
-                        addComment();
-                      }
-                    }}
-                    className="flex-1 px-3 py-2 border rounded-md text-sm resize-none"
-                    style={{
-                      borderColor: 'var(--color-border)',
-                    }}
-                    placeholder="Add a comment... (Ctrl/Cmd + Enter to post)"
-                    rows={2}
-                  />
-                  <button
-                    type="button"
-                    onClick={addComment}
-                    className="px-4 py-2 rounded-md transition-colors flex items-center gap-2"
-                    style={{
-                      backgroundColor: 'var(--color-primary)',
-                      color: '#ffffff',
-                    }}
-                    disabled={!newComment.trim()}
-                  >
-                    <Send size={16} />
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -1245,55 +1223,175 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
               
               <div className="rounded-lg md:p-5 p-4" style={{ background: '#fafbfc', border: '1px solid #e2e8f0' }}>
                 <div className="md:space-y-4 space-y-3">
-                  {/* Status - Desktop only */}
-                  <div className="hidden md:block pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <Select
-                      label="Status"
-                      value={formData.status || (statusOptions[0]?.id || 'todo')}
-                      onChange={(value) => updateFormData({ status: value as TaskStatus })}
-                      options={statusOptions.length > 0 ? statusOptions.map(opt => ({
-                        value: opt.id,
-                        label: opt.label,
-                      })) : [
-                        { value: 'todo', label: 'To Do' },
-                        { value: 'in-progress', label: 'In Progress' },
-                        { value: 'review', label: 'Review' },
-                        { value: 'done', label: 'Done' },
-                      ]}
-                      style={{
-                        background: '#ffffff',
-                        color: formData.status && statusOptions.find(s => s.id === formData.status)?.color 
-                          ? statusOptions.find(s => s.id === formData.status)?.color 
-                          : '#0f172a',
-                        border: `2px solid ${formData.status && statusOptions.find(s => s.id === formData.status)?.color ? statusOptions.find(s => s.id === formData.status)?.color : '#e2e8f0'}`,
-                      }}
-                    />
-                  </div>
+                  {/* Compact pill toolbar: Status · Topic · Priority */}
+                  <div ref={toolbarRef} className="relative pb-3" style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <div
+                      className="flex items-stretch rounded-md overflow-visible"
+                      style={{ border: '1px solid #e2e8f0', background: '#ffffff' }}
+                    >
+                      {/* Status pill */}
+                      {(() => {
+                        const opt = statusOptions.find(s => s.id === formData.status);
+                        const color = opt?.color || 'var(--color-text-secondary)';
+                        const label = opt?.label || formData.status || 'Status';
+                        return (
+                          <div className="relative flex-1">
+                            <button
+                              type="button"
+                              onClick={() => setOpenToolbarField(openToolbarField === 'status' ? null : 'status')}
+                              className="w-full flex flex-col items-start px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-gray-50 rounded-l-md"
+                              style={{ color: 'var(--color-text)' }}
+                            >
+                              <span className="text-[10px] uppercase tracking-wide font-semibold mb-0.5" style={{ color: 'var(--color-text-secondary)' }}>Status</span>
+                              <span className="flex items-center gap-1.5">
+                                <span className="flex-shrink-0 rounded-full" style={{ width: '8px', height: '8px', background: color }} />
+                                <span className="truncate">{label}</span>
+                              </span>
+                            </button>
+                            {openToolbarField === 'status' && (
+                              <div
+                                className="absolute left-0 top-full mt-1 bg-white rounded-lg shadow-xl z-50 py-1 min-w-[140px]"
+                                style={{ border: '1px solid #e2e8f0' }}
+                              >
+                                {(statusOptions.length > 0 ? statusOptions : [
+                                  { id: 'todo', label: 'To Do', color: 'var(--color-text-secondary)' },
+                                  { id: 'in-progress', label: 'In Progress', color: '#f6c400' },
+                                  { id: 'review', label: 'Review', color: '#3b82f6' },
+                                  { id: 'done', label: 'Done', color: '#00a61c' },
+                                ]).map(s => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => {
+                                      updateFormData({ status: s.id as TaskStatus });
+                                      setOpenToolbarField(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left"
+                                    style={{ color: formData.status === s.id ? s.color : 'var(--color-text)', fontWeight: formData.status === s.id ? 600 : 400 }}
+                                  >
+                                    <span className="rounded-full flex-shrink-0" style={{ width: '8px', height: '8px', background: s.color }} />
+                                    {s.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
-                  {/* Priority */}
-                  <div className="pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <Select
-                      label="Priority"
-                      value={formData.priority || (priorityOptions[0]?.id || 'medium')}
-                      onChange={(value) => updateFormData({ priority: value as Priority })}
-                      options={priorityOptions.length > 0 ? priorityOptions.map(opt => ({
-                        value: opt.id,
-                        label: opt.label,
-                      })) : [
-                        { value: 'low', label: 'Low' },
-                        { value: 'medium', label: 'Medium' },
-                        { value: 'high', label: 'High' },
-                      ]}
-                      style={{
-                        background: formData.priority && priorityOptions.find(p => p.id === formData.priority)?.color 
-                          ? `${priorityOptions.find(p => p.id === formData.priority)?.color}20` 
-                          : '#ffffff',
-                        color: formData.priority && priorityOptions.find(p => p.id === formData.priority)?.color 
-                          ? priorityOptions.find(p => p.id === formData.priority)?.color 
-                          : '#0f172a',
-                        border: `2px solid ${formData.priority && priorityOptions.find(p => p.id === formData.priority)?.color ? priorityOptions.find(p => p.id === formData.priority)?.color : '#e2e8f0'}`,
-                      }}
-                    />
+                      {/* Divider */}
+                      <div style={{ width: '1px', background: '#e2e8f0', flexShrink: 0 }} />
+
+                      {/* Topic pill — only shown if topic options exist */}
+                      {topicOptions.length > 0 && (() => {
+                        const opt = topicOptions.find(t => t.id === formData.topicId);
+                        const color = opt?.color || 'var(--color-text-secondary)';
+                        const label = opt?.label || topicFieldLabel;
+                        return (
+                          <>
+                            <div className="relative flex-1">
+                              <button
+                                type="button"
+                                onClick={() => setOpenToolbarField(openToolbarField === 'topic' ? null : 'topic')}
+                                className="w-full flex flex-col items-start px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-gray-50"
+                                style={{ color: 'var(--color-text)' }}
+                              >
+                                <span className="text-[10px] uppercase tracking-wide font-semibold mb-0.5" style={{ color: 'var(--color-text-secondary)' }}>{topicFieldLabel}</span>
+                                <span className="flex items-center gap-1.5">
+                                  <span className="flex-shrink-0 rounded-full" style={{ width: '8px', height: '8px', background: color }} />
+                                  <span className="truncate">{label}</span>
+                                </span>
+                              </button>
+                              {openToolbarField === 'topic' && (
+                                <div
+                                  className="absolute left-0 top-full mt-1 bg-white rounded-lg shadow-xl z-50 py-1 min-w-[140px]"
+                                  style={{ border: '1px solid #e2e8f0' }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateFormData({ topicId: undefined });
+                                      setOpenToolbarField(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left"
+                                    style={{ color: !formData.topicId ? 'var(--color-primary)' : 'var(--color-text-secondary)', fontWeight: !formData.topicId ? 600 : 400 }}
+                                  >
+                                    <span className="rounded-full flex-shrink-0" style={{ width: '8px', height: '8px', background: '#e2e8f0' }} />
+                                    No {topicFieldLabel}
+                                  </button>
+                                  {topicOptions.map(t => (
+                                    <button
+                                      key={t.id}
+                                      type="button"
+                                      onClick={() => {
+                                        updateFormData({ topicId: t.id });
+                                        setOpenToolbarField(null);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left"
+                                      style={{ color: formData.topicId === t.id ? t.color : 'var(--color-text)', fontWeight: formData.topicId === t.id ? 600 : 400 }}
+                                    >
+                                      <span className="rounded-full flex-shrink-0" style={{ width: '8px', height: '8px', background: t.color }} />
+                                      {t.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            {/* Divider */}
+                            <div style={{ width: '1px', background: '#e2e8f0', flexShrink: 0 }} />
+                          </>
+                        );
+                      })()}
+
+                      {/* Priority pill */}
+                      {(() => {
+                        const opt = priorityOptions.find(p => p.id === formData.priority);
+                        const color = opt?.color || priorityColors[formData.priority as Priority]?.text || 'var(--color-text-secondary)';
+                        const label = opt?.label || formData.priority || 'Priority';
+                        return (
+                          <div className="relative flex-1">
+                            <button
+                              type="button"
+                              onClick={() => setOpenToolbarField(openToolbarField === 'priority' ? null : 'priority')}
+                              className="w-full flex flex-col items-start px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-gray-50 rounded-r-md"
+                              style={{ color: 'var(--color-text)' }}
+                            >
+                              <span className="text-[10px] uppercase tracking-wide font-semibold mb-0.5" style={{ color: 'var(--color-text-secondary)' }}>Priority</span>
+                              <span className="flex items-center gap-1.5">
+                                <span className="flex-shrink-0 rounded-full" style={{ width: '8px', height: '8px', background: color }} />
+                                <span className="truncate">{label}</span>
+                              </span>
+                            </button>
+                            {openToolbarField === 'priority' && (
+                              <div
+                                className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-xl z-50 py-1 min-w-[140px]"
+                                style={{ border: '1px solid #e2e8f0' }}
+                              >
+                                {(priorityOptions.length > 0 ? priorityOptions : [
+                                  { id: 'low', label: 'Low', color: '#00a61c' },
+                                  { id: 'medium', label: 'Medium', color: '#f6c400' },
+                                  { id: 'high', label: 'High', color: '#f30047' },
+                                ]).map(p => (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => {
+                                      updateFormData({ priority: p.id as Priority });
+                                      setOpenToolbarField(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left"
+                                    style={{ color: formData.priority === p.id ? p.color : 'var(--color-text)', fontWeight: formData.priority === p.id ? 600 : 400 }}
+                                  >
+                                    <span className="rounded-full flex-shrink-0" style={{ width: '8px', height: '8px', background: p.color }} />
+                                    {p.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
 
                   {/* Deadline */}
@@ -1468,12 +1566,47 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, onU
                   ))}
                 </div>
               </div>
+
+              {/* Audit footer — shown under the Details box for existing tasks only */}
+              {task && (
+                <div className="mt-3 px-1 text-xs space-y-1" style={{ color: 'var(--color-text-secondary)' }}>
+                  <div>
+                    Created {task.createdAt ? new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                  </div>
+                  <div>
+                    Last updated {task.updatedAt ? new Date(task.updatedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : 'N/A'}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
         </form>
       </div>
       </div>
+
+      {/* Save status indicator — floats in the bottom-right, doesn't affect layout */}
+      {task && (isSaving || saveError) && (
+        <div
+          className="fixed bottom-6 right-6 z-[110] flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg bg-surface border text-sm"
+          style={{ borderColor: 'var(--color-border)' }}
+        >
+          {isSaving && (
+            <>
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style={{ color: 'var(--color-primary)' }}>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span style={{ color: 'var(--color-text-secondary)' }}>Saving…</span>
+            </>
+          )}
+          {!isSaving && saveError && (
+            <span style={{ color: '#f30047' }} title={saveError}>
+              ⚠ Save failed
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Share Toast Notification */}
       {showShareToast && (

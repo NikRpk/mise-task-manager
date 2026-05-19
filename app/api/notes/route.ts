@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
       
       return NextResponse.json(notes);
     } catch (error) {
-      console.error('Error fetching notes:', error);
       return NextResponse.json(
         { error: 'Failed to fetch notes' },
         { status: 500 }
@@ -46,7 +45,8 @@ export async function POST(request: NextRequest) {
       
       const newNote: Omit<Note, 'id'> = {
         title: body.title || 'Untitled Note',
-        content: body.content || {},
+        agenda: body.agenda || '',
+        content: body.content || '',
         tasks: body.tasks || [],
         calendarEventId: body.calendarEventId || null,
         calendarEventLink: body.calendarEventLink || null,
@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
         { status: 201 }
       );
     } catch (error) {
-      console.error('Error creating note:', error);
       return NextResponse.json(
         { error: 'Failed to create note' },
         { status: 500 }

@@ -1,6 +1,10 @@
 {
-  "name": "Mise - Task and Notes",
+  "id": "/",
+  "name": "Mise",
   "short_name": "Mise",
+  "description": "Task and notes management",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",

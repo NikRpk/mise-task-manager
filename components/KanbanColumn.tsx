@@ -14,6 +14,7 @@ interface KanbanColumnProps {
   onTaskClick: (task: Task) => void;
   onQuickComplete?: (taskId: string) => Promise<boolean> | boolean;
   color?: string;
+  getTaskColor?: (task: Task) => string | undefined;
   viewMode?: 'normal' | 'compact';
   canEdit?: boolean;
   showOwner?: boolean;
@@ -30,7 +31,8 @@ const KanbanColumn = memo(function KanbanColumn({
   tasks, 
   onTaskClick, 
   onQuickComplete, 
-  color, 
+  color,
+  getTaskColor,
   viewMode = 'normal', 
   canEdit = true, 
   showOwner = false,
@@ -47,10 +49,8 @@ const KanbanColumn = memo(function KanbanColumn({
   // Pagination state for done column
   const [doneLimit, setDoneLimit] = useState(INITIAL_DONE_LIMIT);
   
-  // Check if this is the done column
   const isDoneColumn = id === 'done';
   
-  // Apply limit only to done column
   const displayedTasks = isDoneColumn ? tasks.slice(0, doneLimit) : tasks;
   const hasMoreTasks = isDoneColumn && tasks.length > doneLimit;
   const remainingCount = isDoneColumn ? tasks.length - doneLimit : 0;
@@ -107,7 +107,7 @@ const KanbanColumn = memo(function KanbanColumn({
             task={task}
             onClick={() => onTaskClick(task)}
             onQuickComplete={onQuickComplete}
-            statusColor={columnColor}
+            statusColor={getTaskColor ? getTaskColor(task) : columnColor}
             viewMode={viewMode}
             canDrag={canEdit}
             showOwner={showOwner}
@@ -134,7 +134,6 @@ const KanbanColumn = memo(function KanbanColumn({
     </div>
   );
 }, (prevProps, nextProps) => {
-  // Only re-render if tasks array changed, or column config changed
   return (
     prevProps.id === nextProps.id &&
     prevProps.title === nextProps.title &&
@@ -144,6 +143,7 @@ const KanbanColumn = memo(function KanbanColumn({
       task.updatedAt === nextProps.tasks[idx]?.updatedAt
     ) &&
     prevProps.color === nextProps.color &&
+    prevProps.getTaskColor === nextProps.getTaskColor &&
     prevProps.viewMode === nextProps.viewMode &&
     prevProps.canEdit === nextProps.canEdit &&
     prevProps.showOwner === nextProps.showOwner &&

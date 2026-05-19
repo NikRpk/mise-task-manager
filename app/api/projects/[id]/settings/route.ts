@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, checkProjectPermission } from '@/lib/auth-middleware';
 import { adminDb } from '@/lib/firebase-admin';
+import { logger } from '@/lib/logger';
 import { ProjectSettings } from '@/types';
+import { DEFAULT_TASK_COLOR_FIELD, DEFAULT_TOPIC_OPTIONS } from '@/lib/constants';
 
 export async function GET(
   request: NextRequest,
@@ -11,7 +13,6 @@ export async function GET(
     try {
       const { id } = await params;
 
-      // Check if user has access (throws on failure)
       await checkProjectPermission(user.uid, id, 'VIEW');
 
       const projectRef = adminDb.collection('projects').doc(id);
@@ -25,12 +26,15 @@ export async function GET(
       const settings = projectData?.settings || {
         statusOptions: [],
         priorityOptions: [],
+        topicOptions: DEFAULT_TOPIC_OPTIONS,
         customFields: [],
+        taskColorField: DEFAULT_TASK_COLOR_FIELD,
+        topicFieldLabel: 'Topic',
       };
 
       return NextResponse.json(settings);
     } catch (error) {
-      console.error('Error fetching project settings:', error);
+      logger.error('Error fetching project settings', error as Error);
       return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
     }
   });
@@ -45,7 +49,6 @@ export async function PUT(
       const { id } = await params;
       const body = await request.json();
 
-      // Check if user has ADMIN permission (throws on failure)
       await checkProjectPermission(user.uid, id, 'ADMIN');
 
       const projectRef = adminDb.collection('projects').doc(id);
@@ -58,7 +61,10 @@ export async function PUT(
       const settings: ProjectSettings = {
         statusOptions: body.statusOptions || [],
         priorityOptions: body.priorityOptions || [],
+        topicOptions: body.topicOptions || [],
         customFields: body.customFields || [],
+        taskColorField: body.taskColorField || DEFAULT_TASK_COLOR_FIELD,
+        topicFieldLabel: body.topicFieldLabel || 'Topic',
       };
 
       await projectRef.update({
@@ -68,7 +74,7 @@ export async function PUT(
 
       return NextResponse.json(settings);
     } catch (error) {
-      console.error('Error updating project settings:', error);
+      logger.error('Error updating project settings', error as Error);
       return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
     }
   });

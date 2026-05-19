@@ -16,7 +16,7 @@ import { useUserSettings } from '@/hooks/useUserSettings';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import AuthGuard from '@/components/AuthGuard';
 import UserProfile from '@/components/UserProfile';
-import { format } from 'date-fns';
+import { format, getISOWeek, getISOWeekYear, startOfISOWeek, addWeeks, isSameWeek } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { DEFAULT_TIMEZONE } from '@/lib/constants';
 import Link from 'next/link';
@@ -50,11 +50,64 @@ function NotesPage() {
 
   // Filtered and searched notes
   const filteredNotes = useMemo(() => {
+    if (!searchQuery.trim()) return notes;
+    const q = searchQuery.toLowerCase();
     return notes.filter(note => {
-      const matchesSearch = note.title.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
+      if (note.title.toLowerCase().includes(q)) return true;
+
+      // Search attendee display names and emails
+      const attendees = note.calendarEventData?.attendees?.filter(a => !a.resource) || [];
+      if (attendees.some(a =>
+        (a.displayName || '').toLowerCase().includes(q) ||
+        (a.email || '').toLowerCase().includes(q)
+      )) return true;
+
+      // Search note content (strip HTML tags first)
+      const plainContent = (note.content || '').replace(/<[^>]+>/g, ' ').toLowerCase();
+      if (plainContent.includes(q)) return true;
+
+      return false;
     });
   }, [notes, searchQuery]);
+
+  // Group filtered notes by ISO calendar week, sorted by meeting/creation date descending
+  const groupedNotes = useMemo(() => {
+    const now = new Date();
+    const thisWeekStart = startOfISOWeek(now);
+    const lastWeekStart = addWeeks(thisWeekStart, -1);
+
+    const getNoteDate = (note: Note): Date =>
+      note.calendarEventData?.start
+        ? new Date(note.calendarEventData.start)
+        : new Date(note.createdAt);
+
+    const getWeekLabel = (date: Date): string => {
+      if (isSameWeek(date, thisWeekStart, { weekStartsOn: 1 })) return 'This Week';
+      if (isSameWeek(date, lastWeekStart, { weekStartsOn: 1 })) return 'Last Week';
+      const kw = getISOWeek(date);
+      const yr = getISOWeekYear(date);
+      return yr === getISOWeekYear(now) ? `Week ${kw}` : `Week ${kw}, ${yr}`;
+    };
+
+    // Sort notes newest-first by meeting/creation date
+    const sorted = [...filteredNotes].sort(
+      (a, b) => getNoteDate(b).getTime() - getNoteDate(a).getTime()
+    );
+
+    const groups: { label: string; notes: Note[] }[] = [];
+    const labelIndex = new Map<string, number>();
+
+    for (const note of sorted) {
+      const label = getWeekLabel(getNoteDate(note));
+      if (!labelIndex.has(label)) {
+        labelIndex.set(label, groups.length);
+        groups.push({ label, notes: [] });
+      }
+      groups[labelIndex.get(label)!].notes.push(note);
+    }
+
+    return groups;
+  }, [filteredNotes]);
 
   const handleNewNote = () => {
     router.push('/notes/new');
@@ -180,22 +233,30 @@ function NotesPage() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="px-6 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Note
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="px-6 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Attendees
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="px-6 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Date
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="px-6 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredNotes.map(note => {
+                  {groupedNotes.map(({ label, notes: groupNotes }) => (
+                    <>
+                      {/* Week group header */}
+                      <tr key={`header-${label}`} style={{ backgroundColor: '#f1f5f9', borderLeft: '3px solid var(--color-primary)' }}>
+                        <td colSpan={4} className="px-5 py-2">
+                          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)' }}>{label}</span>
+                        </td>
+                      </tr>
+                      {groupNotes.map(note => {
                     const createdDate = toZonedTime(new Date(note.createdAt), userTimezone);
                     const eventDate = note.calendarEventData?.start 
                       ? toZonedTime(new Date(note.calendarEventData.start), userTimezone)
@@ -216,7 +277,7 @@ function NotesPage() {
                         style={{ borderColor: 'var(--color-border)' }}
                       >
                         {/* Note Title + Recurring Indicator */}
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-2">
                           <button
                             onClick={() => handleViewNote(note)}
                             className="flex items-center gap-2 hover:underline text-left"
@@ -248,7 +309,7 @@ function NotesPage() {
                         </td>
                         
                         {/* Attendees */}
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-2">
                           {attendees.length > 0 ? (
                             <div className="relative group">
                               <div className="flex items-center gap-1 text-sm text-gray-600">
@@ -285,7 +346,7 @@ function NotesPage() {
                         </td>
                         
                         {/* Date (Event date or Created date) */}
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-2">
                           <span className="text-sm text-gray-600">
                             {eventDate 
                               ? format(eventDate, 'dd.MM.yyyy HH:mm')
@@ -295,7 +356,7 @@ function NotesPage() {
                         </td>
                         
                         {/* Actions */}
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-2">
                           <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() => handleEditNote(note)}
@@ -316,6 +377,8 @@ function NotesPage() {
                       </tr>
                     );
                   })}
+                    </>
+                  ))}
                 </tbody>
               </table>
             </div>

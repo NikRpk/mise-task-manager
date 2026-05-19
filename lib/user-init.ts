@@ -22,7 +22,7 @@ export async function ensureUserSettings(
 
     const defaultSettings: UserSettings = {
       email,
-      colorScheme: 'hellofresh',
+      colorScheme: 'mise',
       displayName,
       timezone: 'Europe/Berlin',
       notifications: {

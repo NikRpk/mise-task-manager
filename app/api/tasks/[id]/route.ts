@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/firebase-admin';
 import { handleApiError, successResponse } from '@/lib/api-errors';
 import { NotFoundError, AuthorizationError, ValidationError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
+import { normalizeOwner } from '@/lib/owner-normalizer';
 
 export async function GET(
   request: NextRequest,
@@ -120,13 +121,16 @@ export async function PUT(
         updatedAt: new Date().toISOString(),
       };
 
-      // Log what we're about to save to Firestore
-      console.log('[API] Updating task in Firestore:', {
-        taskId: id,
-        isRecurring: updatedTask.isRecurring,
-        recurrenceInterval: updatedTask.recurrenceInterval,
-        recurrenceUnit: updatedTask.recurrenceUnit,
-      });
+      // If the client included an `owner`, normalize it to an email. Omitting
+      // the field on PUT leaves the stored owner untouched, which is what we
+      // want for partial updates that don't touch assignment.
+      if (Object.prototype.hasOwnProperty.call(body, 'owner')) {
+        const { owner: normalizedOwner } = await normalizeOwner(body.owner, {
+          userId: user.uid,
+          taskId: id,
+        });
+        updatedTask.owner = normalizedOwner;
+      }
 
       await taskRef.update(updatedTask);
 

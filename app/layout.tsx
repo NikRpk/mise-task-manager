@@ -15,8 +15,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Mise - Task and Notes",
-  description: "Internal task management and note-taking system",
+  title: "Mise",
+  description: "Task and notes management",
   icons: {
     icon: [
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },

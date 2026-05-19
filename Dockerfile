@@ -1,12 +1,19 @@
 # Multi-stage Dockerfile for Next.js on Cloud Run
-FROM node:20-alpine AS base
+# Optimized with layer caching to avoid reinstalling dependencies
 
-# Install dependencies
+FROM node:22-alpine AS base
+
+# Install dependencies only when package files change (cached layer)
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
+
+# Copy only package files first for better Docker layer caching
 COPY package.json package-lock.json ./
-RUN npm ci
+
+# Use npm ci with caching optimizations
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit
 
 # Build the app
 FROM base AS builder
@@ -25,7 +32,13 @@ ENV NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="G-HJL2Y0VRXJ"
 ENV NODE_ENV="production"
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+# Skip tests in Docker build (they run in Cloud Build step instead)
+ARG SKIP_PREBUILD=1
+ENV SKIP_PREBUILD=$SKIP_PREBUILD
+
+# Build with Next.js cache mounting for faster rebuilds
+RUN --mount=type=cache,target=/app/.next/cache \
+    npm run build
 
 # Production runtime
 FROM base AS runner

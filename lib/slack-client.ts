@@ -38,7 +38,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 
 {{#if todayTasks}}
 ---
-*📅 DUE TODAY ({{todayCount}} task{{#unless singleToday}}s{{/unless}})*
+*🟢 DUE TODAY ({{todayCount}} task{{#unless singleToday}}s{{/unless}})*
 {{#each todayTasks}}
 • {{title}}
 {{/each}}
@@ -46,7 +46,7 @@ Good morning, {{userName}}! You have *{{totalTasks}}* task{{#unless singleTask}}
 
 {{#if tomorrowTasks}}
 ---
-*📆 DUE TOMORROW ({{tomorrowCount}} task{{#unless singleTomorrow}}s{{/unless}})*
+*⚪ DUE TOMORROW ({{tomorrowCount}} task{{#unless singleTomorrow}}s{{/unless}})*
 {{#each tomorrowTasks}}
 • {{title}}
 {{/each}}

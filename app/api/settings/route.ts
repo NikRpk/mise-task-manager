@@ -20,8 +20,7 @@ export async function GET(request: NextRequest) {
         // Return default settings
         const defaultSettings: UserSettings = {
           email: user.email,
-          colorScheme: 'hellofresh',
-          displayName: user.displayName,
+          colorScheme: 'mise',
           timezone: 'Europe/Berlin',
           notifications: {
             email: true,
@@ -67,12 +66,12 @@ export async function PUT(request: NextRequest) {
 
       const settings: UserSettings = {
         email: user.email || body.email,
-        colorScheme: body.colorScheme || 'hellofresh',
+        colorScheme: body.colorScheme || 'mise',
         displayName: body.displayName || user.displayName,
         timezone: body.timezone || 'Europe/Berlin',
         noteTemplate: body.noteTemplate,
-        driveFolderId: body.driveFolderId,
         defaultProjectId: body.defaultProjectId,
+        feedbackWebhookUrl: body.feedbackWebhookUrl,
         notifications: body.notifications || {
           email: true,
           desktop: true,

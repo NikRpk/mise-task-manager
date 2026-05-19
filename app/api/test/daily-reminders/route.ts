@@ -11,10 +11,12 @@ import { sendDailyTaskReminder } from '@/lib/slack-client';
 import { adminDb } from '@/lib/firebase-admin';
 import { Task, UserSettings } from '@/types';
 import { startOfDay, addDays, isBefore, isSameDay, parseISO } from 'date-fns';
+import { withAuth } from '@/lib/auth-middleware';
 
 export async function POST(request: NextRequest) {
+  return withAuth(request, async (req) => {
   try {
-    const body = await request.json();
+    const body = await req.json();
     const { email, userName = 'User', userId } = body;
 
     if (!email && !userId) {
@@ -187,4 +189,5 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  });
 }

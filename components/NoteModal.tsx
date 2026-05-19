@@ -41,7 +41,6 @@ export default function NoteModal({
   const [tasks, setTasks] = useState<NoteTask[]>([]);
   const [templateId, setTemplateId] = useState('default');
   const [isSaving, setIsSaving] = useState(false);
-  const [attachToCalendar, setAttachToCalendar] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isEditMode, setIsEditMode] = useState(!readOnly);
   const [userTimezone, setUserTimezone] = useState(DEFAULT_TIMEZONE);
@@ -166,47 +165,8 @@ ACTION ITEMS
       };
 
       // Save the note first and get the ID back
-      const savedNoteId = await onSave(noteData);
-      
-      // If checkbox is enabled and note is linked to calendar, attach it
-      if (attachToCalendar && (note?.calendarEventId || calendarEvent?.id)) {
-        try {
-          const attachRes = await authenticatedFetch(`/api/notes/${savedNoteId}/attach-to-calendar`, {
-            method: 'POST',
-          });
-          
-          if (attachRes.ok) {
-            setAlertDialog({
-              isOpen: true,
-              title: 'Success',
-              message: 'Note saved and attached to calendar event as a Google Doc',
-              type: 'success',
-            });
-            // Close after success message
-            setTimeout(() => onClose(), 1500);
-          } else {
-            setAlertDialog({
-              isOpen: true,
-              title: 'Note Saved',
-              message: 'Note saved, but failed to attach to calendar event. You may need to reconnect Google Calendar with Drive permissions.',
-              type: 'warning',
-            });
-            // Don't auto-close - let user read the warning
-          }
-        } catch (error) {
-          console.warn('Failed to attach to calendar:', error);
-          setAlertDialog({
-            isOpen: true,
-            title: 'Note Saved',
-            message: 'Note saved successfully, but failed to attach to calendar event. Check your Google Calendar connection.',
-            type: 'warning',
-          });
-          // Don't auto-close - let user read the warning
-        }
-      } else {
-        // No attachment needed, just close
-        onClose();
-      }
+      await onSave(noteData);
+      onClose();
     } catch (error) {
       setAlertDialog({
         isOpen: true,
@@ -432,27 +392,7 @@ ACTION ITEMS
             className="flex items-center justify-between px-6 py-4 border-t"
             style={{ borderColor: 'var(--color-border)', backgroundColor: '#f8fafc' }}
           >
-            <div className="flex items-center gap-3">
-              {(note?.calendarEventId || calendarEvent) && !readOnly && (
-                <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                  <input
-                    type="checkbox"
-                    id="attach-to-calendar"
-                    checked={attachToCalendar}
-                    onChange={(e) => setAttachToCalendar(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                  />
-                  <label 
-                    htmlFor="attach-to-calendar"
-                    className="text-sm font-medium cursor-pointer select-none flex items-center gap-2"
-                    style={{ color: '#1e40af' }}
-                  >
-                    <Calendar size={14} />
-                    <span>Attach to calendar event on save</span>
-                  </label>
-                </div>
-              )}
-            </div>
+            <div className="flex-1" />
 
             <div className="flex items-center gap-3">
               {isEditMode ? (

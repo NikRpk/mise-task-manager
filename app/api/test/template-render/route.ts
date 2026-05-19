@@ -5,11 +5,13 @@
  * GET /api/test/template-render
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import Handlebars from 'handlebars';
 import { DEFAULT_SLACK_TEMPLATES } from '@/lib/slack-client';
+import { withAuth } from '@/lib/auth-middleware';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  return withAuth(request, async () => {
   const variables = {
     userName: 'Niklas Röpke',
     totalTasks: 7,
@@ -38,10 +40,11 @@ export async function GET() {
   const template = Handlebars.compile(DEFAULT_SLACK_TEMPLATES.dailyReminder);
   const renderedText = template(variables);
 
-  return NextResponse.json({
+  return Response.json({
     success: true,
     template: DEFAULT_SLACK_TEMPLATES.dailyReminder,
     variables,
     renderedText,
+  });
   });
 }

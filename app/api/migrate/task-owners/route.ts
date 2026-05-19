@@ -10,7 +10,6 @@ import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
     const adminSecret = request.headers.get('x-admin-secret');
     
     // Security: Only allow with admin secret
@@ -19,7 +18,6 @@ export async function POST(request: NextRequest) {
     }
 
     logger.info('Starting task owner migration');
-    console.log('=== TASK OWNER MIGRATION START ===');
 
     // Get all people to build email mapping
     const peopleSnapshot = await adminDb.collection('people').get();
@@ -30,7 +28,6 @@ export async function POST(request: NextRequest) {
       if (data.name && data.email) {
         emailMap.set(data.name, data.email);
       }
-      // Also map displayName if available
       if (data.displayName && data.email) {
         emailMap.set(data.displayName, data.email);
       }
@@ -45,12 +42,11 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    console.log(`Built email map with ${emailMap.size} entries`);
-    console.log('Email map:', Array.from(emailMap.entries()).slice(0, 5)); // Show first 5
+    logger.info('Built email map', { entryCount: emailMap.size });
 
     // Get all projects
     const projectsSnapshot = await adminDb.collection('projects').get();
-    console.log(`Found ${projectsSnapshot.size} projects`);
+    logger.info('Found projects', { projectCount: projectsSnapshot.size });
     
     let totalTasks = 0;
     let migratedTasks = 0;
@@ -59,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Get all tasks from the top-level tasks collection
     const tasksSnapshot = await adminDb.collection('tasks').get();
-    console.log(`Found ${tasksSnapshot.size} total tasks`);
+    logger.info('Found tasks', { taskCount: tasksSnapshot.size });
 
     for (const taskDoc of tasksSnapshot.docs) {
       totalTasks++;
@@ -88,7 +84,7 @@ export async function POST(request: NextRequest) {
           .update({ owner: email });
         
         migratedTasks++;
-        console.log(`Migrated task ${taskDoc.id}: "${currentOwner}" → "${email}"`);
+        logger.info('Migrated task owner', { taskId: taskDoc.id, from: currentOwner, to: email });
       } else {
         errors.push(`No email found for owner: "${currentOwner}" (task: ${taskDoc.id})`);
         skippedTasks++;

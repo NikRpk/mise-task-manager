@@ -315,17 +315,16 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               compressImage(file)
                 .then((compressedBase64) => {
                   if (editor) {
-                    editor.chain().focus().insertContent(`<img src="${compressedBase64}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
+                    editor.chain().focus().insertContent({ type: 'imageResize', attrs: { src: compressedBase64, alt: 'Image' } }).run();
                   }
                 })
-                .catch((error) => {
-                  console.error('[Image Paste] Compression failed:', error);
+                .catch(() => {
                   // Fallback to uncompressed if compression fails
                   const reader = new FileReader();
                   reader.onload = (e) => {
                     const base64 = e.target?.result as string;
                     if (editor) {
-                      editor.chain().focus().insertContent(`<img src="${base64}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
+                      editor.chain().focus().insertContent({ type: 'imageResize', attrs: { src: base64, alt: 'Image' } }).run();
                     }
                   };
                   reader.readAsDataURL(file);
@@ -537,7 +536,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           {isInTable && (
             <>
               <button
-                onClick={() => editor.chain().focus().addColumnBefore().run()}
+                onClick={() => editor.chain().addColumnBefore().run()}
                 className="p-1.5 rounded hover:bg-gray-200 transition-colors text-xs"
                 title="Add Column Before"
                 type="button"
@@ -547,7 +546,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               </button>
               
               <button
-                onClick={() => editor.chain().focus().addColumnAfter().run()}
+                onClick={() => editor.chain().addColumnAfter().run()}
                 className="p-1.5 rounded hover:bg-gray-200 transition-colors text-xs"
                 title="Add Column After"
                 type="button"
@@ -557,7 +556,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               </button>
               
               <button
-                onClick={() => editor.chain().focus().deleteColumn().run()}
+                onClick={() => editor.chain().deleteColumn().run()}
                 className="p-1.5 rounded hover:bg-red-100 transition-colors text-red-600"
                 title="Delete Column"
                 type="button"
@@ -569,7 +568,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               <div className="w-px h-6 bg-gray-300 mx-1" />
               
               <button
-                onClick={() => editor.chain().focus().addRowBefore().run()}
+                onClick={() => editor.chain().addRowBefore().run()}
                 className="p-1.5 rounded hover:bg-gray-200 transition-colors text-xs"
                 title="Add Row Before"
                 type="button"
@@ -579,7 +578,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               </button>
               
               <button
-                onClick={() => editor.chain().focus().addRowAfter().run()}
+                onClick={() => editor.chain().addRowAfter().run()}
                 className="p-1.5 rounded hover:bg-gray-200 transition-colors text-xs"
                 title="Add Row After"
                 type="button"
@@ -589,7 +588,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               </button>
               
               <button
-                onClick={() => editor.chain().focus().deleteRow().run()}
+                onClick={() => editor.chain().deleteRow().run()}
                 className="p-1.5 rounded hover:bg-red-100 transition-colors text-red-600"
                 title="Delete Row"
                 type="button"
@@ -601,7 +600,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               <div className="w-px h-6 bg-gray-300 mx-1" />
               
               <button
-                onClick={() => editor.chain().focus().deleteTable().run()}
+                onClick={() => editor.chain().deleteTable().run()}
                 className="p-1.5 rounded hover:bg-red-100 transition-colors text-red-600"
                 title="Delete Table"
                 type="button"
@@ -715,6 +714,26 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
           min-height: 200px;
           font-size: 0.875rem;
           line-height: 1.5;
+        }
+        .ProseMirror > *:first-child {
+          margin-top: 0 !important;
+        }
+        .ProseMirror > *:last-child {
+          margin-bottom: 0 !important;
+        }
+        .ProseMirror ul > li:first-child,
+        .ProseMirror ol > li:first-child {
+          margin-top: 0 !important;
+        }
+        .ProseMirror ul > li:last-child,
+        .ProseMirror ol > li:last-child {
+          margin-bottom: 0 !important;
+        }
+        .ProseMirror li > p:first-child {
+          margin-top: 0 !important;
+        }
+        .ProseMirror li > p:last-child {
+          margin-bottom: 0 !important;
         }
         .ProseMirror p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);
@@ -863,19 +882,20 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         }
         .ProseMirror ul[data-type="taskList"] li {
           display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          min-height: 1.5em; /* Ensure task items have minimum height */
+          align-items: baseline;
+          gap: 0;
+          min-height: 1.5em;
         }
         .ProseMirror ul[data-type="taskList"] li label {
-          flex: 0 0 auto;
+          width: 1.5rem;
+          flex-shrink: 0;
           display: flex;
           align-items: center;
+          translate: 0 0.1em;
         }
         .ProseMirror ul[data-type="taskList"] li input[type="checkbox"] {
           cursor: pointer;
         }
-        /* Fix cursor visibility in task list items */
         .ProseMirror ul[data-type="taskList"] li > div,
         .ProseMirror ul[data-type="taskList"] li > p {
           cursor: text;
@@ -883,7 +903,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
         }
         .ProseMirror ul[data-type="taskList"] li > div:empty::after,
         .ProseMirror ul[data-type="taskList"] li > p:empty::after {
-          content: '\\u200B'; /* Zero-width space */
+          content: '\\u200B';
           display: inline;
         }
         .ProseMirror .mention {
@@ -1013,17 +1033,16 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
                       // Compress and insert image
                     compressImage(file)
                       .then((compressedBase64) => {
-                        editor.chain().focus().insertContent(`<img src="${compressedBase64}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
+                        editor.chain().focus().insertContent({ type: 'imageResize', attrs: { src: compressedBase64, alt: 'Image' } }).run();
                         setShowImageDialog(false);
                         setImageUrl('');
                       })
-                        .catch((error) => {
-                          console.error('[Image Upload] Compression failed:', error);
+                        .catch(() => {
                           // Fallback to uncompressed if compression fails
                         const reader = new FileReader();
                         reader.onload = (e) => {
                           const base64 = e.target?.result as string;
-                          editor.chain().focus().insertContent(`<img src="${base64}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
+                          editor.chain().focus().insertContent({ type: 'imageResize', attrs: { src: base64, alt: 'Image' } }).run();
                           setShowImageDialog(false);
                           setImageUrl('');
                         };
@@ -1057,7 +1076,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
                 style={{ borderColor: 'var(--color-border)' }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && imageUrl.trim()) {
-                    editor.chain().focus().insertContent(`<img src="${imageUrl}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
+                    editor.chain().focus().insertContent({ type: 'imageResize', attrs: { src: imageUrl, alt: 'Image' } }).run();
                     setShowImageDialog(false);
                     setImageUrl('');
                   }
@@ -1086,7 +1105,7 @@ export default function TipTapEditor({ value, onChange, placeholder = 'Start typ
               <button
                 onClick={() => {
                   if (imageUrl.trim()) {
-                    editor.chain().focus().insertContent(`<img src="${imageUrl}" alt="Image" class="rounded-md max-w-full h-auto" />`).run();
+                    editor.chain().focus().insertContent({ type: 'imageResize', attrs: { src: imageUrl, alt: 'Image' } }).run();
                     setShowImageDialog(false);
                     setImageUrl('');
                   }

@@ -6,6 +6,7 @@ import { handleApiError, successResponse } from '@/lib/api-errors';
 import { ValidationError, DatabaseError, AuthorizationError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { TASKS_PER_PAGE } from '@/lib/constants';
+import { normalizeOwner } from '@/lib/owner-normalizer';
 
 export async function GET(request: NextRequest) {
   return withAuth(request, async (req, user) => {
@@ -20,8 +21,8 @@ export async function GET(request: NextRequest) {
       }
 
       // Validate limit
-      if (limit < 1 || limit > 100) {
-        throw new ValidationError('Limit must be between 1 and 100');
+      if (limit < 1 || limit > 500) {
+        throw new ValidationError('Limit must be between 1 and 500');
       }
 
       // Check if user has access to this project
@@ -180,6 +181,14 @@ export async function POST(request: NextRequest) {
         changedAt: new Date().toISOString(),
       }];
 
+      // Guard: owner must be an email (the canonical ID used by the daily
+      // reminder cron). If the client sent a displayName, rewrite it; if it
+      // wasn't supplied at all, fall back to the authenticated user's email.
+      const { owner: normalizedOwner } = await normalizeOwner(
+        body.owner || user.email,
+        { userId: user.uid }
+      );
+
       const newTask: Task = {
         id: newTaskRef.id,
         title: body.title || '',
@@ -187,7 +196,7 @@ export async function POST(request: NextRequest) {
         subTasks: body.subTasks || [],
         deadline: body.deadline || null,
         status: body.status || 'todo',
-        owner: body.owner || user.email, // Always use email as ID
+        owner: normalizedOwner,
         projectId: body.projectId,
         priority: body.priority || 'medium',
         images: body.images || [],
@@ -195,7 +204,8 @@ export async function POST(request: NextRequest) {
         statusHistory: body.statusHistory || initialStatusHistory,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        // Recurring task fields - only include if they have values (Firestore doesn't like undefined)
+        // Optional fields — only include if they have values (Firestore doesn't like undefined)
+        ...(body.topicId !== undefined && { topicId: body.topicId }),
         ...(body.isRecurring !== undefined && { isRecurring: body.isRecurring }),
         ...(body.recurrenceInterval !== undefined && { recurrenceInterval: body.recurrenceInterval }),
         ...(body.recurrenceUnit !== undefined && { recurrenceUnit: body.recurrenceUnit }),

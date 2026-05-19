@@ -42,38 +42,32 @@ export async function GET(
       // If includePrevious is requested and this note is part of a recurring series
       if (includePrevious && noteData?.recurringEventId && noteData?.recurringInstanceDate) {
         try {
-          // Query for previous instance of the same recurring event
+          // Query for up to 5 previous instances of the same recurring event
           const previousNotesQuery = await adminDb
             .collection('notes')
             .where('createdBy', '==', user.uid)
             .where('recurringEventId', '==', noteData.recurringEventId)
             .where('recurringInstanceDate', '<', noteData.recurringInstanceDate)
             .orderBy('recurringInstanceDate', 'desc')
-            .limit(1)
+            .limit(5)
             .get();
           
           if (!previousNotesQuery.empty) {
-            const previousNoteDoc = previousNotesQuery.docs[0];
-            const previousNote = {
-              id: previousNoteDoc.id,
-              ...previousNoteDoc.data()
-            };
+            const previousNotes = previousNotesQuery.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
             
-            return NextResponse.json({
-              currentNote,
-              previousNote
-            });
+            return NextResponse.json({ currentNote, previousNotes });
           }
         } catch (queryError) {
-          console.error('Error fetching previous note:', queryError);
           // If query fails (e.g., missing index), just return current note
-          return NextResponse.json({ currentNote, previousNote: null });
+          return NextResponse.json({ currentNote, previousNotes: [] });
         }
       }
       
-      return NextResponse.json({ currentNote, previousNote: null });
+      return NextResponse.json({ currentNote, previousNotes: [] });
     } catch (error) {
-      console.error('Error fetching note:', error);
       return NextResponse.json(
         { error: 'Failed to fetch note' },
         { status: 500 }
@@ -123,7 +117,6 @@ export async function PUT(
       
       return NextResponse.json({ id, ...updatedNote });
     } catch (error) {
-      console.error('Error updating note:', error);
       return NextResponse.json(
         { error: 'Failed to update note' },
         { status: 500 }
@@ -163,7 +156,6 @@ export async function DELETE(
       
       return NextResponse.json({ success: true });
     } catch (error) {
-      console.error('Error deleting note:', error);
       return NextResponse.json(
         { error: 'Failed to delete note' },
         { status: 500 }

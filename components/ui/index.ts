@@ -18,3 +18,9 @@ export type { ToggleProps } from './Toggle';
 
 export { default as DatePicker } from './DatePicker';
 export type { DatePickerProps } from './DatePicker';
+
+export { default as ColorPicker } from './ColorPicker';
+export type { ColorPickerProps } from './ColorPicker';
+
+export { FilterPills } from './FilterPills';
+export type { FilterPillsProps, FilterPillOption } from './FilterPills';

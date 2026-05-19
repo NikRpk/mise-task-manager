@@ -79,6 +79,21 @@ export const DEFAULT_PRIORITY_OPTIONS = [
 ] as const;
 
 // ============================================================================
+// DEFAULT TOPIC OPTIONS
+// ============================================================================
+
+/** Single default topic so new boards always have something to assign */
+export const DEFAULT_TOPIC_OPTIONS = [
+  { id: 'default', label: 'Default', color: '#94a3b8', isDefault: true },
+] as const;
+
+/** Default field that determines task card border colour */
+export const DEFAULT_TASK_COLOR_FIELD = 'status' as const;
+
+/** Default label for the topic field */
+export const DEFAULT_TOPIC_FIELD_LABEL = 'Topic';
+
+// ============================================================================
 // TIMEZONE
 // ============================================================================
 

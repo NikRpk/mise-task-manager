@@ -33,6 +33,7 @@ export interface Task {
   owner: string;
   projectId: string;
   priority: Priority;
+  topicId?: string; // Optional topic assignment
   createdAt: string;
   updatedAt: string;
   images?: string[];
@@ -70,8 +71,11 @@ export interface ProjectMember {
 export interface ProjectSettings {
   statusOptions?: StatusOption[];
   priorityOptions?: PriorityOption[];
+  topicOptions?: TopicOption[];
   customFields?: CustomField[];
-  [key: string]: string | number | boolean | undefined | StatusOption[] | PriorityOption[] | CustomField[];
+  taskColorField?: 'status' | 'topic' | 'priority';
+  topicFieldLabel?: string; // User-configurable label for the topic field (default: "Topic")
+  [key: string]: string | number | boolean | undefined | StatusOption[] | PriorityOption[] | TopicOption[] | CustomField[];
 }
 
 export interface StatusOption {
@@ -82,6 +86,13 @@ export interface StatusOption {
 }
 
 export interface PriorityOption {
+  id: string;
+  label: string;
+  color: string;
+  isDefault?: boolean;
+}
+
+export interface TopicOption {
   id: string;
   label: string;
   color: string;
@@ -101,6 +112,7 @@ export interface FilterOptions {
   status?: TaskStatus[];
   owner?: string[];
   priority?: Priority[];
+  topic?: string[]; // topicId values
 }
 
 // ========== NOTES & TEMPLATES ==========
@@ -117,7 +129,8 @@ export interface NoteTask {
 export interface Note {
   id: string;
   title: string;
-  content: string; // Single rich text content field
+  agenda: string; // Agenda section (checkboxes / bullet points)
+  content: string; // Notes section (uses user template)
   tasks: NoteTask[];
   calendarEventId: string | null; // Google Calendar event ID
   calendarEventLink: string | null;
@@ -199,10 +212,10 @@ export interface UserSettings {
   displayName?: string;
   timezone?: string;
   noteTemplate?: string;
-  driveFolderId?: string;
   defaultProjectId?: string;
   googleCalendarRefreshToken?: string;
   googleCalendarConnectedAt?: string;
+  feedbackWebhookUrl?: string;
   notifications?: {
     email?: boolean;
     desktop?: boolean;

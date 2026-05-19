@@ -21,5 +21,10 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json",
     "database": "task-and-note-manager"
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs20",
+    "region": "europe-west1"
   }
 }

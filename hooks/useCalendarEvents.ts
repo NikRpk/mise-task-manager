@@ -50,8 +50,7 @@ export function useCalendarEvents(userId: string | undefined): UseCalendarEvents
         setConnected(false);
         
         if (isAuth) {
-          console.warn('⚠️ Calendar Authentication Required');
-          console.warn('💡 Go to Settings → Profile → Connect Google Calendar');
+          logger.warn('Calendar authentication required — reconnect in Settings → Profile');
         }
         
         logger.error('Failed to fetch calendar events', new Error(errorMessage), { 

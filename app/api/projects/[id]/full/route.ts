@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { withAuth, checkProjectPermission } from '@/lib/auth-middleware';
 import { logger } from '@/lib/logger';
+import { DEFAULT_TOPIC_OPTIONS } from '@/lib/constants';
 
 /**
  * GET /api/projects/[id]/full
@@ -48,6 +49,7 @@ export async function GET(
           { id: 'medium', label: 'Medium', color: '#f59e0b' },
           { id: 'high', label: 'High', color: '#ef4444' },
         ],
+        topicOptions: DEFAULT_TOPIC_OPTIONS,
         customFields: [],
       };
 
