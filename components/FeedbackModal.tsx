@@ -1,7 +1,6 @@
 /**
  * Feedback Modal Component
  * Allows users to submit feedback, ideas, or bug reports via Slack.
- * Feedback is posted to #mise-task-management-tool.
  */
 
 'use client';
@@ -19,10 +18,11 @@ interface FeedbackModalProps {
 
 type FeedbackType = 'idea' | 'bug' | 'other';
 
-const SLACK_CHANNEL_NAME = 'mise-task-management-tool';
-const SLACK_CHANNEL_URL = `https://hellofresh.slack.com/channels/${SLACK_CHANNEL_NAME}`;
+const SLACK_CHANNEL_NAME = process.env.NEXT_PUBLIC_SLACK_CHANNEL_NAME || 'feedback';
+const SLACK_CHANNEL_URL = process.env.NEXT_PUBLIC_SLACK_CHANNEL_URL || '';
 
 function SlackChannelBadge() {
+  if (!SLACK_CHANNEL_URL) return null;
   return (
     <a
       href={SLACK_CHANNEL_URL}

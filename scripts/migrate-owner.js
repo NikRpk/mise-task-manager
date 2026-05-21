@@ -9,16 +9,18 @@
  *   node scripts/migrate-owner.js \
  *     --from "Old Name" --to "new@email" --apply      # custom values
  *
- * Defaults are the values from the current investigation so the most common
- * invocation is just `node scripts/migrate-owner.js --apply`.
+ * Defaults can be set via MIGRATE_OWNER_FROM and MIGRATE_OWNER_TO environment
+ * variables in .env.local, or passed directly with --from / --to flags.
+ * The most common invocation is just `node scripts/migrate-owner.js --apply`
+ * once the env vars are set.
  */
 require('dotenv').config({ path: '.env.local' });
 
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
-const DEFAULT_FROM = 'Niklas Röpke';
-const DEFAULT_TO = 'niklas.roepke@hellofresh.de';
+const DEFAULT_FROM = process.env.MIGRATE_OWNER_FROM || '';
+const DEFAULT_TO = process.env.MIGRATE_OWNER_TO || '';
 const FIRESTORE_BATCH_LIMIT = 400;
 
 // Production uses a NAMED Firestore database (see lib/firebase-admin.ts).

@@ -29,16 +29,29 @@ fi
 echo "🌐 Target: $BASE_URL"
 echo ""
 
+if [ -z "$TEST_EMAIL" ]; then
+  echo "❌ Set TEST_EMAIL env var before running this script."
+  echo "   e.g. TEST_EMAIL=you@example.com ./scripts/test-reminders.sh local"
+  exit 1
+fi
+
+if [ -z "$TEST_USERNAME" ]; then
+  TEST_USERNAME="Test User"
+fi
+
+echo "👤 Testing as: $TEST_EMAIL"
+echo ""
+
 # Send test request
 echo "📤 Sending test request..."
 echo ""
 
 curl -X POST "$BASE_URL/api/test/daily-reminders" \
   -H "Content-Type: application/json" \
-  -d '{
-    "email": "niklas.roepke@hellofresh.de",
-    "userName": "Niklas"
-  }' \
+  -d "{
+    \"email\": \"$TEST_EMAIL\",
+    \"userName\": \"$TEST_USERNAME\"
+  }" \
   | jq '.'
 
 echo ""

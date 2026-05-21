@@ -1,16 +1,13 @@
 # Security Model
 
-This document describes how authentication, authorization, and access control work in `hf-tasks` (Mise). It exists primarily so that:
-
-1. The next person to do a security sweep doesn't break production by "fixing" something that isn't broken.
-2. Wiz / HelloFresh Security have a written justification for the architectural decisions documented here.
+This document describes how authentication, authorization, and access control work in Mise. It exists primarily so that the next person to do a security sweep doesn't break production by "fixing" something that isn't broken.
 
 ## Architecture summary
 
 ```
 User (browser)
   → Firebase Hosting (DNS + TLS + CDN, no app logic)
-    → Cloud Run: hf-tasks (Next.js standalone, public invoker)
+    → Cloud Run: mise-tasks (Next.js standalone, public invoker)
       → Firestore (database: task-and-note-manager)
       → Secret Manager (OAuth client credentials, Slack webhook)
       → Google APIs (Calendar, OAuth)
@@ -24,11 +21,11 @@ Auth is enforced at the **application layer**, not at the IAM / Cloud Run invoke
 
 ### Page routes
 
-Every page is wrapped in a Firebase Auth check. Unauthenticated visitors are redirected to `/login`, which only accepts Google Sign-In with `@hellofresh.de` (and configured HF subsidiary domains). Anonymous users see the login page; they cannot read any data.
+Every page is wrapped in a Firebase Auth check. Unauthenticated visitors are redirected to `/login`, which only accepts Google Sign-In. The allowed domain(s) are configured via the `NEXT_PUBLIC_ALLOWED_EMAIL_DOMAIN` environment variable. Anonymous users see the login page; they cannot read any data.
 
 ### API routes
 
-Every `app/api/**/route.ts` handler validates the caller's Firebase ID token and rejects requests where the token's `email` is not on the HelloFresh domain allow-list. See `lib/auth-check.ts` (or equivalent) for the canonical helper. The `api-auth-enforcement` skill is the source of truth for the pattern.
+Every `app/api/**/route.ts` handler validates the caller's Firebase ID token and rejects requests where the token's `email` does not match the configured domain allow-list. See `lib/auth-middleware.ts` for the canonical helper.
 
 ### Firestore
 
@@ -36,47 +33,31 @@ Firestore security rules (`firestore.rules`) enforce per-user and per-project ow
 
 ## IAM model
 
-### Cloud Run invoker (`roles/run.invoker` on `hf-tasks`)
+### Cloud Run invoker (`roles/run.invoker`)
 
 | Member | Purpose |
 |---|---|
-| `allUsers` | **Required.** Firebase Hosting forwards anonymous browser requests on `hf-tasks.web.app`. Without this, Google Frontend (GFE) returns a `403 Forbidden` page before Next.js can render `/login`, taking the entire site down for everyone. App-layer auth then gates everything past `/login`. |
-| `firebase-hosting@system.gserviceaccount.com` | Default Firebase Hosting → Cloud Run binding. Kept for completeness; not sufficient on its own for browser traffic. |
-| `scheduler-invoker@dach-ai-mvps.iam.gserviceaccount.com` | Used by Cloud Scheduler to invoke `/api/cron/daily-reminders` with an OIDC-signed request. |
+| `allUsers` | **Required.** Firebase Hosting forwards anonymous browser requests to Cloud Run. Without this, Google Frontend (GFE) returns a `403 Forbidden` page before Next.js can render `/login`, taking the entire site down for everyone. App-layer auth then gates everything past `/login`. |
+| `firebase-hosting@system.gserviceaccount.com` | Default Firebase Hosting → Cloud Run binding. |
+| `scheduler-invoker@<project>.iam.gserviceaccount.com` | Used by Cloud Scheduler to invoke `/api/cron/daily-reminders` with an OIDC-signed request. |
 
-**Why `allUsers` is intentional, despite Wiz flagging it:**
+**Why `allUsers` is intentional:**
 
-- The `deploying-nextjs-to-cloud-run` HelloFresh skill explicitly documents `--allow-unauthenticated` as the correct setting for Next.js + Firebase Hosting + Cloud Run.
-- "Public" at the IAM layer does not mean "public" at the application layer. Every page and API route requires a Firebase ID token from an `@hellofresh.de` user.
-- Headless Cloud Run services (webhook receivers, internal-only APIs) should use `--no-allow-unauthenticated`. `hf-tasks` is not headless — it is an interactive web app whose login page must be reachable by anonymous browsers.
+- "Public" at the IAM layer does not mean "public" at the application layer. Every page and API route requires a valid Firebase ID token.
+- Headless Cloud Run services (webhook receivers, internal-only APIs) should use `--no-allow-unauthenticated`. This app is not headless — its login page must be reachable by anonymous browsers.
 
-### Runtime service account (`hf-tasks-runner@dach-ai-mvps.iam.gserviceaccount.com`)
+### Runtime service account
 
 Roles granted at the project level:
 
 - `roles/datastore.user` — read/write the `task-and-note-manager` Firestore database
 - `roles/secretmanager.secretAccessor` — read OAuth and webhook secrets
 
-This is least-privilege per the `gcp-least-privilege` skill. No `Owner`, `Editor`, or wildcard roles. If Wiz flags this account as "high privilege", the alert is miscalibrated.
+This is least-privilege. No `Owner`, `Editor`, or wildcard roles.
 
 ## Secrets
 
 All secrets live in Secret Manager and are injected into Cloud Run at deploy time (see `cloudbuild.yaml`'s `--update-secrets` flag). Nothing sensitive is committed to git. `.env.local` is gitignored.
-
-## Wiz alert response policy
-
-When Wiz flags `hf-tasks` for "publicly accessible Cloud Run":
-
-1. Confirm the alert is referring to `hf-tasks` (not a different service).
-2. Mark the issue as **"Risk Accepted"** in Wiz with a justification that links to this file.
-3. **Do not** remove `allUsers` from `roles/run.invoker`. Doing so will take the site offline within seconds (GFE returns 403 before Next.js can render anything).
-
-If a future security review concludes that public invoker is no longer acceptable, the correct migration is:
-
-1. Replace the Firebase Hosting → Cloud Run rewrite with Identity-Aware Proxy (IAP) in front of Cloud Run, OR
-2. Move the login page to a separate fully-static Firebase Hosting path that exchanges Firebase Auth tokens for OIDC-signed requests to Cloud Run.
-
-Both are non-trivial. Coordinate with Niklas Röpke before starting.
 
 ## Incident history
 

@@ -8,7 +8,7 @@
  * Security: Requires the same `x-admin-secret` header as the bulk migration.
  *
  * Request body:
- *   { "fromOwner": "Niklas Röpke", "toOwner": "niklas.roepke@hellofresh.de" }
+ *   { "fromOwner": "Old Name", "toOwner": "new@email.com" }
  *   - `dryRun: true` returns what would change without writing.
  */
 

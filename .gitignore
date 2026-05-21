@@ -23,6 +23,11 @@
 # misc
 .DS_Store
 *.pem
+*.code-workspace
+
+# Cursor IDE
+.cursor/
+.cursorrules
 
 # debug
 npm-debug.log*

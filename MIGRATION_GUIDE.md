@@ -59,8 +59,8 @@ curl -X POST https://hf-tasks-1014309748045.europe-west1.run.app/api/cron/daily-
 1. **Builds email mapping** from the `people` collection (name → email)
 2. **Scans all tasks** across all projects
 3. **Converts owner field**:
-   - `"Niklas Röpke"` → `"niklas.roepke@hellofresh.de"`
-   - `"John Doe"` → `"john.doe@hellofresh.de"`
+   - `"Display Name"` → `"user@example.com"`
+   - `"Another User"` → `"another@example.com"`
 4. **Skips tasks** that already have email as owner
 5. **Reports errors** for tasks where no email mapping exists
 

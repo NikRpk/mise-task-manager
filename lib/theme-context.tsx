@@ -240,7 +240,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
               setCurrentScheme(data.customColorScheme);
               applyScheme(data.customColorScheme);
             } else {
-              // 'hellofresh' is the legacy ID for 'mise' — treat them as the same
+              // 'hellofresh' is a legacy color scheme ID — map to 'mise'
               const resolvedId = data.colorScheme === 'hellofresh' ? 'mise' : data.colorScheme;
               const scheme = colorSchemes.find(s => s.id === resolvedId);
               if (scheme) {
@@ -270,7 +270,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setScheme = (schemeId: string) => {
-    // 'hellofresh' is the legacy ID for 'mise'
+    // 'hellofresh' is a legacy color scheme ID — map to 'mise'
     const resolvedId = schemeId === 'hellofresh' ? 'mise' : schemeId;
     const scheme = colorSchemes.find(s => s.id === resolvedId);
     if (scheme) {
