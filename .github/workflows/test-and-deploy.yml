@@ -92,11 +92,12 @@ jobs:
           NEXT_PUBLIC_SLACK_CHANNEL_URL: ${{ secrets.NEXT_PUBLIC_SLACK_CHANNEL_URL }}
 
   # ─── Job 3: Deploy to STAGING (main push or manual dispatch → staging) ────────
+  # Builds Docker image directly on the runner (bypasses Cloud Build source bucket)
+  # then pushes to Artifact Registry and deploys to Cloud Run.
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [test, build]
-    # Run on main pushes OR when manually triggered with target=staging
     if: |
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging')
@@ -108,6 +109,12 @@ jobs:
       contents: read
       id-token: write
 
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: europe-west1
+      SERVICE_NAME: mise-tasks-staging
+      IMAGE_BASE: europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mise-tasks/mise-tasks-staging
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -122,23 +129,52 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Deploy to staging Cloud Run (mise-tasks-staging)
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+
+      - name: Ensure Artifact Registry repository exists
+        run: |
+          gcloud artifacts repositories describe mise-tasks \
+            --location=europe-west1 --project=$PROJECT_ID 2>/dev/null || \
+          gcloud artifacts repositories create mise-tasks \
+            --repository-format=docker \
+            --location=europe-west1 \
+            --project=$PROJECT_ID \
+            --description="Mise task manager images"
+
+      - name: Build and push Docker image
         run: |
           TAG=$(date +%Y%m%d-%H%M%S)-${{ github.sha }}
-          gcloud builds submit \
-            --config=cloudbuild.yaml \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --region=europe-west1 \
-            --substitutions=_TAG=$TAG,_SERVICE_NAME=mise-tasks-staging,\
-          _FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }},\
-          _FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }},\
-          _FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }},\
-          _FIREBASE_STORAGE_BUCKET=${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }},\
-          _FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }},\
-          _FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }},\
-          _APP_URL=https://hf-tasks-staging.web.app,\
-          _SLACK_CHANNEL_NAME=${{ secrets.NEXT_PUBLIC_SLACK_CHANNEL_NAME }},\
-          _SLACK_CHANNEL_URL=${{ secrets.NEXT_PUBLIC_SLACK_CHANNEL_URL }}
+          docker build \
+            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}" \
+            --build-arg NEXT_PUBLIC_APP_URL="https://hf-tasks-staging.web.app" \
+            --build-arg SKIP_PREBUILD=1 \
+            -t "$IMAGE_BASE:$TAG" \
+            -t "$IMAGE_BASE:latest" \
+            .
+          docker push "$IMAGE_BASE:$TAG"
+          docker push "$IMAGE_BASE:latest"
+          echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run (staging)
+        run: |
+          gcloud run deploy $SERVICE_NAME \
+            --image "$IMAGE_BASE:$IMAGE_TAG" \
+            --region $REGION \
+            --platform managed \
+            --allow-unauthenticated \
+            --project $PROJECT_ID \
+            --set-env-vars "NODE_ENV=production,NEXT_TELEMETRY_DISABLED=1" \
+            --update-secrets \
+              "GOOGLE_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID:latest,\
+              GOOGLE_CLIENT_SECRET=GOOGLE_OAUTH_CLIENT_SECRET:latest,\
+              GOOGLE_REDIRECT_URI=GOOGLE_REDIRECT_URI:latest,\
+              NEXT_PUBLIC_APP_URL=NEXT_PUBLIC_APP_URL:latest"
 
       - name: Setup Node.js (for Firebase CLI)
         uses: actions/setup-node@v4
@@ -148,12 +184,10 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      # google-github-actions/auth already exported GOOGLE_APPLICATION_CREDENTIALS —
-      # Firebase CLI picks it up automatically via ADC, no FIREBASE_TOKEN needed.
       - name: Deploy Firebase Hosting (staging target)
         run: |
-          firebase target:apply hosting hf-tasks-staging hf-tasks-staging --project ${{ secrets.GCP_PROJECT_ID }}
-          firebase deploy --only hosting:hf-tasks-staging --project ${{ secrets.GCP_PROJECT_ID }}
+          firebase target:apply hosting hf-tasks-staging hf-tasks-staging --project $PROJECT_ID
+          firebase deploy --only hosting:hf-tasks-staging --project $PROJECT_ID
 
       - name: Print staging URL
         run: echo "✅ Staging deployed → https://hf-tasks-staging.web.app"
@@ -163,7 +197,6 @@ jobs:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [test, build]
-    # Only runs when manually triggered with target=production
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'production'
     environment:
       name: production
@@ -172,6 +205,12 @@ jobs:
     permissions:
       contents: read
       id-token: write
+
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: europe-west1
+      SERVICE_NAME: mise-tasks
+      IMAGE_BASE: europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mise-tasks/mise-tasks
 
     steps:
       - name: Checkout code
@@ -187,23 +226,42 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Deploy to production Cloud Run (hf-tasks)
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+
+      - name: Build and push Docker image
         run: |
           TAG=$(date +%Y%m%d-%H%M%S)-${{ github.sha }}
-          gcloud builds submit \
-            --config=cloudbuild.yaml \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --region=europe-west1 \
-            --substitutions=_TAG=$TAG,_SERVICE_NAME=mise-tasks,\
-          _FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }},\
-          _FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }},\
-          _FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }},\
-          _FIREBASE_STORAGE_BUCKET=${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }},\
-          _FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }},\
-          _FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }},\
-          _APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }},\
-          _SLACK_CHANNEL_NAME=${{ secrets.NEXT_PUBLIC_SLACK_CHANNEL_NAME }},\
-          _SLACK_CHANNEL_URL=${{ secrets.NEXT_PUBLIC_SLACK_CHANNEL_URL }}
+          docker build \
+            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}" \
+            --build-arg NEXT_PUBLIC_APP_URL="${{ secrets.NEXT_PUBLIC_APP_URL }}" \
+            --build-arg SKIP_PREBUILD=1 \
+            -t "$IMAGE_BASE:$TAG" \
+            -t "$IMAGE_BASE:latest" \
+            .
+          docker push "$IMAGE_BASE:$TAG"
+          docker push "$IMAGE_BASE:latest"
+          echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run (production)
+        run: |
+          gcloud run deploy $SERVICE_NAME \
+            --image "$IMAGE_BASE:$IMAGE_TAG" \
+            --region $REGION \
+            --platform managed \
+            --allow-unauthenticated \
+            --project $PROJECT_ID \
+            --set-env-vars "NODE_ENV=production,NEXT_TELEMETRY_DISABLED=1" \
+            --update-secrets \
+              "GOOGLE_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID:latest,\
+              GOOGLE_CLIENT_SECRET=GOOGLE_OAUTH_CLIENT_SECRET:latest,\
+              GOOGLE_REDIRECT_URI=GOOGLE_REDIRECT_URI:latest,\
+              NEXT_PUBLIC_APP_URL=NEXT_PUBLIC_APP_URL:latest"
 
       - name: Setup Node.js (for Firebase CLI)
         uses: actions/setup-node@v4
@@ -215,8 +273,8 @@ jobs:
 
       - name: Deploy Firebase Hosting (production target)
         run: |
-          firebase target:apply hosting hf-tasks hf-tasks --project ${{ secrets.GCP_PROJECT_ID }}
-          firebase deploy --only hosting:hf-tasks --project ${{ secrets.GCP_PROJECT_ID }}
+          firebase target:apply hosting hf-tasks hf-tasks --project $PROJECT_ID
+          firebase deploy --only hosting:hf-tasks --project $PROJECT_ID
 
       - name: Print production URL
         run: echo "🚀 Production deployed → https://hf-tasks.web.app"
