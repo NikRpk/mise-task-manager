@@ -1,233 +1,245 @@
-# Mise - Task and Notes
+# Mise — Task & Note Manager
 
-A task management and note-taking system, built with Next.js, Firebase, and Tailwind CSS.
+A production-ready internal tool for task management, note-taking, and team collaboration. Built with Next.js, Firebase, and deployed to Google Cloud Run.
+
+**Live:** https://hf-tasks.web.app · **Staging:** https://hf-tasks-staging.web.app
+
+---
 
 ## Features
 
-- 🔐 **Google Authentication** - Sign in with your Google account
-- 📋 **Project Management** - Create and manage multiple projects
-- ✅ **Task Tracking** - Kanban-style task boards with drag-and-drop
-- 👥 **Team Collaboration** - Share projects with role-based permissions (VIEW/EDIT/ADMIN)
-- ⚙️ **Project-Specific Settings** - Custom status options, priorities, and fields per project
-- 🎨 **Multiple Color Schemes** - Choose from Classic Green, Ocean Blue, Dark Mode, or Minimal Grey
-- 📱 **Fully Responsive** - Works seamlessly on desktop, tablet, and mobile
+### Tasks
+- **Kanban board** — drag-and-drop columns with custom status options per project
+- **Task detail modal** — title, description (rich text), deadline, priority, owner, sub-tasks, image attachments, comments, and status history
+- **Recurring tasks** — set a recurrence interval and unit; completed instances automatically spawn the next occurrence
+- **Quick-add page** (`/quick`) — minimal single-field form to create a task in seconds without opening the full board
+- **Pagination** — "Done" column loads the 10 most recent completed tasks to keep the board fast; load more on demand
+- **Owner normalisation** — owners are stored as emails (canonical ID); display names are resolved at render time
+
+### Notes
+- **Rich-text editor** — TipTap-powered editor with formatting, image upload, and auto-replacements (`->` → `→`)
+- **Note templates** — reusable templates for meeting notes, retrospectives, etc.; managed in Settings
+- **Calendar event linking** — attach a Google Calendar event to a note for meeting minutes
+- **Previous meeting sections** — notes can include a pull-in of the previous meeting's content for continuity
+
+### Google Calendar Integration
+- Connect your Google account via OAuth to pull in upcoming and past calendar events
+- Browse events from a date-range window; load earlier events with "Load More"
+- Attach events to notes directly from the note editor
+
+### Notifications & Reminders
+- **Daily Slack reminders** — Cloud Scheduler triggers at 08:00 Europe/Berlin and sends each user a personalised Slack message listing overdue, due-today, and due-tomorrow tasks
+- **Customisable Slack templates** — per-project template with Handlebars syntax, editable in Project Settings
+- **Feedback button** — in-app feedback goes directly to a Slack channel via Webhook
+
+### Projects & Collaboration
+- Create multiple projects; invite teammates by email
+- **Role-based access control** — VIEW / EDIT / ADMIN roles enforced at the API and Firestore rules layer
+- **Per-project settings** — custom status columns, priority levels, and topic labels
+- **Member management** — add / remove members, change roles from Project Settings
+
+### Settings
+- **Profile** — display name
+- **Appearance** — four colour schemes: Classic Green, Ocean Blue, Dark Mode, Minimal Grey
+- **Notifications** — toggle email and desktop notifications per project
+- **Note templates** — create, edit, delete reusable templates
+- **Project settings** — per-project status, priority, topic, member, and Slack template configuration
+
+---
 
 ## Tech Stack
 
-- **Framework**: Next.js 16 (React 19)
-- **Styling**: Tailwind CSS 4
-- **Backend**: Firebase (Auth, Firestore, Hosting)
-- **Language**: TypeScript
-- **Drag & Drop**: @dnd-kit
-- **Icons**: Lucide React
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 14+ (App Router, SSR) |
+| Language | TypeScript (strict mode) |
+| Styling | Tailwind CSS + CSS variables |
+| Auth | Firebase Authentication (Google Sign-In) |
+| Database | Firestore (`task-and-note-manager` database) |
+| Storage | Firebase Storage (image attachments) |
+| Hosting | Firebase Hosting → Cloud Run proxy |
+| Backend | Google Cloud Run (Docker, `europe-west1`) |
+| Build | Google Cloud Build (`cloudbuild.yaml`) |
+| Cron | Google Cloud Scheduler |
+| Functions | Firebase Cloud Functions (Slack deploy notifications) |
+| CI/CD | GitHub Actions |
+| Drag & Drop | @dnd-kit |
+| Rich Text | TipTap |
+| Icons | Lucide React |
+| Date utils | date-fns + date-fns-tz |
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ and npm
-- Firebase project set up (see `FIREBASE_SETUP.md`)
-- Google Workspace account
+- Node.js 20+ and npm
+- A Firebase project (Firestore + Auth + Hosting enabled)
+- Google Cloud project with Cloud Run API enabled
+- Google Workspace account for OAuth sign-in
 
-### Installation
-
-1. Clone the repository:
+### Local development
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/NikRpk/hf-task-manager.git
 cd hf-task-manager
-```
-
-2. Install dependencies:
-
-```bash
 npm install
-```
-
-3. Set up environment variables:
-
-Copy `.env.example` to `.env.local` and fill in your Firebase credentials:
-
-```bash
-cp .env.example .env.local
-```
-
-Edit `.env.local` with your Firebase configuration from the Firebase Console.
-
-4. Run the development server:
-
-```bash
+cp .env.example .env.local   # fill in your Firebase config
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000).
+
+The app connects to the production Firebase project by default. Set `NEXT_PUBLIC_DEV_MODE=true` in `.env.local` to skip authentication during development.
+
+### Environment variables
+
+| Variable | Where to find it |
+|---|---|
+| `NEXT_PUBLIC_FIREBASE_*` | Firebase Console → Project Settings → Your apps |
+| `FIREBASE_ADMIN_CLIENT_EMAIL` | Firebase Console → Service Accounts |
+| `FIREBASE_ADMIN_PRIVATE_KEY` | Same service account JSON |
+| `GOOGLE_CLIENT_ID` | GCP Console → APIs & Services → Credentials |
+| `GOOGLE_CLIENT_SECRET` | Same OAuth client |
+| `GOOGLE_REDIRECT_URI` | Your app URL + `/api/auth/google/callback` |
+| `SLACK_FEEDBACK_WEBHOOK_URL` | Slack Workflow Builder webhook |
+
+Server-side secrets (`FIREBASE_ADMIN_PRIVATE_KEY`, `GOOGLE_CLIENT_SECRET`) are **never** in the codebase — they are stored in GCP Secret Manager and injected at deploy time via `cloudbuild.yaml --update-secrets`.
+
+---
 
 ## Project Structure
 
 ```
-hf-task-manager/
-├── app/                    # Next.js app directory
-│   ├── api/               # API routes (with Firebase Admin SDK)
-│   ├── login/             # Login page
-│   ├── settings/          # User settings page
-│   ├── projects/[id]/     # Project-specific pages
-│   └── page.tsx           # Main task board
-├── components/            # React components
-├── lib/                   # Utility functions and Firebase config
-├── types/                 # TypeScript type definitions
-├── public/                # Static assets
-├── firestore.rules        # Firebase security rules
-├── firestore.indexes.json # Firestore indexes
-└── firebase.json          # Firebase configuration
+├── app/
+│   ├── api/               # API routes (all protected with Firebase Auth)
+│   │   ├── tasks/         # CRUD for tasks
+│   │   ├── notes/         # CRUD for notes
+│   │   ├── projects/      # Project management
+│   │   ├── settings/      # User + project settings
+│   │   ├── calendar/      # Google Calendar OAuth + events
+│   │   ├── people/        # Project member lookup
+│   │   ├── slack/         # Slack template management
+│   │   ├── cron/          # Daily reminder endpoint (called by Cloud Scheduler)
+│   │   └── feedback/      # In-app feedback → Slack
+│   ├── login/             # Google Sign-In page
+│   ├── notes/             # Notes list, new note, note detail
+│   ├── quick/             # Quick task creation
+│   ├── settings/          # Settings page (profile, appearance, projects)
+│   └── page.tsx           # Main Kanban board
+├── components/
+│   ├── ui/                # Shared primitives (Button, Input, DatePicker, Select, Toggle, ColorPicker, FilterPills)
+│   ├── TaskModal/         # Task detail + edit modal
+│   ├── KanbanColumn.tsx   # Drag-and-drop column
+│   ├── TipTapEditor.tsx   # Rich text editor
+│   └── ...
+├── functions/             # Firebase Cloud Functions (deploy Slack notifier)
+├── hooks/                 # useTaskFilters, useCalendarEvents, usePermissions, …
+├── lib/                   # Firebase clients, logger, API helpers, reminder logic, Slack client
+├── types/                 # TypeScript interfaces
+├── scripts/               # One-off admin/migration scripts (Node.js, not linted)
+├── __tests__/             # Jest test suites
+├── cloudbuild.yaml        # GCP Cloud Build pipeline
+├── Dockerfile             # Multi-stage production image
+├── firebase.json          # Hosting targets (production + staging)
+└── firestore.rules        # Security rules
 ```
-
-## Key Concepts
-
-### Authentication
-
-The app uses Firebase Authentication with Google Sign-In.
-
-### Projects
-
-- Each user can create multiple projects
-- Projects have members with different roles:
-  - **VIEW**: Read-only access
-  - **EDIT**: Can create and modify tasks
-  - **ADMIN**: Full control (tasks, settings, member management)
-
-### Project Settings
-
-Each project has its own configuration:
-- Status options (columns in Kanban board)
-- Priority levels
-- Custom fields
-
-### User Settings
-
-Global user preferences:
-- Display name
-- Color scheme
-- Notification preferences
-
-## Deployment
-
-### Quick Deploy (2-3 minutes)
-
-```bash
-npm run deploy
-```
-
-### Deploy to Custom Domain (hf-tasks.web.app)
-
-```bash
-npm run deploy:custom-domain
-```
-
-For detailed deployment options and troubleshooting, see [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).
-
-## Development Workflow
-
-### Local Development (Instant!)
-
-```bash
-# Standard local development (uses production Firebase)
-npm run dev
-
-# Local development with emulators (isolated testing)
-npm run dev:local
-```
-
-Open [http://localhost:3000](http://localhost:3000)
-
-**All API routes work locally!** ✅
-
-### Deployment
-
-```bash
-# Fast deployment (2-3 minutes) - RECOMMENDED!
-npm run deploy
-
-# Standard deployment (5-8 minutes)
-npm run deploy:standard
-
-# Deploy to custom domain (hf-tasks.web.app)
-npm run deploy:custom-domain
-```
-
-See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed instructions.
-
-### Testing
-
-```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run with coverage
-npm run test:coverage
-
-# CI test run (what runs in deployment)
-npm run test:ci
-```
-
-**Test Coverage:**
-- ✅ 94 tests protecting critical functionality
-- ✅ 100% coverage on date filtering logic
-- ✅ 100% coverage on debounce utility
-- ✅ 96% coverage on XSS prevention
-- ✅ Tests run automatically before deployment
-
-See `TESTING_GUIDE.md` for detailed testing documentation.
-
-### Linting
-
-```bash
-npm run lint
-```
-
-### Building for Production
-
-```bash
-npm run build
-```
-
-**Note:** Tests and linting run automatically before build (`prebuild` script).
-
-### Deploy Firestore Rules
-
-```bash
-npm run firebase:rules
-```
-
-### Deploy Firestore Indexes
-
-```bash
-npm run firebase:indexes
-```
-
-## Security
-
-- All API routes are protected with Firebase authentication
-- Firestore security rules enforce role-based access control
-- Service account keys are never committed to git
-- Environment variables are kept in `.env.local` (gitignored)
-
-## Documentation
-
-- [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) - Fast deployment & local development
-- [FIREBASE_SETUP.md](FIREBASE_SETUP.md) - Step-by-step Firebase project setup
-- [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md) - Design system and UI guidelines
-
-## Contributing
-
-For feature requests or bug reports, use the in-app feedback button.
-
-## License
-
-Proprietary
 
 ---
 
-Built with ❤️
+## Deployment
+
+### Manual deploy (recommended for now)
+
+Deploys to Cloud Run via Cloud Build, then updates Firebase Hosting:
+
+```bash
+npm run deploy
+```
+
+Requires `GCP_PROJECT_ID` set in your environment (or in `.env.local`). Uses `cloudbuild.yaml` — builds a Docker image, pushes to Artifact Registry, deploys to the `mise-tasks` Cloud Run service.
+
+### GitHub Actions CI/CD
+
+Every push to `main` automatically:
+1. Runs the linter
+2. Runs all tests with coverage
+3. Builds the Next.js app (validates it compiles)
+4. Deploys to **staging** (`https://hf-tasks-staging.web.app` → `mise-tasks-staging` Cloud Run)
+
+To promote to **production**, go to **Actions → Test and Deploy → Run workflow → target: production**.
+
+Secrets required in GitHub repository settings:
+
+| Secret | Description |
+|---|---|
+| `GCP_SERVICE_ACCOUNT_KEY` | JSON key for `github-actions-deployer@dach-ai-mvps` SA |
+| `GCP_PROJECT_ID` | `dach-ai-mvps` |
+| `NEXT_PUBLIC_FIREBASE_*` | All six Firebase web config values |
+| `NEXT_PUBLIC_APP_URL` | Production URL |
+
+### Firebase Hosting targets
+
+| Target | URL | Cloud Run service |
+|---|---|---|
+| `hf-tasks` (production) | https://hf-tasks.web.app | `mise-tasks` |
+| `hf-tasks-staging` (staging) | https://hf-tasks-staging.web.app | `mise-tasks-staging` |
+
+### Deploy Firestore rules / indexes only
+
+```bash
+npm run firebase:rules
+npm run firebase:indexes
+```
+
+---
+
+## Testing
+
+```bash
+npm test                  # run all tests
+npm run test:watch        # watch mode
+npm run test:coverage     # with coverage report
+npm run test:ci           # CI mode (used in GitHub Actions and pre-build)
+```
+
+Tests run automatically before every production build (`prebuild` script). Set `SKIP_PREBUILD=1` to bypass during local iteration.
+
+**Current coverage:**
+- Filtering logic (deadline, status, owner, priority, search) — 100%
+- XSS sanitisation — 96%
+- Debounce utility — 100%
+- Firebase error helpers — 100%
+- Permission / role checks — 100%
+
+---
+
+## Security
+
+- Every API route is wrapped with `withAuth()` — unauthenticated requests return 401
+- Firestore security rules enforce role-based access; the backend is a second layer, not the first
+- Google Sign-In is restricted to `hellofresh.com` / `hellofresh.de` domains via Firebase Auth settings
+- All server-side secrets live in GCP Secret Manager — never in git or environment files
+- The `github-actions-deployer` service account has only the minimum IAM roles needed to submit builds and deploy Cloud Run
+
+---
+
+## Daily Reminders
+
+Cloud Scheduler calls `POST /api/cron/daily-reminders` at **08:00 Europe/Berlin** every weekday. The endpoint:
+
+1. Loads all tasks grouped by owner
+2. Filters for overdue, due-today, and due-tomorrow items
+3. Sends each user a Slack message via their configured webhook
+4. Uses a per-project Handlebars template (editable in Project Settings → Slack)
+
+To test locally: `npm run test:smoke`
+
+---
+
+## Documentation
+
+- `FIREBASE_SETUP.md` — step-by-step Firebase project setup
+- `DEPLOYMENT_GUIDE.md` — detailed deployment and local dev options
+- `SECURITY.md` — why Cloud Run is public and how auth is enforced at the app layer
