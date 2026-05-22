@@ -442,7 +442,7 @@ export default function DesignOptionsPage() {
         <div className="mt-12 p-6 bg-blue-50 rounded-lg border border-blue-200">
           <h3 className="font-semibold text-blue-900 mb-2">Which one do you prefer?</h3>
           <p className="text-sm text-blue-800">
-            Once you've decided, let me know the option number and I'll implement it in the main app!
+            Once you&apos;ve decided, let me know the option number and I&apos;ll implement it in the main app!
           </p>
         </div>
       </div>

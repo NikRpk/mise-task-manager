@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     "coverage/**",
     "design-mockups/**",
     "design-concepts/**",
+    // Plain Node.js scripts that legitimately use CommonJS require()
+    "scripts/**",
+    "functions/lib/**",
   ]),
 ]);
 

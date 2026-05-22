@@ -185,11 +185,11 @@ describe('sanitizeHTML', () => {
     });
 
     test('handles null input', () => {
-      expect(sanitizeHTML(null as any)).toBe('');
+      expect(sanitizeHTML(null as unknown as string)).toBe('');
     });
 
     test('handles undefined input', () => {
-      expect(sanitizeHTML(undefined as any)).toBe('');
+      expect(sanitizeHTML(undefined as unknown as string)).toBe('');
     });
 
     test('handles deeply nested tags', () => {

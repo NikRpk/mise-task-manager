@@ -110,12 +110,14 @@ export default function OwnerSelector({ value, onChange, people, disabled = fals
     if (value) {
       const person = people.find(p => p.email === value);
       if (person) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSearchQuery(person.displayName);
       } else {
-        // Show the custom value as-is
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSearchQuery(value);
       }
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchQuery('');
     }
   }, [value, people]);

@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
     } catch (error) {
       if (isFirebaseError(error)) {
-        logger.error('Error signing in with Google', error, {
+        logger.error('Error signing in with Google', error as Error, {
           code: error.code,
           message: error.message,
         });

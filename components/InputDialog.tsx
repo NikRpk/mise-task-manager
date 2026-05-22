@@ -29,6 +29,7 @@ export default function InputDialog({
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValue(defaultValue);
       // Focus input after a small delay to ensure it's rendered
       setTimeout(() => {

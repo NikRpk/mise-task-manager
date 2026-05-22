@@ -320,7 +320,7 @@ describe('filterTasks', () => {
     test('handles null/undefined deadline gracefully', () => {
       const tasks = [
         createMockTask({ deadline: null }),
-        createMockTask({ deadline: undefined as any }),
+        createMockTask({ deadline: undefined as unknown as string }),
       ];
 
       const result = filterTasks(tasks, { deadline: 'overdue' });

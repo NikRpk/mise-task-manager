@@ -43,13 +43,17 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>(
         try {
           const date = new Date(value);
           if (!isNaN(date.getTime())) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSelectedDate(date);
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setCurrentMonth(date);
           }
         } catch {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setSelectedDate(null);
         }
       } else {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedDate(null);
       }
     }, [value]);

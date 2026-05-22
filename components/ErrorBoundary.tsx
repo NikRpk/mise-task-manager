@@ -101,7 +101,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   className="text-base mb-4"
                   style={{ color: 'var(--color-text-secondary)' }}
                 >
-                  We're sorry for the inconvenience. An unexpected error occurred.
+                  We&apos;re sorry for the inconvenience. An unexpected error occurred.
                 </p>
               </div>
 

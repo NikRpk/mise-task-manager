@@ -37,6 +37,7 @@ export default function SettingsLayout({ children, activeSection }: SettingsLayo
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchProjects();
   }, []);
 

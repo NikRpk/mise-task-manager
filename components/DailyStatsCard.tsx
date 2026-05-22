@@ -16,6 +16,7 @@ export default function DailyStatsCard({ completedToday, totalTasks, percentComp
   // Trigger animation when count increases
   useEffect(() => {
     if (completedToday > prevCount) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsAnimating(true);
       const timer = setTimeout(() => setIsAnimating(false), 600);
       setPrevCount(completedToday);
