@@ -86,8 +86,8 @@ Write meeting notes, capture decisions, and track tasks — all in one place, or
 ### Local development
 
 ```bash
-git clone https://github.com/NikRpk/hf-task-manager.git
-cd hf-task-manager
+git clone https://github.com/NikRpk/mise-task-manager.git
+cd mise-task-manager
 npm install
 cp .env.example .env.local   # fill in your Firebase config
 npm run dev
