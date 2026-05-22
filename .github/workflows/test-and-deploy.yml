@@ -7,10 +7,11 @@ on:
     branches: [main]
 
 jobs:
+  # ─── Job 1: Lint + Tests ─────────────────────────────────────────────────────
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -46,11 +47,12 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
+  # ─── Job 2: Build check (validates the Next.js build compiles) ───────────────
   build:
     name: Build Application
     runs-on: ubuntu-latest
     needs: test
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -65,7 +67,7 @@ jobs:
         run: npm ci
 
       - name: Build Next.js app
-        run: npm run build
+        run: SKIP_PREBUILD=1 npm run build
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
@@ -73,47 +75,54 @@ jobs:
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+          NEXT_PUBLIC_SLACK_CHANNEL_NAME: ${{ secrets.NEXT_PUBLIC_SLACK_CHANNEL_NAME }}
+          NEXT_PUBLIC_SLACK_CHANNEL_URL: ${{ secrets.NEXT_PUBLIC_SLACK_CHANNEL_URL }}
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: .next
-          retention-days: 7
-
+  # ─── Job 3: Deploy to Cloud Run (main branch only, with manual approval) ─────
   deploy:
-    name: Deploy to Firebase
+    name: Deploy to Cloud Run
     runs-on: ubuntu-latest
     needs: [test, build]
+    # Only deploy on pushes to main — not on PRs or develop
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
+    # GitHub Environment with required reviewers — pauses here for your approval
+    environment: production
+
+    permissions:
+      contents: read
+      id-token: write  # Required for Workload Identity Federation
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      # Authenticate to GCP using a Service Account key stored in GitHub Secrets.
+      # To set this up, see the README section "GitHub Actions Deployment Setup".
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          node-version: '20'
-          cache: 'npm'
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build for production
-        run: npm run build
-        env:
-          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: live
-          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy via Cloud Build
+        run: |
+          TAG=$(date +%Y%m%d-%H%M%S)-${{ github.sha }}
+          gcloud builds submit \
+            --config=cloudbuild.yaml \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --region=europe-west1 \
+            --substitutions=_TAG=$TAG,_SERVICE_NAME=mise-tasks,\
+          _FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }},\
+          _FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }},\
+          _FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }},\
+          _FIREBASE_STORAGE_BUCKET=${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }},\
+          _FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }},\
+          _FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }},\
+          _APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }},\
+          _SLACK_CHANNEL_NAME=${{ secrets.NEXT_PUBLIC_SLACK_CHANNEL_NAME }},\
+          _SLACK_CHANNEL_URL=${{ secrets.NEXT_PUBLIC_SLACK_CHANNEL_URL }}
