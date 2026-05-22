@@ -132,16 +132,6 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
 
-      - name: Ensure Artifact Registry repository exists
-        run: |
-          gcloud artifacts repositories describe mise-tasks \
-            --location=europe-west1 --project=$PROJECT_ID 2>/dev/null || \
-          gcloud artifacts repositories create mise-tasks \
-            --repository-format=docker \
-            --location=europe-west1 \
-            --project=$PROJECT_ID \
-            --description="Mise task manager images"
-
       - name: Build and push Docker image
         run: |
           TAG=$(date +%Y%m%d-%H%M%S)-${{ github.sha }}
