@@ -1,12 +1,22 @@
 # Mise — Task & Note Manager
 
-A production-ready internal tool for task management, note-taking, and team collaboration. Built with Next.js, Firebase, and deployed to Google Cloud Run.
+A production-ready internal tool for **task management and note-taking**, built with Next.js, Firebase, and deployed to Google Cloud Run.
+
+Write meeting notes, capture decisions, and track tasks — all in one place, organised by project.
 
 **Live:** https://hf-tasks.web.app · **Staging:** https://hf-tasks-staging.web.app
 
 ---
 
 ## Features
+
+### Notes
+- **Rich-text editor** — TipTap-powered with bold, italic, headings, bullet lists, images, and smart auto-replacements (`->` → `→`, etc.)
+- **Standalone notes** — write freeform notes, meeting minutes, decisions, or anything else; not tied to tasks
+- **Note templates** — create reusable templates (e.g. "Weekly Sync", "Retrospective") and pick one when starting a new note; managed in Settings
+- **Google Calendar linking** — attach a calendar event to a note so meeting minutes stay connected to the invite
+- **Previous meeting pull-in** — a note can include a collapsible section showing the previous meeting's content for continuity
+- **Notes list** — browse all notes in a project, searchable and sorted by last updated
 
 ### Tasks
 - **Kanban board** — drag-and-drop columns with custom status options per project
@@ -15,12 +25,6 @@ A production-ready internal tool for task management, note-taking, and team coll
 - **Quick-add page** (`/quick`) — minimal single-field form to create a task in seconds without opening the full board
 - **Pagination** — "Done" column loads the 10 most recent completed tasks to keep the board fast; load more on demand
 - **Owner normalisation** — owners are stored as emails (canonical ID); display names are resolved at render time
-
-### Notes
-- **Rich-text editor** — TipTap-powered editor with formatting, image upload, and auto-replacements (`->` → `→`)
-- **Note templates** — reusable templates for meeting notes, retrospectives, etc.; managed in Settings
-- **Calendar event linking** — attach a Google Calendar event to a note for meeting minutes
-- **Previous meeting sections** — notes can include a pull-in of the previous meeting's content for continuity
 
 ### Google Calendar Integration
 - Connect your Google account via OAuth to pull in upcoming and past calendar events
