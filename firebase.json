@@ -1,22 +1,42 @@
 {
-  "hosting": {
-    "target": "hf-tasks",
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "run": {
-          "serviceId": "hf-tasks",
-          "region": "europe-west1"
+  "hosting": [
+    {
+      "target": "hf-tasks",
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "hf-tasks",
+            "region": "europe-west1"
+          }
         }
-      }
-    ]
-  },
+      ]
+    },
+    {
+      "target": "hf-tasks-staging",
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "mise-tasks-staging",
+            "region": "europe-west1"
+          }
+        }
+      ]
+    }
+  ],
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json",
