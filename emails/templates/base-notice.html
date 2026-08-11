@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!--
+  Base template: Notice (informational, no CTA button) email.
+  Used for: security notifications like "password changed", "email changed" —
+  anything Supabase sends that isn't asking the user to click through.
+
+  See base-cta.html for the full authoring notes (theme tokens, build process).
+  Placeholders (replaced by emails/build.js):
+    {{SUBJECT}}   - <title> / email subject
+    {{HEADING}}   - h1 text
+    {{BODY}}      - paragraph under the heading (can include inline HTML)
+    {{FOOTER}}    - small print under the card
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{SUBJECT}}</title>
+<style>
+  :root {
+    --token-navy: #003366;
+    --token-navy-muted: #5A7897;
+    --token-porcelain: #FDFFFC;
+    --token-raspberry: #960050;
+    --token-amber: #FF9F1C;
+    --token-lime: #50C846;
+    --token-border: #E7EAE4;
+    --token-card-bg: #FFFFFF;
+  }
+  body { margin: 0; padding: 0; background-color: var(--token-porcelain); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  .page { background-color: var(--token-porcelain); }
+  .cell { padding: 40px 16px; }
+  .card { max-width: 480px; width: 100%; background-color: var(--token-card-bg); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,51,102,0.10); }
+  .accent-bar { background-color: var(--token-raspberry); height: 6px; line-height: 6px; font-size: 0; }
+  .brand-row { padding: 28px 40px 0 40px; }
+  .brand-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--token-lime); margin-right: 8px; vertical-align: middle; }
+  .brand-name { font-size: 20px; font-weight: 700; color: var(--token-navy); letter-spacing: -0.02em; vertical-align: middle; }
+  h1.heading { margin: 0; padding: 24px 40px 8px 40px; font-size: 22px; line-height: 1.3; color: var(--token-navy); font-weight: 600; }
+  p.body-text { margin: 0; padding: 0 40px 32px 40px; font-size: 15px; line-height: 1.6; color: var(--token-navy-muted); }
+  .divider-row td { padding: 0 40px; }
+  .divider-row hr { border: none; border-top: 1px solid var(--token-border); margin: 0; }
+  p.footer { margin: 24px 0 0 0; font-size: 12px; color: var(--token-navy-muted); text-align: center; }
+</style>
+</head>
+<body>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="page">
+    <tr>
+      <td align="center" class="cell">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" class="card">
+          <tr><td class="accent-bar">&nbsp;</td></tr>
+          <tr>
+            <td class="brand-row">
+              <span class="brand-dot">&nbsp;</span>
+              <span class="brand-name">Mise</span>
+            </td>
+          </tr>
+          <tr><td><h1 class="heading">{{HEADING}}</h1></td></tr>
+          <tr><td><p class="body-text">{{BODY}}</p></td></tr>
+        </table>
+        <p class="footer">{{FOOTER}}</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

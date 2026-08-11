@@ -13,7 +13,8 @@
     "test:ci": "jest --ci --coverage --maxWorkers=2 --passWithNoTests",
     "prebuild": "if [ \"$SKIP_PREBUILD\" != \"1\" ]; then npm run test:ci; fi",
     "test:smoke": "npx tsx scripts/smoke-tests.ts",
-    "supabase:types": "npx supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" --schema public > types/supabase.ts"
+    "supabase:types": "npx supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" --schema public > types/supabase.ts",
+    "emails:build": "node emails/build.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

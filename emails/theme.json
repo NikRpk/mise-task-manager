@@ -1,0 +1,45 @@
+{
+  "$comment": "Shared color tokens for transactional emails (Supabase Auth templates). Edit values here, then run `node emails/build.js` to regenerate emails/output/*.html. Use emails/playground.html to experiment visually before settling on final values.",
+  "colors": {
+    "navy": {
+      "value": "#003366",
+      "name": "Oxford Navy",
+      "usedFor": "Headings, wordmark, primary button text"
+    },
+    "navyMuted": {
+      "value": "#5A7897",
+      "name": "Navy (muted tint)",
+      "usedFor": "Body copy, footer text"
+    },
+    "porcelain": {
+      "value": "#EEF6FF",
+      "name": "Porcelain",
+      "usedFor": "Page background"
+    },
+    "raspberry": {
+      "value": "#FF9F1C",
+      "name": "Dark Raspberry",
+      "usedFor": "Fallback link accent"
+    },
+    "amber": {
+      "value": "#50C846",
+      "name": "Amber Glow",
+      "usedFor": "Primary CTA button background, top accent bar"
+    },
+    "lime": {
+      "value": "#50C846",
+      "name": "Lime Green",
+      "usedFor": "Small logo accent dot"
+    },
+    "border": {
+      "value": "#50C846",
+      "name": "Divider",
+      "usedFor": "Card internal divider line"
+    },
+    "cardBackground": {
+      "value": "#FFFFFF",
+      "name": "Card background",
+      "usedFor": "The white card the email content sits on"
+    }
+  }
+}
