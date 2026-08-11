@@ -4,8 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import { adminDb } from '@/lib/firebase-admin';
-import { Person } from '@/types';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { rowToPerson, PersonRow } from '@/lib/db-mappers';
 
 /**
  * GET /api/people - Fetch all people from database
@@ -13,17 +13,17 @@ import { Person } from '@/types';
 export async function GET(request: NextRequest) {
   return withAuth(request, async () => {
     try {
-      const peopleSnapshot = await adminDb
-        .collection('people')
-        .orderBy('displayName')
-        .limit(1000)
-        .get();
-      
-      const people: Person[] = peopleSnapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-      } as Person));
-      
+      const db = getSupabaseAdmin();
+      const { data: rows, error } = await db
+        .from('people')
+        .select('*')
+        .order('display_name')
+        .limit(1000);
+
+      if (error) throw error;
+
+      const people = ((rows as PersonRow[]) || []).map(rowToPerson);
+
       return NextResponse.json({ people });
     } catch (error) {
       console.error('Failed to fetch people:', error);

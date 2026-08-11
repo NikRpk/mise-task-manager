@@ -4,7 +4,7 @@
  */
 
 import { google } from 'googleapis';
-import { adminDb } from './firebase-admin';
+import { getSupabaseAdmin } from './supabase/admin';
 import { createOAuth2Client, getAccessTokenFromRefresh, getUserRefreshToken } from './google-calendar';
 import { logger } from './logger';
 
@@ -39,33 +39,27 @@ export async function syncWorkspaceUsers(userId: string): Promise<number> {
     
     const users = response.data.users || [];
     logger.info('Found users from Directory', { count: users.length });
-    
-    const batch = adminDb.batch();
-    let syncedCount = 0;
-    
-    users.forEach(user => {
-      if (user.primaryEmail) {
-        const personRef = adminDb.collection('people').doc(user.primaryEmail);
-        batch.set(personRef, {
-          id: user.primaryEmail,
-          email: user.primaryEmail,
-          displayName: user.name?.fullName || user.primaryEmail,
-          firstName: user.name?.givenName,
-          lastName: user.name?.familyName,
-          photoUrl: user.thumbnailPhotoUrl,
-          source: 'workspace',
-          lastSeen: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
-        syncedCount++;
-      }
-    });
-    
-    await batch.commit();
-    logger.info('Workspace users synced successfully', { userId, count: syncedCount });
-    
-    return syncedCount;
+
+    const rows = users
+      .filter(user => !!user.primaryEmail)
+      .map(user => ({
+        email: user.primaryEmail!,
+        display_name: user.name?.fullName || user.primaryEmail!,
+        first_name: user.name?.givenName || null,
+        last_name: user.name?.familyName || null,
+        photo_url: user.thumbnailPhotoUrl || null,
+        source: 'workspace' as const,
+        last_seen: new Date().toISOString(),
+      }));
+
+    if (rows.length > 0) {
+      const { error } = await getSupabaseAdmin().from('people').upsert(rows, { onConflict: 'email' });
+      if (error) throw error;
+    }
+
+    logger.info('Workspace users synced successfully', { userId, count: rows.length });
+
+    return rows.length;
   } catch (error) {
     logger.error('Failed to sync workspace users', error as Error, { userId });
     throw error;
@@ -81,55 +75,25 @@ export async function addPeopleFromAttendees(
   if (!attendees || attendees.length === 0) {
     return;
   }
-  
+
   try {
-    const batch = adminDb.batch();
     const now = new Date().toISOString();
-    
-    // #region Debug logging - Save to database
-    const withNames: string[] = [];
-    const withoutNames: string[] = [];
-    // #endregion
-    
-    attendees.forEach(attendee => {
-      if (attendee.email) {
-        const personRef = adminDb.collection('people').doc(attendee.email);
-        
-        // #region Debug logging - Track what we're saving
-        if (attendee.displayName) {
-          withNames.push(`${attendee.displayName} <${attendee.email}>`);
-        } else {
-          withoutNames.push(attendee.email);
-        }
-        // #endregion
-        
-        batch.set(personRef, {
-          id: attendee.email,
-          email: attendee.email,
-          displayName: attendee.displayName || attendee.email, // TODO: This fallback causes emails to show as names
-          source: 'calendar',
-          lastSeen: now,
-          createdAt: now,
-          updatedAt: now,
-        }, { merge: true });
-      }
-    });
-    
-    // #region Debug logging - Database save summary
-    console.log('=== DATABASE SAVE DEBUG ===');
-    console.log(`Saving ${attendees.length} people to database`);
-    console.log(`\n✅ Saving WITH actual names (${withNames.length}):`);
-    withNames.slice(0, 5).forEach(name => console.log(`  - ${name}`));
-    if (withNames.length > 5) console.log(`  ... and ${withNames.length - 5} more`);
-    
-    console.log(`\n❌ Saving WITHOUT names - using email as fallback (${withoutNames.length}):`);
-    withoutNames.slice(0, 5).forEach(email => console.log(`  - ${email}`));
-    if (withoutNames.length > 5) console.log(`  ... and ${withoutNames.length - 5} more`);
-    console.log('=== END DEBUG ===\n');
-    // #endregion
-    
-    await batch.commit();
-    logger.info('Added people from calendar attendees', { count: attendees.length });
+
+    const rows = attendees
+      .filter(a => !!a.email)
+      .map(attendee => ({
+        email: attendee.email,
+        display_name: attendee.displayName || attendee.email,
+        source: 'calendar' as const,
+        last_seen: now,
+      }));
+
+    if (rows.length === 0) return;
+
+    const { error } = await getSupabaseAdmin().from('people').upsert(rows, { onConflict: 'email' });
+    if (error) throw error;
+
+    logger.info('Added people from calendar attendees', { count: rows.length });
   } catch (error) {
     logger.error('Failed to add people from attendees', error as Error);
     // Don't throw - this is non-critical

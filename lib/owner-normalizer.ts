@@ -12,7 +12,7 @@
  * returned unchanged so team members can still assign tasks to people who
  * haven't been onboarded into the auth system yet.
  */
-import { adminDb } from './firebase-admin';
+import { getSupabaseAdmin } from './supabase/admin';
 import { logger } from './logger';
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -28,8 +28,8 @@ let cachedAt = 0;
 const CACHE_TTL_MS = 60_000;
 
 /**
- * Builds a displayName → email lookup from `userSettings` and `people`.
- * Cached for 60s to avoid a double collection scan on every task write.
+ * Builds a displayName → email lookup from `user_settings` and `people`.
+ * Cached for 60s to avoid re-querying both tables on every task write.
  */
 async function loadDisplayNameToEmailMap(): Promise<Map<string, string>> {
   if (cachedMap && Date.now() - cachedAt < CACHE_TTL_MS) {
@@ -38,29 +38,20 @@ async function loadDisplayNameToEmailMap(): Promise<Map<string, string>> {
 
   const map = new Map<string, string>();
 
-  const [settingsSnap, peopleSnap] = await Promise.all([
-    adminDb.collection('userSettings').get(),
-    adminDb.collection('people').get(),
+  const [{ data: settingsRows }, { data: peopleRows }] = await Promise.all([
+    getSupabaseAdmin().from('user_settings').select('display_name, email'),
+    getSupabaseAdmin().from('people').select('display_name, email'),
   ]);
 
-  settingsSnap.docs.forEach(doc => {
-    const data = doc.data() as { displayName?: string; email?: string };
-    if (data.displayName && data.email) {
-      map.set(data.displayName.trim(), data.email);
+  (settingsRows || []).forEach((row) => {
+    if (row.display_name && row.email) {
+      map.set(row.display_name.trim(), row.email);
     }
   });
 
-  peopleSnap.docs.forEach(doc => {
-    const data = doc.data() as {
-      name?: string;
-      displayName?: string;
-      email?: string;
-    };
-    if (data.email && data.displayName) {
-      map.set(data.displayName.trim(), data.email);
-    }
-    if (data.email && data.name) {
-      map.set(data.name.trim(), data.email);
+  (peopleRows || []).forEach((row) => {
+    if (row.email && row.display_name) {
+      map.set(row.display_name.trim(), row.email);
     }
   });
 

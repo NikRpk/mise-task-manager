@@ -1,10 +1,8 @@
 # Mise — Task & Note Manager
 
-A production-ready internal tool for **task management and note-taking**, built with Next.js, Firebase, and deployed to Google Cloud Run.
+A production-ready personal tool for **task management and note-taking**, built with Next.js, Supabase, and deployed on Vercel.
 
 Write meeting notes, capture decisions, and track tasks — all in one place, organised by project.
-
-**Live:** https://hf-tasks.web.app · **Staging:** https://hf-tasks-staging.web.app
 
 ---
 
@@ -32,13 +30,13 @@ Write meeting notes, capture decisions, and track tasks — all in one place, or
 - Attach events to notes directly from the note editor
 
 ### Notifications & Reminders
-- **Daily Slack reminders** — Cloud Scheduler triggers at 08:00 Europe/Berlin and sends each user a personalised Slack message listing overdue, due-today, and due-tomorrow tasks
+- **Daily Slack reminders** — Vercel Cron triggers at 06:00 UTC and sends each user a personalised Slack message listing overdue, due-today, and due-tomorrow tasks
 - **Customisable Slack templates** — per-project template with Handlebars syntax, editable in Project Settings
 - **Feedback button** — in-app feedback goes directly to a Slack channel via Webhook
 
 ### Projects & Collaboration
 - Create multiple projects; invite teammates by email
-- **Role-based access control** — VIEW / EDIT / ADMIN roles enforced at the API and Firestore rules layer
+- **Role-based access control** — VIEW / EDIT / ADMIN roles enforced at the API layer and backed by Postgres Row Level Security
 - **Per-project settings** — custom status columns, priority levels, and topic labels
 - **Member management** — add / remove members, change roles from Project Settings
 
@@ -55,18 +53,15 @@ Write meeting notes, capture decisions, and track tasks — all in one place, or
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 14+ (App Router, SSR) |
+| Framework | Next.js 16+ (App Router, SSR) |
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS + CSS variables |
-| Auth | Firebase Authentication (Google Sign-In) |
-| Database | Firestore (`task-and-note-manager` database) |
-| Storage | Firebase Storage (image attachments) |
-| Hosting | Firebase Hosting → Cloud Run proxy |
-| Backend | Google Cloud Run (Docker, `europe-west1`) |
-| Build | Google Cloud Build (`cloudbuild.yaml`) |
-| Cron | Google Cloud Scheduler |
-| Functions | Firebase Cloud Functions (Slack deploy notifications) |
-| CI/CD | GitHub Actions |
+| Auth | Supabase Auth (Google OAuth + email/password) |
+| Database | Supabase Postgres, with Row Level Security |
+| Realtime | Supabase Realtime (Postgres change streams) |
+| Hosting | Vercel |
+| Cron | Vercel Cron Jobs |
+| CI | GitHub Actions (lint + test + build check only — deploys happen via Vercel's Git integration) |
 | Drag & Drop | @dnd-kit |
 | Rich Text | TipTap |
 | Icons | Lucide React |
@@ -79,37 +74,46 @@ Write meeting notes, capture decisions, and track tasks — all in one place, or
 ### Prerequisites
 
 - Node.js 20+ and npm
-- A Firebase project (Firestore + Auth + Hosting enabled)
-- Google Cloud project with Cloud Run API enabled
-- Google Workspace account for OAuth sign-in
+- A [Supabase](https://supabase.com) project (Postgres + Auth enabled)
+- A [Vercel](https://vercel.com) account, for hosting
+- (Optional) A Google Cloud project with OAuth credentials, for Google Sign-In and Calendar integration
+- (Optional) A Slack app/bot token, for reminders and feedback
 
-### Local development
+### 1. Set up Supabase
+
+1. Create a new Supabase project.
+2. Open the SQL editor and run the contents of [`db/schema.sql`](db/schema.sql) — this creates all tables, enums, triggers, and Row Level Security policies.
+3. In **Authentication → Providers**, enable **Email** and (optionally) **Google**. For Google, you'll need a Google OAuth client ID/secret (see below) and to set the redirect URL to `https://<your-project-ref>.supabase.co/auth/v1/callback`.
+4. In **Authentication → URL Configuration**, add your app URL (e.g. `http://localhost:3000` for local dev, your Vercel domain for production) to the redirect allow-list.
+5. Copy your **Project URL**, **anon public key**, and **service_role key** from **Project Settings → API**.
+
+### 2. Local development
 
 ```bash
 git clone https://github.com/NikRpk/mise-task-manager.git
 cd mise-task-manager
 npm install
-cp .env.example .env.local   # fill in your Firebase config
+cp .env.example .env.local   # fill in your Supabase project values
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
-
-The app connects to the production Firebase project by default. Set `NEXT_PUBLIC_DEV_MODE=true` in `.env.local` to skip authentication during development.
+Open [http://localhost:3000](http://localhost:3000), sign up with email/password (or Google, if configured), and start creating projects.
 
 ### Environment variables
 
 | Variable | Where to find it |
 |---|---|
-| `NEXT_PUBLIC_FIREBASE_*` | Firebase Console → Project Settings → Your apps |
-| `FIREBASE_ADMIN_CLIENT_EMAIL` | Firebase Console → Service Accounts |
-| `FIREBASE_ADMIN_PRIVATE_KEY` | Same service account JSON |
-| `GOOGLE_CLIENT_ID` | GCP Console → APIs & Services → Credentials |
-| `GOOGLE_CLIENT_SECRET` | Same OAuth client |
-| `GOOGLE_REDIRECT_URI` | Your app URL + `/api/auth/google/callback` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API (**secret** — server-side only) |
+| `SUPABASE_PROJECT_ID` | Your Supabase project ref (used by `npm run supabase:types`) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | GCP Console → APIs & Services → Credentials |
+| `GOOGLE_REDIRECT_URI` | Your app URL + `/api/auth/google/callback` (Calendar integration only — separate from Supabase's OAuth redirect) |
+| `SLACK_BOT_TOKEN` | Slack app → OAuth & Permissions |
 | `SLACK_FEEDBACK_WEBHOOK_URL` | Slack Workflow Builder webhook |
+| `CRON_SECRET` | Any long random string — set the same value in Vercel |
 
-Server-side secrets (`FIREBASE_ADMIN_PRIVATE_KEY`, `GOOGLE_CLIENT_SECRET`) are **never** in the codebase — they are stored in GCP Secret Manager and injected at deploy time via `cloudbuild.yaml --update-secrets`.
+See [`.env.example`](.env.example) for the full list with placeholder values.
 
 ---
 
@@ -117,7 +121,7 @@ Server-side secrets (`FIREBASE_ADMIN_PRIVATE_KEY`, `GOOGLE_CLIENT_SECRET`) are *
 
 ```
 ├── app/
-│   ├── api/               # API routes (all protected with Firebase Auth)
+│   ├── api/               # API routes (all protected with Supabase Auth via withAuth())
 │   │   ├── tasks/         # CRUD for tasks
 │   │   ├── notes/         # CRUD for notes
 │   │   ├── projects/      # Project management
@@ -125,9 +129,10 @@ Server-side secrets (`FIREBASE_ADMIN_PRIVATE_KEY`, `GOOGLE_CLIENT_SECRET`) are *
 │   │   ├── calendar/      # Google Calendar OAuth + events
 │   │   ├── people/        # Project member lookup
 │   │   ├── slack/         # Slack template management
-│   │   ├── cron/          # Daily reminder endpoint (called by Cloud Scheduler)
+│   │   ├── cron/          # Daily reminder endpoint (called by Vercel Cron)
 │   │   └── feedback/      # In-app feedback → Slack
-│   ├── login/             # Google Sign-In page
+│   ├── auth/callback/     # Supabase OAuth redirect handler
+│   ├── login/             # Google Sign-In + email/password login page
 │   ├── notes/             # Notes list, new note, note detail
 │   ├── quick/             # Quick task creation
 │   ├── settings/          # Settings page (profile, appearance, projects)
@@ -138,64 +143,52 @@ Server-side secrets (`FIREBASE_ADMIN_PRIVATE_KEY`, `GOOGLE_CLIENT_SECRET`) are *
 │   ├── KanbanColumn.tsx   # Drag-and-drop column
 │   ├── TipTapEditor.tsx   # Rich text editor
 │   └── ...
-├── functions/             # Firebase Cloud Functions (deploy Slack notifier)
 ├── hooks/                 # useTaskFilters, useCalendarEvents, usePermissions, …
-├── lib/                   # Firebase clients, logger, API helpers, reminder logic, Slack client
+├── lib/
+│   ├── supabase/          # client.ts (browser), server.ts (SSR/OAuth), admin.ts (service-role)
+│   ├── auth-middleware.ts # withAuth() — verifies Supabase JWTs, checks project roles
+│   ├── db-mappers.ts      # snake_case Postgres rows ↔ camelCase TS types
+│   ├── realtime-listeners.ts # Supabase Realtime subscriptions
+│   └── ...                # logger, API helpers, reminder logic, Slack client
 ├── types/                 # TypeScript interfaces
-├── scripts/               # One-off admin/migration scripts (Node.js, not linted)
-├── __tests__/             # Jest test suites
-├── cloudbuild.yaml        # GCP Cloud Build pipeline
-├── Dockerfile             # Multi-stage production image
-├── firebase.json          # Hosting targets (production + staging)
-└── firestore.rules        # Security rules
+├── db/
+│   └── schema.sql         # Postgres schema + RLS policies (run once in Supabase SQL editor)
+├── scripts/                # Smoke tests
+├── __tests__/              # Jest test suites
+└── vercel.json             # Vercel Cron configuration
 ```
 
 ---
 
 ## Deployment
 
-### Manual deploy (recommended for now)
+Deployment is handled entirely by **Vercel's Git integration** — no manual deploy scripts or CI deploy jobs.
 
-Deploys to Cloud Run via Cloud Build, then updates Firebase Hosting:
+### First-time setup
 
-```bash
-npm run deploy
-```
+1. Push this repo to your own GitHub account (or fork it).
+2. In the [Vercel dashboard](https://vercel.com/new), import the repository.
+3. Add all environment variables from `.env.example` (with real values) under **Project Settings → Environment Variables**. Add them for both **Production** and **Preview** environments.
+4. Deploy. Vercel automatically detects Next.js and builds/deploys on every push.
+5. In Supabase, add your production Vercel URL to **Authentication → URL Configuration → Redirect URLs** (and update `NEXT_PUBLIC_APP_URL` / `GOOGLE_REDIRECT_URI` accordingly).
 
-Requires `GCP_PROJECT_ID` set in your environment (or in `.env.local`). Uses `cloudbuild.yaml` — builds a Docker image, pushes to Artifact Registry, deploys to the `mise-tasks` Cloud Run service.
+### Ongoing deploys
 
-### GitHub Actions CI/CD
+- Every push to `main` → production deploy.
+- Every pull request → an isolated preview deploy with its own URL (posted as a PR comment by Vercel's GitHub app).
 
-Every push to `main` automatically:
-1. Runs the linter
-2. Runs all tests with coverage
-3. Builds the Next.js app (validates it compiles)
-4. Deploys to **staging** (`https://hf-tasks-staging.web.app` → `mise-tasks-staging` Cloud Run)
+### GitHub Actions (CI only)
 
-To promote to **production**, go to **Actions → Test and Deploy → Run workflow → target: production**.
+`.github/workflows/test-and-deploy.yml` runs on every push/PR:
+1. Lint
+2. Tests with coverage
+3. A production build (`next build`), to catch build-time errors before Vercel does
 
-Secrets required in GitHub repository settings:
+It does **not** deploy anything — that's Vercel's job.
 
-| Secret | Description |
-|---|---|
-| `GCP_SERVICE_ACCOUNT_KEY` | JSON key for `github-actions-deployer@dach-ai-mvps` SA |
-| `GCP_PROJECT_ID` | `dach-ai-mvps` |
-| `NEXT_PUBLIC_FIREBASE_*` | All six Firebase web config values |
-| `NEXT_PUBLIC_APP_URL` | Production URL |
+### Vercel Cron
 
-### Firebase Hosting targets
-
-| Target | URL | Cloud Run service |
-|---|---|---|
-| `hf-tasks` (production) | https://hf-tasks.web.app | `mise-tasks` |
-| `hf-tasks-staging` (staging) | https://hf-tasks-staging.web.app | `mise-tasks-staging` |
-
-### Deploy Firestore rules / indexes only
-
-```bash
-npm run firebase:rules
-npm run firebase:indexes
-```
+`vercel.json` schedules `GET /api/cron/daily-reminders` at `0 6 * * *` (06:00 UTC daily). Vercel automatically sends `Authorization: Bearer $CRON_SECRET`, which the route verifies. Adjust the schedule or timezone handling directly in the route (it currently reasons in `Europe/Berlin` internally — see `lib/reminders.ts`).
 
 ---
 
@@ -206,44 +199,47 @@ npm test                  # run all tests
 npm run test:watch        # watch mode
 npm run test:coverage     # with coverage report
 npm run test:ci           # CI mode (used in GitHub Actions and pre-build)
+npm run test:smoke        # black-box HTTP smoke tests against a running instance
 ```
 
 Tests run automatically before every production build (`prebuild` script). Set `SKIP_PREBUILD=1` to bypass during local iteration.
 
-**Current coverage:**
-- Filtering logic (deadline, status, owner, priority, search) — 100%
-- XSS sanitisation — 96%
-- Debounce utility — 100%
-- Firebase error helpers — 100%
-- Permission / role checks — 100%
+To smoke-test a live deployment:
+
+```bash
+BASE_URL=https://your-app.vercel.app npm run test:smoke
+```
 
 ---
 
 ## Security
 
 - Every API route is wrapped with `withAuth()` — unauthenticated requests return 401
-- Firestore security rules enforce role-based access; the backend is a second layer, not the first
-- Google Sign-In is restricted to `hellofresh.com` / `hellofresh.de` domains via Firebase Auth settings
-- All server-side secrets live in GCP Secret Manager — never in git or environment files
-- The `github-actions-deployer` service account has only the minimum IAM roles needed to submit builds and deploy Cloud Run
+- Postgres Row Level Security policies (`db/schema.sql`) enforce role-based access as a second layer, independent of the API
+- Sign-in supports Google OAuth and email/password; there is no email-domain restriction — this is a personal deployment anyone can sign up to
+- All server-side secrets live in Vercel Environment Variables — never in git
+- See [`SECURITY.md`](SECURITY.md) for the full architecture and threat model
 
 ---
 
 ## Daily Reminders
 
-Cloud Scheduler calls `POST /api/cron/daily-reminders` at **08:00 Europe/Berlin** every weekday. The endpoint:
+Vercel Cron calls `GET /api/cron/daily-reminders` at **06:00 UTC** every day. The endpoint:
 
 1. Loads all tasks grouped by owner
 2. Filters for overdue, due-today, and due-tomorrow items
 3. Sends each user a Slack message via their configured webhook
 4. Uses a per-project Handlebars template (editable in Project Settings → Slack)
 
-To test locally: `npm run test:smoke`
+To test locally: `npm run test:smoke`, or trigger `POST /api/cron/daily-reminders` directly with `Authorization: Bearer $CRON_SECRET`.
 
 ---
 
+## Migrating from the previous Firebase/GCP deployment
+
+This project was migrated from Firestore + Firebase Auth + Cloud Run to Supabase + Vercel. There is no automatic data migration path — this is a fresh instance with an empty database. If you have data in an old Firestore instance you want to preserve, you'll need to export it and write a one-off script to insert it into the corresponding Postgres tables (see `db/schema.sql` for the target schema).
+
 ## Documentation
 
-- `FIREBASE_SETUP.md` — step-by-step Firebase project setup
-- `DEPLOYMENT_GUIDE.md` — detailed deployment and local dev options
-- `SECURITY.md` — why Cloud Run is public and how auth is enforced at the app layer
+- [`SECURITY.md`](SECURITY.md) — authentication/authorization model and architecture
+- [`db/schema.sql`](db/schema.sql) — full Postgres schema, run once in the Supabase SQL editor

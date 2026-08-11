@@ -1,5 +1,5 @@
 import type { Config } from 'jest';
-import nextJest from 'next/jest';
+import nextJest from 'next/jest.js';
 
 const createJestConfig = nextJest({
   // Provide the path to your Next.js app to load next.config.js and .env files in your test environment
@@ -16,14 +16,14 @@ const config: Config = {
   },
   collectCoverageFrom: [
     'lib/**/*.{ts,tsx}',
-    '!lib/firebase.ts',
-    '!lib/firebase-admin.ts',
+    '!lib/supabase/client.ts',
+    '!lib/supabase/server.ts',
+    '!lib/supabase/admin.ts',
     '!lib/theme-context.tsx',
     '!lib/auth-context.tsx',
     '!lib/cache-context.tsx',
     '!lib/people-context.tsx',
     '!lib/toast-context.tsx',
-    '!lib/firestore-db.ts',
     '!lib/constants.ts',
     '!lib/api-client.ts',
     '!lib/google-calendar.ts',
@@ -34,6 +34,9 @@ const config: Config = {
     '!lib/use-permissions.ts',
     '!lib/slack-client.ts',
     '!lib/realtime-listeners.ts',
+    '!lib/db-mappers.ts',
+    '!lib/owner-normalizer.ts',
+    '!lib/user-init.ts',
     '!lib/**/*.d.ts',
     '!**/node_modules/**',
     '!**/.next/**',
@@ -80,7 +83,7 @@ const config: Config = {
     '**/__tests__/**/*.{ts,tsx}',
     '**/*.{spec,test}.{ts,tsx}',
   ],
-  testPathIgnorePatterns: ['/node_modules/', '/.next/'],
+  testPathIgnorePatterns: ['/node_modules/', '/.next/', '__tests__/test-utils/'],
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

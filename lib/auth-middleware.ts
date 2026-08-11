@@ -1,6 +1,6 @@
 // Server-side authentication middleware for API routes
 import { NextRequest } from 'next/server';
-import { adminAuth, adminDb } from './firebase-admin';
+import { getSupabaseAdmin } from './supabase/admin';
 import { ProjectRole } from '@/types';
 import { AuthenticationError, AuthorizationError, NotFoundError, DatabaseError } from './errors';
 import { logger } from './logger';
@@ -16,7 +16,7 @@ export interface AuthenticatedRequest extends NextRequest {
 }
 
 /**
- * Verify Firebase authentication token from request headers
+ * Verify a Supabase access token from the request's Authorization header.
  * @throws AuthenticationError if token is invalid or missing
  */
 export async function verifyAuth(request: NextRequest): Promise<{
@@ -31,22 +31,28 @@ export async function verifyAuth(request: NextRequest): Promise<{
     }
 
     const token = authHeader.substring(7);
-    const decodedToken = await adminAuth.verifyIdToken(token);
+    const { data, error } = await getSupabaseAdmin().auth.getUser(token);
+
+    if (error || !data.user) {
+      throw new AuthenticationError('Invalid or expired authentication token');
+    }
+
+    const meta = data.user.user_metadata || {};
 
     return {
-      uid: decodedToken.uid,
-      email: decodedToken.email || '',
-      displayName: decodedToken.name || decodedToken.email?.split('@')[0] || 'User',
+      uid: data.user.id,
+      email: data.user.email || '',
+      displayName: meta.full_name || meta.name || data.user.email?.split('@')[0] || 'User',
     };
   } catch (error) {
     if (error instanceof AuthenticationError) {
       throw error;
     }
-    
+
     logger.error('Error verifying auth token', error as Error, {
       hasAuthHeader: !!request.headers.get('authorization'),
     });
-    
+
     throw new AuthenticationError('Invalid or expired authentication token');
   }
 }
@@ -62,34 +68,36 @@ export async function checkProjectPermission(
   requiredRole: ProjectRole
 ): Promise<void> {
   try {
-    const projectRef = adminDb.collection('projects').doc(projectId);
-    const projectDoc = await projectRef.get();
+    const { data: project, error: projectError } = await getSupabaseAdmin()
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .maybeSingle();
 
-    if (!projectDoc.exists) {
+    if (projectError) throw projectError;
+    if (!project) {
       throw new NotFoundError('Project', projectId);
     }
 
-    const projectData = projectDoc.data();
-    const members = projectData?.members || [];
+    const { data: member, error: memberError } = await getSupabaseAdmin()
+      .from('project_members')
+      .select('role')
+      .eq('project_id', projectId)
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    interface ProjectMember {
-      userId: string;
-      role: ProjectRole;
-    }
-
-    const member = (members as ProjectMember[]).find((m) => m.userId === userId);
+    if (memberError) throw memberError;
     if (!member) {
       throw new AuthorizationError('You are not a member of this project');
     }
 
-    // Role hierarchy: VIEW < EDIT < ADMIN
     const roleHierarchy: { [key in ProjectRole]: number } = {
       VIEW: 1,
       EDIT: 2,
       ADMIN: 3,
     };
 
-    if (roleHierarchy[member.role] < roleHierarchy[requiredRole]) {
+    if (roleHierarchy[member.role as ProjectRole] < roleHierarchy[requiredRole]) {
       throw new AuthorizationError(
         `This action requires ${requiredRole} permission, but you have ${member.role}`
       );
@@ -98,13 +106,13 @@ export async function checkProjectPermission(
     if (error instanceof NotFoundError || error instanceof AuthorizationError) {
       throw error;
     }
-    
+
     logger.error('Error checking project permission', error as Error, {
       userId,
       projectId,
       requiredRole,
     });
-    
+
     throw new DatabaseError('Permission check', 'Failed to verify project permissions');
   }
 }
@@ -118,36 +126,33 @@ export async function getUserProjectRole(
   userId: string,
   projectId: string
 ): Promise<ProjectRole | null> {
-  try {
-    const projectRef = adminDb.collection('projects').doc(projectId);
-    const projectDoc = await projectRef.get();
+  const { data: project, error: projectError } = await getSupabaseAdmin()
+    .from('projects')
+    .select('id')
+    .eq('id', projectId)
+    .maybeSingle();
 
-    if (!projectDoc.exists) {
-      throw new NotFoundError('Project', projectId);
-    }
-
-    const projectData = projectDoc.data();
-    const members = projectData?.members || [];
-
-    interface ProjectMember {
-      userId: string;
-      role: ProjectRole;
-    }
-
-    const member = (members as ProjectMember[]).find((m) => m.userId === userId);
-    return member?.role || null;
-  } catch (error) {
-    if (error instanceof NotFoundError) {
-      throw error;
-    }
-    
-    logger.error('Error getting user project role', error as Error, {
-      userId,
-      projectId,
-    });
-    
+  if (projectError) {
+    logger.error('Error getting user project role', projectError, { userId, projectId });
     throw new DatabaseError('Role fetch', 'Failed to get user role');
   }
+  if (!project) {
+    throw new NotFoundError('Project', projectId);
+  }
+
+  const { data: member, error: memberError } = await getSupabaseAdmin()
+    .from('project_members')
+    .select('role')
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (memberError) {
+    logger.error('Error getting user project role', memberError, { userId, projectId });
+    throw new DatabaseError('Role fetch', 'Failed to get user role');
+  }
+
+  return (member?.role as ProjectRole) || null;
 }
 
 /**
@@ -160,12 +165,11 @@ export async function withAuth(
 ): Promise<Response> {
   try {
     const user = await verifyAuth(request);
-    
-    // Ensure user settings are initialized (runs async, doesn't block request)
+
     ensureUserSettings(user.uid, user.email, user.displayName).catch(err => {
       logger.error('Background user settings initialization failed', err);
     });
-    
+
     return await handler(request, user);
   } catch (error) {
     return handleApiError(error, {

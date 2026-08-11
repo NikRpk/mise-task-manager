@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import { adminDb } from '@/lib/firebase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { rowToNote, noteToRow, NoteRow } from '@/lib/db-mappers';
 
 export async function GET(
   request: NextRequest,
@@ -16,58 +17,45 @@ export async function GET(
       const { id } = await params;
       const { searchParams } = new URL(request.url);
       const includePrevious = searchParams.get('includePrevious') === 'true';
-      
-      const noteRef = adminDb.collection('notes').doc(id);
-      const noteDoc = await noteRef.get();
-      
-      if (!noteDoc.exists) {
-        return NextResponse.json(
-          { error: 'Note not found' },
-          { status: 404 }
-        );
+
+      const db = getSupabaseAdmin();
+      const { data: row, error } = await db.from('notes').select('*').eq('id', id).maybeSingle();
+
+      if (error) throw error;
+      if (!row) {
+        return NextResponse.json({ error: 'Note not found' }, { status: 404 });
       }
-      
-      const noteData = noteDoc.data();
-      
-      // Check if user owns this note
-      if (noteData?.createdBy !== user.uid) {
-        return NextResponse.json(
-          { error: 'Access denied' },
-          { status: 403 }
-        );
+
+      if (row.created_by !== user.uid) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
-      
-      const currentNote = { id: noteDoc.id, ...noteData };
-      
-      // If includePrevious is requested and this note is part of a recurring series
-      if (includePrevious && noteData?.recurringEventId && noteData?.recurringInstanceDate) {
+
+      const currentNote = rowToNote(row as NoteRow);
+
+      if (includePrevious && currentNote.recurringEventId && currentNote.recurringInstanceDate) {
         try {
-          // Query for up to 5 previous instances of the same recurring event
-          const previousNotesQuery = await adminDb
-            .collection('notes')
-            .where('createdBy', '==', user.uid)
-            .where('recurringEventId', '==', noteData.recurringEventId)
-            .where('recurringInstanceDate', '<', noteData.recurringInstanceDate)
-            .orderBy('recurringInstanceDate', 'desc')
-            .limit(5)
-            .get();
-          
-          if (!previousNotesQuery.empty) {
-            const previousNotes = previousNotesQuery.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }));
-            
+          const { data: previousRows, error: previousError } = await db
+            .from('notes')
+            .select('*')
+            .eq('created_by', user.uid)
+            .eq('recurring_event_id', currentNote.recurringEventId)
+            .lt('recurring_instance_date', currentNote.recurringInstanceDate)
+            .order('recurring_instance_date', { ascending: false })
+            .limit(5);
+
+          if (previousError) throw previousError;
+
+          if (previousRows && previousRows.length > 0) {
+            const previousNotes = (previousRows as NoteRow[]).map(rowToNote);
             return NextResponse.json({ currentNote, previousNotes });
           }
-        } catch (queryError) {
-          // If query fails (e.g., missing index), just return current note
+        } catch {
           return NextResponse.json({ currentNote, previousNotes: [] });
         }
       }
-      
+
       return NextResponse.json({ currentNote, previousNotes: [] });
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: 'Failed to fetch note' },
         { status: 500 }
@@ -84,39 +72,32 @@ export async function PUT(
     try {
       const { id } = await params;
       const body = await request.json();
-      
-      const noteRef = adminDb.collection('notes').doc(id);
-      const noteDoc = await noteRef.get();
-      
-      if (!noteDoc.exists) {
-        return NextResponse.json(
-          { error: 'Note not found' },
-          { status: 404 }
-        );
+
+      const db = getSupabaseAdmin();
+      const { data: existingRow, error: fetchError } = await db.from('notes').select('*').eq('id', id).maybeSingle();
+
+      if (fetchError) throw fetchError;
+      if (!existingRow) {
+        return NextResponse.json({ error: 'Note not found' }, { status: 404 });
       }
-      
-      const noteData = noteDoc.data();
-      
-      // Check if user owns this note
-      if (noteData?.createdBy !== user.uid) {
-        return NextResponse.json(
-          { error: 'Access denied' },
-          { status: 403 }
-        );
+
+      if (existingRow.created_by !== user.uid) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
-      
-      // Update note
-      const updatedNote = {
-        ...body,
-        updatedAt: new Date().toISOString(),
-        createdBy: noteData.createdBy, // Preserve original creator
-        createdAt: noteData.createdAt, // Preserve creation date
-      };
-      
-      await noteRef.update(updatedNote);
-      
-      return NextResponse.json({ id, ...updatedNote });
-    } catch (error) {
+
+      const updateRow = noteToRow(body);
+
+      const { data: updatedRow, error: updateError } = await db
+        .from('notes')
+        .update(updateRow)
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (updateError) throw updateError;
+
+      return NextResponse.json(rowToNote(updatedRow as NoteRow));
+    } catch {
       return NextResponse.json(
         { error: 'Failed to update note' },
         { status: 500 }
@@ -132,30 +113,23 @@ export async function DELETE(
   return withAuth(request, async (req, user) => {
     try {
       const { id } = await params;
-      const noteRef = adminDb.collection('notes').doc(id);
-      const noteDoc = await noteRef.get();
-      
-      if (!noteDoc.exists) {
-        return NextResponse.json(
-          { error: 'Note not found' },
-          { status: 404 }
-        );
+      const db = getSupabaseAdmin();
+
+      const { data: existingRow, error: fetchError } = await db.from('notes').select('created_by').eq('id', id).maybeSingle();
+      if (fetchError) throw fetchError;
+      if (!existingRow) {
+        return NextResponse.json({ error: 'Note not found' }, { status: 404 });
       }
-      
-      const noteData = noteDoc.data();
-      
-      // Check if user owns this note
-      if (noteData?.createdBy !== user.uid) {
-        return NextResponse.json(
-          { error: 'Access denied' },
-          { status: 403 }
-        );
+
+      if (existingRow.created_by !== user.uid) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
-      
-      await noteRef.delete();
-      
+
+      const { error: deleteError } = await db.from('notes').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+
       return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: 'Failed to delete note' },
         { status: 500 }

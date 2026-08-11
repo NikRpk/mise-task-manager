@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import { adminDb } from '@/lib/firebase-admin';
-import { Task } from '@/types';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { handleApiError, successResponse } from '@/lib/api-errors';
 import { ValidationError, DatabaseError, AuthorizationError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { TASKS_PER_PAGE } from '@/lib/constants';
 import { normalizeOwner } from '@/lib/owner-normalizer';
+import { rowToTask, TaskRow } from '@/lib/db-mappers';
+import { StatusHistoryEntry } from '@/types';
 
 export async function GET(request: NextRequest) {
   return withAuth(request, async (req, user) => {
@@ -14,37 +15,38 @@ export async function GET(request: NextRequest) {
       const searchParams = request.nextUrl.searchParams;
       const projectId = searchParams.get('projectId');
       const limit = parseInt(searchParams.get('limit') || String(TASKS_PER_PAGE));
-      const cursor = searchParams.get('cursor'); // For cursor-based pagination
+      const cursor = searchParams.get('cursor'); // task id to start after
 
       if (!projectId) {
         throw new ValidationError('Project ID is required');
       }
 
-      // Validate limit
       if (limit < 1 || limit > 500) {
         throw new ValidationError('Limit must be between 1 and 500');
       }
 
-      // Check if user has access to this project
-      // This will throw AuthorizationError if user doesn't have access
-      const projectRef = adminDb.collection('projects').doc(projectId);
-      const projectDoc = await projectRef.get();
+      const db = getSupabaseAdmin();
 
-      if (!projectDoc.exists) {
+      const { data: project, error: projectError } = await db
+        .from('projects')
+        .select('id')
+        .eq('id', projectId)
+        .maybeSingle();
+
+      if (projectError) throw new DatabaseError('Project fetch', projectError.message);
+      if (!project) {
         throw new ValidationError(`Project '${projectId}' not found`);
       }
 
-      const projectData = projectDoc.data();
-      
-      interface ProjectMember {
-        userId: string;
-        role?: string;
-      }
-      
-      const members = (projectData?.members || []) as ProjectMember[];
-      const isMember = members.some((m: ProjectMember) => m.userId === user.uid);
+      const { data: member, error: memberError } = await db
+        .from('project_members')
+        .select('user_id')
+        .eq('project_id', projectId)
+        .eq('user_id', user.uid)
+        .maybeSingle();
 
-      if (!isMember) {
+      if (memberError) throw new DatabaseError('Membership check', memberError.message);
+      if (!member) {
         throw new AuthorizationError('You do not have access to this project');
       }
 
@@ -55,41 +57,30 @@ export async function GET(request: NextRequest) {
         hasCursor: !!cursor,
       });
 
-      const tasksRef = adminDb.collection('tasks');
-      let query = tasksRef
-        .where('projectId', '==', projectId)
-        .orderBy('createdAt', 'desc')
-        .limit(limit + 1); // Fetch one extra to determine if there are more
+      let query = db
+        .from('tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+        .limit(limit + 1); // fetch one extra to determine if there are more
 
-      // Apply cursor if provided (cursor-based pagination)
       if (cursor) {
-        try {
-          const cursorDoc = await adminDb.collection('tasks').doc(cursor).get();
-          if (cursorDoc.exists) {
-            query = query.startAfter(cursorDoc);
-          }
-        } catch (error) {
-          logger.warn('Invalid cursor provided', {
-            userId: user.uid,
-            projectId,
-            cursor,
-          });
+        const { data: cursorTask } = await db.from('tasks').select('created_at').eq('id', cursor).maybeSingle();
+        if (cursorTask) {
+          query = query.lt('created_at', cursorTask.created_at);
         }
       }
 
-      const snapshot = await query.get();
-      const tasks = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const { data: rows, error: tasksError } = await query;
+      if (tasksError) throw new DatabaseError('Tasks fetch', tasksError.message);
 
-      // Check if there are more results
+      const tasks = ((rows as TaskRow[]) || []).map(rowToTask);
+
       const hasMore = tasks.length > limit;
       if (hasMore) {
-        tasks.pop(); // Remove the extra item
+        tasks.pop();
       }
 
-      // Get the last task ID for next cursor
       const nextCursor = hasMore && tasks.length > 0 ? tasks[tasks.length - 1].id : null;
 
       logger.apiResponse('GET', '/api/tasks', 200, undefined, {
@@ -131,34 +122,24 @@ export async function POST(request: NextRequest) {
         throw new ValidationError('Project ID is required');
       }
 
-      // Title OR description is required (not both)
       if ((!body.title || body.title.trim().length === 0) && (!body.description || body.description.trim().length === 0)) {
         throw new ValidationError('Task title or description is required');
       }
 
-      // Check if user has EDIT permission
-      const projectRef = adminDb.collection('projects').doc(body.projectId);
-      const projectDoc = await projectRef.get();
+      const db = getSupabaseAdmin();
 
-      if (!projectDoc.exists) {
-        throw new ValidationError(`Project '${body.projectId}' not found`);
-      }
+      const { data: member, error: memberError } = await db
+        .from('project_members')
+        .select('role')
+        .eq('project_id', body.projectId)
+        .eq('user_id', user.uid)
+        .maybeSingle();
 
-      const projectData = projectDoc.data();
-      
-      interface ProjectMember {
-        userId: string;
-        role?: string;
-      }
-      
-      const members = (projectData?.members || []) as ProjectMember[];
-      const member = members.find((m: ProjectMember) => m.userId === user.uid);
-
+      if (memberError) throw new DatabaseError('Membership check', memberError.message);
       if (!member) {
         throw new AuthorizationError('You are not a member of this project');
       }
 
-      // Check role hierarchy
       const roleHierarchy = { VIEW: 1, EDIT: 2, ADMIN: 3 };
       if (roleHierarchy[member.role as keyof typeof roleHierarchy] < roleHierarchy.EDIT) {
         throw new AuthorizationError('You need EDIT permission to create tasks');
@@ -169,11 +150,7 @@ export async function POST(request: NextRequest) {
         projectId: body.projectId,
       });
 
-      const tasksRef = adminDb.collection('tasks');
-      const newTaskRef = tasksRef.doc();
-
-      // Create initial status history entry
-      const initialStatusHistory = [{
+      const initialStatusHistory: StatusHistoryEntry[] = [{
         id: Date.now().toString(),
         fromStatus: null,
         toStatus: body.status || 'todo',
@@ -181,47 +158,39 @@ export async function POST(request: NextRequest) {
         changedAt: new Date().toISOString(),
       }];
 
-      // Guard: owner must be an email (the canonical ID used by the daily
-      // reminder cron). If the client sent a displayName, rewrite it; if it
-      // wasn't supplied at all, fall back to the authenticated user's email.
       const { owner: normalizedOwner } = await normalizeOwner(
         body.owner || user.email,
         { userId: user.uid }
       );
 
-      const newTask: Task = {
-        id: newTaskRef.id,
+      const insertRow = {
+        project_id: body.projectId,
         title: body.title || '',
         description: body.description || '',
-        subTasks: body.subTasks || [],
+        sub_tasks: body.subTasks || [],
         deadline: body.deadline || null,
         status: body.status || 'todo',
         owner: normalizedOwner,
-        projectId: body.projectId,
         priority: body.priority || 'medium',
         images: body.images || [],
         comments: body.comments || [],
-        statusHistory: body.statusHistory || initialStatusHistory,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        // Optional fields — only include if they have values (Firestore doesn't like undefined)
-        ...(body.topicId !== undefined && { topicId: body.topicId }),
-        ...(body.isRecurring !== undefined && { isRecurring: body.isRecurring }),
-        ...(body.recurrenceInterval !== undefined && { recurrenceInterval: body.recurrenceInterval }),
-        ...(body.recurrenceUnit !== undefined && { recurrenceUnit: body.recurrenceUnit }),
-        ...(body.parentRecurringTaskId !== undefined && { parentRecurringTaskId: body.parentRecurringTaskId }),
+        status_history: body.statusHistory || initialStatusHistory,
+        topic_id: body.topicId ?? null,
+        is_recurring: body.isRecurring ?? false,
+        recurrence_interval: body.recurrenceInterval ?? null,
+        recurrence_unit: body.recurrenceUnit ?? null,
+        parent_recurring_task_id: body.parentRecurringTaskId ?? null,
       };
 
-      logger.debug('API: Creating new task with recurring fields', {
-        id: newTask.id,
-        title: newTask.title,
-        isRecurring: newTask.isRecurring,
-        recurrenceInterval: newTask.recurrenceInterval,
-        recurrenceUnit: newTask.recurrenceUnit,
-        parentRecurringTaskId: newTask.parentRecurringTaskId,
-      });
+      const { data: row, error: insertError } = await db
+        .from('tasks')
+        .insert(insertRow)
+        .select('*')
+        .single();
 
-      await newTaskRef.set(newTask);
+      if (insertError) throw new DatabaseError('Task creation', insertError.message);
+
+      const newTask = rowToTask(row as TaskRow);
 
       logger.info('API POST /api/tasks: Task created successfully', {
         id: newTask.id,

@@ -9,7 +9,7 @@
  *   BASE_URL=https://your-app.web.app npm run test:smoke
  *
  * Run with Slack connectivity check:
- *   BASE_URL=https://... SMOKE_AUTH_TOKEN=<firebase-id-token> npm run test:smoke
+ *   BASE_URL=https://... SMOKE_AUTH_TOKEN=<supabase-access-token> npm run test:smoke
  *
  * Exit code 0 = all checks passed.
  * Exit code 1 = one or more checks failed.
@@ -69,7 +69,7 @@ async function run(): Promise<void> {
     401
   );
 
-  // 3. Cron endpoint is protected — missing Cloud Scheduler header
+  // 3. Cron endpoint is protected — missing bearer secret
   await check(
     'POST /api/cron/daily-reminders (no header) → 401',
     () =>
@@ -77,13 +77,13 @@ async function run(): Promise<void> {
     401
   );
 
-  // 4. Cron endpoint rejects wrong header value
+  // 4. Cron endpoint rejects wrong secret
   await check(
-    'POST /api/cron/daily-reminders (wrong header) → 401',
+    'POST /api/cron/daily-reminders (wrong secret) → 401',
     () =>
       fetch(`${BASE_URL}/api/cron/daily-reminders`, {
         method: 'POST',
-        headers: { 'X-CloudScheduler-JobName': 'not-the-right-job' },
+        headers: { Authorization: 'Bearer not-the-right-secret' },
       }),
     401
   );

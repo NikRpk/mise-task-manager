@@ -1,16 +1,17 @@
 /**
  * Daily Task Reminders Cron Job
- * Triggered by Cloud Scheduler at 8:00 AM Europe/Berlin
- * Sends Slack and Email reminders to users for overdue, today, and tomorrow tasks
+ * Triggered by Vercel Cron (see vercel.json) — sends Slack reminders to users
+ * for overdue, today, and tomorrow tasks.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { handleApiError, successResponse } from '@/lib/api-errors';
 import { logger } from '@/lib/logger';
 import { sendDailyTaskReminder } from '@/lib/slack-client';
 import { groupTasksByDeadline } from '@/lib/reminders';
 import { Task, UserSettings } from '@/types';
+import { rowToTask, TaskRow } from '@/lib/db-mappers';
 
 interface NotificationResult {
   userId: string;
@@ -20,36 +21,42 @@ interface NotificationResult {
 }
 
 /**
- * POST /api/cron/daily-reminders
- * Sends daily task reminders to all users who have enabled them
+ * Sends daily task reminders to all users who have enabled them.
+ *
+ * Vercel Cron sends a GET request with `Authorization: Bearer $CRON_SECRET`
+ * for jobs defined in vercel.json. This route also accepts POST for manual
+ * / test triggering. Either way, the bearer token is checked explicitly so
+ * it can't be triggered by an arbitrary public request.
  */
-export async function POST(request: NextRequest) {
+async function handleDailyReminders(request: NextRequest, method: 'GET' | 'POST') {
   try {
-    const schedulerHeader = request.headers.get('X-CloudScheduler-JobName');
-    
-    if (schedulerHeader !== 'daily-task-reminders') {
-      logger.warn('Unauthorized cron request', { 
-        schedulerHeader: schedulerHeader || 'none' 
-      });
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      logger.warn('Unauthorized cron request');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    logger.apiRequest('POST', '/api/cron/daily-reminders');
+    logger.apiRequest(method, '/api/cron/daily-reminders');
 
+    const db = getSupabaseAdmin();
     const results: NotificationResult[] = [];
 
-    const usersSnapshot = await adminDb.collection('userSettings').get();
-    logger.info('Processing daily reminders', { totalUsers: usersSnapshot.size });
+    const { data: settingsRows, error: settingsError } = await db.from('user_settings').select('*');
+    if (settingsError) throw settingsError;
 
-    for (const userDoc of usersSnapshot.docs) {
-      const userId = userDoc.id;
-      const settings = userDoc.data() as UserSettings;
+    logger.info('Processing daily reminders', { totalUsers: settingsRows?.length || 0 });
+
+    for (const settingsRow of settingsRows || []) {
+      const userId = settingsRow.user_id as string;
+      const settings = {
+        email: settingsRow.email,
+        displayName: settingsRow.display_name,
+        notifications: settingsRow.notifications,
+        slackTemplates: settingsRow.slack_templates,
+      } as UserSettings;
 
       const dailyReminderSettings = settings.notifications?.dailyTaskReminder;
-      
+
       if (!dailyReminderSettings || !dailyReminderSettings.slack) {
         continue;
       }
@@ -63,39 +70,20 @@ export async function POST(request: NextRequest) {
         const userEmail = settings.email;
         const userName = settings.displayName || 'User';
 
-        const projectsSnapshot = await adminDb.collection('projects').get();
-        const allTasks: Task[] = [];
+        const [{ data: projectRows }, { data: memberRows }, { data: taskRows }] = await Promise.all([
+          db.from('projects').select('id, name'),
+          db.from('project_members').select('project_id').eq('user_id', userId),
+          db.from('tasks').select('*').eq('owner', userEmail),
+        ]);
+
         const projectNames = new Map<string, string>();
+        (projectRows || []).forEach(p => projectNames.set(p.id, p.name || 'Unnamed Project'));
 
-        // Build map of project IDs where user is a member
-        const userProjectIds = new Set<string>();
-        for (const projectDoc of projectsSnapshot.docs) {
-          const projectData = projectDoc.data();
-          projectNames.set(projectDoc.id, projectData.name || 'Unnamed Project');
+        const userProjectIds = new Set((memberRows || []).map(m => m.project_id));
 
-          const members = projectData.members || [];
-          const userMember = members.find(
-            (m: { userId: string }) => m.userId === userId
-          );
-
-          if (userMember) {
-            userProjectIds.add(projectDoc.id);
-          }
-        }
-
-        // Query tasks from top-level tasks collection where owner is user's email
-        const tasksSnapshot = await adminDb
-          .collection('tasks')
-          .where('owner', '==', userEmail)
-          .get();
-
-        // Filter tasks to only include those in projects where user is a member
-        tasksSnapshot.docs.forEach(taskDoc => {
-          const taskData = taskDoc.data();
-          if (userProjectIds.has(taskData.projectId)) {
-            allTasks.push({ id: taskDoc.id, ...taskData } as Task);
-          }
-        });
+        const allTasks: Task[] = ((taskRows as TaskRow[]) || [])
+          .filter(row => userProjectIds.has(row.project_id))
+          .map(rowToTask);
 
         const groupedTasks = groupTasksByDeadline(allTasks);
         const totalRelevantTasks =
@@ -114,7 +102,7 @@ export async function POST(request: NextRequest) {
           tasksCount: totalRelevantTasks,
         };
 
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hf-tasks.web.app';
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const customTemplate = settings.slackTemplates?.dailyReminder;
 
         result.slack = await sendDailyTaskReminder(
@@ -140,7 +128,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    logger.apiResponse('POST', '/api/cron/daily-reminders', 200, undefined, {
+    logger.apiResponse(method, '/api/cron/daily-reminders', 200, undefined, {
       totalUsers: results.length,
       totalNotifications: results.reduce(
         (sum, r) => sum + (r.slack?.success ? 1 : 0),
@@ -156,7 +144,15 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return handleApiError(error, {
       endpoint: '/api/cron/daily-reminders',
-      method: 'POST',
+      method,
     });
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleDailyReminders(request, 'GET');
+}
+
+export async function POST(request: NextRequest) {
+  return handleDailyReminders(request, 'POST');
 }

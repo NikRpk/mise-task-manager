@@ -6,59 +6,47 @@ This document describes how authentication, authorization, and access control wo
 
 ```
 User (browser)
-  → Firebase Hosting (DNS + TLS + CDN, no app logic)
-    → Cloud Run: mise-tasks (Next.js standalone, public invoker)
-      → Firestore (database: task-and-note-manager)
-      → Secret Manager (OAuth client credentials, Slack webhook)
-      → Google APIs (Calendar, OAuth)
+  → Vercel Edge Network (DNS + TLS + CDN, runs Next.js middleware/SSR)
+    → Next.js app (App Router, API routes run as Vercel Functions)
+      → Supabase Postgres (RLS-protected tables)
+      → Supabase Auth (Google OAuth + email/password)
+      → Google APIs (Calendar OAuth)
+      → Slack (webhooks / bot token)
 ```
 
-Firebase Hosting does **not** run code. All auth, page rendering, and API logic runs inside the Next.js container on Cloud Run.
+There is no separate hosting proxy — Vercel serves the Next.js app directly, including SSR pages and `/api/**` routes.
 
 ## Authentication & authorization
 
-Auth is enforced at the **application layer**, not at the IAM / Cloud Run invoker layer.
+Auth is enforced at the **application layer** using Supabase Auth, with Postgres Row Level Security (RLS) as a second line of defense.
 
 ### Page routes
 
-Every page is wrapped in a Firebase Auth check. Unauthenticated visitors are redirected to `/login`, which only accepts Google Sign-In. The allowed domain(s) are configured via the `NEXT_PUBLIC_ALLOWED_EMAIL_DOMAIN` environment variable. Anonymous users see the login page; they cannot read any data.
+Every page is wrapped in a Supabase Auth check (`lib/auth-context.tsx`). Unauthenticated visitors are redirected to `/login`, which supports both **Google Sign-In** and **email/password**. This is a personal deployment — there is no email-domain allow-list; anyone who signs up can create an account. Anonymous users cannot read any data.
 
 ### API routes
 
-Every `app/api/**/route.ts` handler validates the caller's Firebase ID token and rejects requests where the token's `email` does not match the configured domain allow-list. See `lib/auth-middleware.ts` for the canonical helper.
+Every `app/api/**/route.ts` handler validates the caller's Supabase access token (JWT) via `lib/auth-middleware.ts`'s `withAuth()` helper, which calls `supabase.auth.getUser()` against the service-role client. Project-scoped routes additionally check the caller's role in the `project_members` table (VIEW / EDIT / ADMIN).
 
-### Firestore
+### Postgres Row Level Security
 
-Firestore security rules (`firestore.rules`) enforce per-user and per-project ownership independently of the API layer. Even if an API route had a bug, the rules would block unauthorized access. This is the second layer of defense.
-
-## IAM model
-
-### Cloud Run invoker (`roles/run.invoker`)
-
-| Member | Purpose |
-|---|---|
-| `allUsers` | **Required.** Firebase Hosting forwards anonymous browser requests to Cloud Run. Without this, Google Frontend (GFE) returns a `403 Forbidden` page before Next.js can render `/login`, taking the entire site down for everyone. App-layer auth then gates everything past `/login`. |
-| `firebase-hosting@system.gserviceaccount.com` | Default Firebase Hosting → Cloud Run binding. |
-| `scheduler-invoker@<project>.iam.gserviceaccount.com` | Used by Cloud Scheduler to invoke `/api/cron/daily-reminders` with an OIDC-signed request. |
-
-**Why `allUsers` is intentional:**
-
-- "Public" at the IAM layer does not mean "public" at the application layer. Every page and API route requires a valid Firebase ID token.
-- Headless Cloud Run services (webhook receivers, internal-only APIs) should use `--no-allow-unauthenticated`. This app is not headless — its login page must be reachable by anonymous browsers.
-
-### Runtime service account
-
-Roles granted at the project level:
-
-- `roles/datastore.user` — read/write the `task-and-note-manager` Firestore database
-- `roles/secretmanager.secretAccessor` — read OAuth and webhook secrets
-
-This is least-privilege. No `Owner`, `Editor`, or wildcard roles.
+`db/schema.sql` defines RLS policies on every table (`projects`, `project_members`, `tasks`, `notes`, `note_templates`, `user_settings`, `people`) using an `is_project_member()` helper function. Even if an API route had a bug, RLS would block unauthorized reads/writes for any client using the anon key. **Server-side API routes use the `service_role` key, which bypasses RLS by design** — so the API layer (not Postgres) is the primary authorization boundary; RLS is the safety net for anything that talks to Supabase directly with the anon key (e.g. Realtime subscriptions from the browser).
 
 ## Secrets
 
-All secrets live in Secret Manager and are injected into Cloud Run at deploy time (see `cloudbuild.yaml`'s `--update-secrets` flag). Nothing sensitive is committed to git. `.env.local` is gitignored.
+| Secret | Where it lives |
+|---|---|
+| `SUPABASE_SERVICE_ROLE_KEY` | Vercel Environment Variables (server-only, never exposed to the client) |
+| `GOOGLE_CLIENT_SECRET` | Vercel Environment Variables |
+| `SLACK_BOT_TOKEN` / `SLACK_FEEDBACK_WEBHOOK_URL` | Vercel Environment Variables |
+| `CRON_SECRET` | Vercel Environment Variables + Vercel Cron (auto-attached as a bearer token) |
+
+Nothing sensitive is committed to git. `.env.local` is gitignored; `.env.example` documents required variables with placeholder values only.
+
+## Cron authentication
+
+`/api/cron/daily-reminders` is triggered by Vercel Cron (see `vercel.json`), which sends `Authorization: Bearer $CRON_SECRET` automatically. The route checks this header explicitly so it can't be triggered by an arbitrary public request.
 
 ## Incident history
 
-- **2026-05-11 11:52 UTC** — `allUsers` was removed from `roles/run.invoker` during a security cleanup. Site returned `403 Forbidden` (Google Frontend) for ~24 hours until restored. Root cause: `cloudbuild.yaml` had `--no-allow-unauthenticated` hardcoded, so even if IAM was patched the next deploy would re-introduce the regression. Fix: changed flag to `--allow-unauthenticated`, added post-deploy verification step in `deploy.sh`, wrote this document.
+- No incidents yet on the Supabase/Vercel stack. The previous GCP/Firebase deployment's incident history (Cloud Run IAM misconfiguration) no longer applies since this app no longer runs on Cloud Run.

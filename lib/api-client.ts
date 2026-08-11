@@ -1,7 +1,7 @@
 /**
  * Client-side API helper with authentication and comprehensive error logging
  */
-import { auth } from './firebase';
+import { createClient } from './supabase/client';
 
 export interface ApiError {
   message: string;
@@ -17,15 +17,16 @@ export interface ApiError {
  * Logs full request/response details for easy debugging
  */
 export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const user = auth.currentUser;
-  
-  if (!user) {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
     const error = new Error('User not authenticated');
     console.error('🔴 API Auth Error: User not authenticated');
     throw error;
   }
 
-  const token = await user.getIdToken();
+  const token = session.access_token;
   const method = options.method || 'GET';
 
   const headers = {

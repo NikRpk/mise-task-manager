@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
-import { logger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth-middleware';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   return withAuth(request, async (req, user) => {
@@ -18,16 +18,16 @@ export async function POST(request: NextRequest) {
       // Resolve webhook URL: user settings take precedence over env var
       let webhookUrl = process.env.SLACK_FEEDBACK_WEBHOOK_URL;
 
-      const userSettingsDoc = await adminDb
-        .collection('userSettings')
-        .doc(user.uid)
-        .get();
+      const db = getSupabaseAdmin();
+      const { data: settingsRow } = await db
+        .from('user_settings')
+        .select('feedback_webhook_url')
+        .eq('user_id', user.uid)
+        .maybeSingle();
 
-      if (userSettingsDoc.exists) {
-        const userWebhookUrl = userSettingsDoc.data()?.feedbackWebhookUrl as string | undefined;
-        if (userWebhookUrl?.trim()) {
-          webhookUrl = userWebhookUrl.trim();
-        }
+      const userWebhookUrl = settingsRow?.feedback_webhook_url as string | undefined;
+      if (userWebhookUrl?.trim()) {
+        webhookUrl = userWebhookUrl.trim();
       }
 
       if (!webhookUrl) {

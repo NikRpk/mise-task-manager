@@ -4,8 +4,8 @@
  * GET  /api/slack/test      — verifies Slack connectivity
  * POST /api/slack/send-note — sends a meeting note to attendees
  *
- * Both endpoints require a valid Firebase auth token via withAuth.
- * The firebase-admin mock in jest.setup.ts resolves verifyIdToken for any Bearer token.
+ * Both endpoints require a valid Supabase auth token via withAuth.
+ * The Supabase admin mock in jest.setup.ts resolves auth.getUser for any Bearer token.
  *
  * @jest-environment node
  */

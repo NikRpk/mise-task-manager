@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, checkProjectPermission } from '@/lib/auth-middleware';
-import { adminDb } from '@/lib/firebase-admin';
-import { ProjectRole, ProjectMember } from '@/types';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { ProjectRole } from '@/types';
+import { rowToProjectMember, ProjectMemberRow } from '@/lib/db-mappers';
 
 export async function GET(
   request: NextRequest,
@@ -11,20 +12,13 @@ export async function GET(
     try {
       const { id } = await params;
 
-      // Check if user has access to view members (throws if no access)
       await checkProjectPermission(user.uid, id, 'VIEW');
 
-      const projectRef = adminDb.collection('projects').doc(id);
-      const projectDoc = await projectRef.get();
+      const db = getSupabaseAdmin();
+      const { data: rows, error } = await db.from('project_members').select('*').eq('project_id', id);
+      if (error) throw error;
 
-      if (!projectDoc.exists) {
-        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-      }
-
-      const projectData = projectDoc.data();
-      const members = projectData?.members || [];
-
-      return NextResponse.json(members);
+      return NextResponse.json(((rows as ProjectMemberRow[]) || []).map(rowToProjectMember));
     } catch (error) {
       console.error('Error fetching members:', error);
       return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 });
@@ -41,7 +35,6 @@ export async function POST(
       const { id } = await params;
       const body = await request.json();
 
-      // Check if user has ADMIN permission (throws if no access)
       await checkProjectPermission(user.uid, id, 'ADMIN');
 
       const { email, role } = body;
@@ -54,36 +47,50 @@ export async function POST(
         return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
       }
 
-      const projectRef = adminDb.collection('projects').doc(id);
-      const projectDoc = await projectRef.get();
+      const db = getSupabaseAdmin();
 
-      if (!projectDoc.exists) {
-        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-      }
+      const { data: existing } = await db
+        .from('project_members')
+        .select('user_id')
+        .eq('project_id', id)
+        .eq('email', email)
+        .maybeSingle();
 
-      const projectData = projectDoc.data();
-      const members = projectData?.members || [];
-
-      // Check if member already exists
-      if (members.find((m: ProjectMember) => m.email === email)) {
+      if (existing) {
         return NextResponse.json({ error: 'Member already exists' }, { status: 400 });
       }
 
-      const newMember: ProjectMember = {
-        userId: email, // Will be updated when user signs in
+      // The invited person may not have signed up yet. We look up any existing
+      // auth user by email (via Supabase's admin user list) so the membership
+      // row can attach to their real user id immediately if they already have
+      // an account; otherwise we key on a deterministic placeholder that gets
+      // reconciled the first time they actually sign in (see /api/settings).
+      const { data: userList } = await db.auth.admin.listUsers();
+      const existingUser = userList?.users?.find(u => u.email === email);
+      const memberUserId = existingUser?.id || crypto.randomUUID();
+
+      const newMemberRow: ProjectMemberRow = {
+        project_id: id,
+        user_id: memberUserId,
         email,
-        displayName: email.split('@')[0],
+        display_name: email.split('@')[0],
         role: role as ProjectRole,
-        addedAt: new Date().toISOString(),
-        addedBy: user.uid,
+        added_at: new Date().toISOString(),
+        added_by: user.uid,
       };
 
-      await projectRef.update({
-        members: [...members, newMember],
-        updatedAt: new Date().toISOString(),
+      const { error: insertError } = await db.from('project_members').insert({
+        project_id: id,
+        user_id: memberUserId,
+        email,
+        display_name: email.split('@')[0],
+        role,
+        added_by: user.uid,
       });
 
-      return NextResponse.json(newMember, { status: 201 });
+      if (insertError) throw insertError;
+
+      return NextResponse.json(rowToProjectMember(newMemberRow), { status: 201 });
     } catch (error) {
       console.error('Error adding member:', error);
       return NextResponse.json({ error: 'Failed to add member' }, { status: 500 });
@@ -100,7 +107,6 @@ export async function PATCH(
       const { id } = await params;
       const body = await request.json();
 
-      // Check if user has ADMIN permission (throws if no access)
       await checkProjectPermission(user.uid, id, 'ADMIN');
 
       const { userId, role } = body;
@@ -113,24 +119,14 @@ export async function PATCH(
         return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
       }
 
-      const projectRef = adminDb.collection('projects').doc(id);
-      const projectDoc = await projectRef.get();
+      const db = getSupabaseAdmin();
+      const { error } = await db
+        .from('project_members')
+        .update({ role })
+        .eq('project_id', id)
+        .eq('user_id', userId);
 
-      if (!projectDoc.exists) {
-        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-      }
-
-      const projectData = projectDoc.data();
-      const members = projectData?.members || [];
-
-      const updatedMembers = members.map((member: ProjectMember) =>
-        member.userId === userId ? { ...member, role: role as ProjectRole } : member
-      );
-
-      await projectRef.update({
-        members: updatedMembers,
-        updatedAt: new Date().toISOString(),
-      });
+      if (error) throw error;
 
       return NextResponse.json({ success: true });
     } catch (error) {
@@ -154,33 +150,27 @@ export async function DELETE(
         return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
       }
 
-      // Check if user has ADMIN permission (throws if no access)
       await checkProjectPermission(user.uid, id, 'ADMIN');
 
-      const projectRef = adminDb.collection('projects').doc(id);
-      const projectDoc = await projectRef.get();
+      const db = getSupabaseAdmin();
+      const { data: rows, error } = await db.from('project_members').select('*').eq('project_id', id);
+      if (error) throw error;
 
-      if (!projectDoc.exists) {
-        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-      }
-
-      const projectData = projectDoc.data();
-      const members = projectData?.members || [];
-
-      // Prevent removing the last admin
-      const admins = members.filter((m: ProjectMember) => m.role === 'ADMIN');
-      const memberToRemove = members.find((m: ProjectMember) => m.userId === userId);
+      const members = (rows as ProjectMemberRow[]) || [];
+      const admins = members.filter(m => m.role === 'ADMIN');
+      const memberToRemove = members.find(m => m.user_id === userId);
 
       if (memberToRemove?.role === 'ADMIN' && admins.length === 1) {
         return NextResponse.json({ error: 'Cannot remove the last admin' }, { status: 400 });
       }
 
-      const updatedMembers = members.filter((m: ProjectMember) => m.userId !== userId);
+      const { error: deleteError } = await db
+        .from('project_members')
+        .delete()
+        .eq('project_id', id)
+        .eq('user_id', userId);
 
-      await projectRef.update({
-        members: updatedMembers,
-        updatedAt: new Date().toISOString(),
-      });
+      if (deleteError) throw deleteError;
 
       return NextResponse.json({ success: true });
     } catch (error) {

@@ -1,16 +1,16 @@
 /**
- * Real-time Firestore Listeners with Smart Cache Invalidation
- * Automatically invalidates caches when Firestore detects changes
+ * Real-time Postgres Change Listeners with Smart Cache Invalidation
+ * Automatically invalidates caches when Supabase Realtime detects changes
  * Pauses listeners when tab is hidden to save resources
- * 
+ *
  * NOTE: Project listener disabled - projects cached for 30min (acceptable since rarely change)
  */
 
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { db } from './firebase';
-import { collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import type { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
+import { createClient } from './supabase/client';
 import { useCache } from './cache-context';
 import { logger } from './logger';
 
@@ -22,8 +22,11 @@ interface RealtimeListenersOptions {
 }
 
 /**
- * Hook to set up real-time listeners for user data
- * Automatically invalidates caches when data changes in Firestore
+ * Hook to set up Supabase Realtime listeners for user data.
+ * Automatically invalidates caches when data changes in Postgres.
+ *
+ * NOTE: Realtime must be enabled for the `notes`, `tasks`, and `people`
+ * tables in Supabase (Database → Replication) for this to fire.
  */
 export function useRealtimeListeners({
   userId,
@@ -32,14 +35,11 @@ export function useRealtimeListeners({
   onTasksChanged,
 }: RealtimeListenersOptions) {
   const cache = useCache();
+  const supabase = createClient();
 
-  // Stable ref for cache so snapshot closures always use the latest version
-  // without needing cache in useEffect dependency arrays (which would cause
-  // re-subscription loops since CacheProvider creates a new context value object on every render)
   const cacheRef = useRef(cache);
   useEffect(() => { cacheRef.current = cache; }, [cache]);
 
-  // Stable ref so the snapshot closure always calls the latest callback
   const onTasksChangedRef = useRef(onTasksChanged);
   useEffect(() => { onTasksChangedRef.current = onTasksChanged; }, [onTasksChanged]);
 
@@ -48,35 +48,33 @@ export function useRealtimeListeners({
     if (!enabled || !userId) return;
     if (typeof document === 'undefined' || typeof window === 'undefined') return;
 
-    let unsubscribe: Unsubscribe | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const setupListener = () => {
-      if (unsubscribe) return;
+      if (channel) return;
 
       try {
-        const notesRef = collection(db, 'notes');
-        const q = query(notesRef, where('createdBy', '==', userId));
-
-        unsubscribe = onSnapshot(
-          q,
-          (snapshot) => {
-            if (!snapshot.metadata.hasPendingWrites) {
+        channel = supabase
+          .channel(`notes-changes-${userId}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'notes', filter: `created_by=eq.${userId}` },
+            () => {
               cacheRef.current.invalidate('user-notes');
             }
-          },
-          (error) => {
-            logger.error('Notes listener error', error, { userId });
-          }
-        );
+          )
+          .subscribe((status: REALTIME_SUBSCRIBE_STATES, err?: Error) => {
+            if (err) logger.error('Notes listener error', err, { userId });
+          });
       } catch (error) {
         logger.error('Failed to setup notes listener', error as Error, { userId });
       }
     };
 
     const teardownListener = () => {
-      if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
       }
     };
 
@@ -98,6 +96,7 @@ export function useRealtimeListeners({
       teardownListener();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, enabled]);
 
   // Listen to tasks changes
@@ -105,27 +104,25 @@ export function useRealtimeListeners({
     if (!enabled || !userId || !selectedProjectId) return;
     if (typeof document === 'undefined' || typeof window === 'undefined') return;
 
-    let unsubscribe: Unsubscribe | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const setupListener = () => {
-      if (unsubscribe) return;
+      if (channel) return;
 
       try {
-        const tasksRef = collection(db, 'tasks');
-        const q = query(tasksRef, where('projectId', '==', selectedProjectId));
-
-        unsubscribe = onSnapshot(
-          q,
-          (snapshot) => {
-            if (!snapshot.metadata.hasPendingWrites) {
+        channel = supabase
+          .channel(`tasks-changes-${selectedProjectId}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'tasks', filter: `project_id=eq.${selectedProjectId}` },
+            () => {
               cacheRef.current.invalidatePattern(new RegExp(`^project-${selectedProjectId}-`));
               onTasksChangedRef.current?.();
             }
-          },
-          (error) => {
-            logger.error('Tasks listener error', error, { projectId: selectedProjectId });
-          }
-        );
+          )
+          .subscribe((status: REALTIME_SUBSCRIBE_STATES, err?: Error) => {
+            if (err) logger.error('Tasks listener error', err, { projectId: selectedProjectId });
+          });
       } catch (error) {
         logger.error('Failed to setup tasks listener', error as Error, {
           projectId: selectedProjectId,
@@ -134,9 +131,9 @@ export function useRealtimeListeners({
     };
 
     const teardownListener = () => {
-      if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
       }
     };
 
@@ -158,6 +155,7 @@ export function useRealtimeListeners({
       teardownListener();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, selectedProjectId, enabled]);
 
   // Listen to people directory changes
@@ -165,34 +163,33 @@ export function useRealtimeListeners({
     if (!enabled || !userId) return;
     if (typeof document === 'undefined' || typeof window === 'undefined') return;
 
-    let unsubscribe: Unsubscribe | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const setupListener = () => {
-      if (unsubscribe) return;
+      if (channel) return;
 
       try {
-        const peopleRef = collection(db, 'people');
-
-        unsubscribe = onSnapshot(
-          peopleRef,
-          (snapshot) => {
-            if (!snapshot.metadata.hasPendingWrites) {
+        channel = supabase
+          .channel('people-changes')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'people' },
+            () => {
               cacheRef.current.invalidate('people-directory');
             }
-          },
-          (error) => {
-            logger.error('People listener error', error, { userId });
-          }
-        );
+          )
+          .subscribe((status: REALTIME_SUBSCRIBE_STATES, err?: Error) => {
+            if (err) logger.error('People listener error', err, { userId });
+          });
       } catch (error) {
         logger.error('Failed to setup people listener', error as Error, { userId });
       }
     };
 
     const teardownListener = () => {
-      if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
       }
     };
 
@@ -214,5 +211,6 @@ export function useRealtimeListeners({
       teardownListener();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, enabled]);
 }
