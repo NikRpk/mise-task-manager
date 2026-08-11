@@ -57,3 +57,4 @@ next-env.d.ts
 service-account*.json
 *-service-account-key.json
 temp-service-account-key.json
+.env*
