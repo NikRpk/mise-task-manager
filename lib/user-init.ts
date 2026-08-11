@@ -1,73 +1,51 @@
 /**
  * User Initialization Utility
- * Ensures all users have complete userSettings with all required fields
+ * Ensures every authenticated user has a row in user_settings.
+ *
+ * Note: a Postgres trigger (`handle_new_user` in db/schema.sql) already
+ * creates this row at sign-up time, so in the common case this is a no-op.
+ * It exists as a safety net for older accounts and for the email/password
+ * flow before the trigger existed.
  */
 
-import { adminDb } from './firebase-admin';
-import { UserSettings } from '@/types';
+import { getSupabaseAdmin } from './supabase/admin';
 import { logger } from './logger';
 
-/**
- * Initialize or update user settings with all required fields
- * Called automatically when a user makes their first API request
- */
 export async function ensureUserSettings(
   uid: string,
   email: string,
   displayName: string
 ): Promise<void> {
   try {
-    const userSettingsRef = adminDb.collection('userSettings').doc(uid);
-    const userSettingsDoc = await userSettingsRef.get();
+    const { data: existing, error: fetchError } = await getSupabaseAdmin()
+      .from('user_settings')
+      .select('user_id, email, display_name')
+      .eq('user_id', uid)
+      .maybeSingle();
 
-    const defaultSettings: UserSettings = {
-      email,
-      colorScheme: 'mise',
-      displayName,
-      timezone: 'Europe/Berlin',
-      notifications: {
-        email: true,
-        desktop: true,
-        dailyTaskReminder: {
-          slack: false,
-          email: false,
-          time: '08:00',
-        },
-      },
-    };
+    if (fetchError) throw fetchError;
 
-    if (!userSettingsDoc.exists) {
-      // Create new user settings
-      await userSettingsRef.set(defaultSettings);
+    if (!existing) {
+      const { error: insertError } = await getSupabaseAdmin().from('user_settings').insert({
+        user_id: uid,
+        email,
+        display_name: displayName,
+      });
+      if (insertError) throw insertError;
       logger.info('Created new user settings', { uid, email });
-    } else {
-      // Update existing settings to ensure all fields are present
-      const existingSettings = userSettingsDoc.data() as UserSettings;
-      
-      const needsUpdate =
-        !existingSettings.email ||
-        !existingSettings.notifications?.dailyTaskReminder;
+      return;
+    }
 
-      if (needsUpdate) {
-        const updatedSettings: UserSettings = {
-          ...defaultSettings,
-          ...existingSettings,
-          email, // Always update email in case it changed
-          displayName: existingSettings.displayName || displayName,
-          notifications: {
-            email: existingSettings.notifications?.email ?? defaultSettings.notifications!.email,
-            desktop: existingSettings.notifications?.desktop ?? defaultSettings.notifications!.desktop,
-            dailyTaskReminder: {
-              slack: existingSettings.notifications?.dailyTaskReminder?.slack ?? false,
-              email: existingSettings.notifications?.dailyTaskReminder?.email ?? false,
-              time: existingSettings.notifications?.dailyTaskReminder?.time ?? '08:00',
-            },
-          },
-        };
-
-        await userSettingsRef.set(updatedSettings, { merge: true });
-        logger.info('Updated user settings with missing fields', { uid, email });
-      }
+    if (!existing.email || !existing.display_name) {
+      const { error: updateError } = await getSupabaseAdmin()
+        .from('user_settings')
+        .update({
+          email: existing.email || email,
+          display_name: existing.display_name || displayName,
+        })
+        .eq('user_id', uid);
+      if (updateError) throw updateError;
+      logger.info('Updated user settings with missing fields', { uid, email });
     }
   } catch (error) {
     logger.error('Failed to ensure user settings', error as Error, { uid, email });

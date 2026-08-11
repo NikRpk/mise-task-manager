@@ -2,15 +2,16 @@
  * Integration tests for GET /api/tasks and POST /api/tasks
  *
  * Verifies authentication enforcement, input validation, and the happy
- * path using the firebase-admin mock from jest.setup.ts.
- * The mock resolves verifyIdToken with { uid: 'test-user-123', email: 'test@hellofresh.com' }.
+ * path using the Supabase admin mock from jest.setup.ts / test-utils.
+ * The default mock resolves auth.getUser to { id: 'test-user-123', email: 'test@example.com' }.
  *
  * @jest-environment node
  */
 
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/tasks/route';
-import { adminDb } from '@/lib/firebase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { createMockSupabaseClient } from '../test-utils/supabase-mock';
 
 const ENDPOINT = 'http://localhost/api/tasks';
 const AUTH_HEADER = { Authorization: 'Bearer mock-token' };
@@ -27,25 +28,13 @@ function makePostRequest(body: unknown, headers: Record<string, string> = {}): N
   });
 }
 
-/** Reset adminDb.collection to the default mock behavior from jest.setup.ts */
-function resetCollectionMock(): void {
-  (adminDb.collection as jest.Mock).mockImplementation(() => ({
-    doc: jest.fn(() => ({
-      get: jest.fn().mockResolvedValue({ exists: false, data: () => ({}) }),
-      set: jest.fn().mockResolvedValue(undefined),
-      update: jest.fn().mockResolvedValue(undefined),
-      delete: jest.fn().mockResolvedValue(undefined),
-    })),
-    get: jest.fn().mockResolvedValue({ docs: [] }),
-    where: jest.fn(function () { return this; }),
-    orderBy: jest.fn(function () { return this; }),
-    limit: jest.fn(function () { return this; }),
-    startAfter: jest.fn(function () { return this; }),
-  }));
+/** Reset the mock Supabase client to a default "no rows found" state. */
+function resetSupabaseMock(): void {
+  (getSupabaseAdmin as jest.Mock).mockReturnValue(createMockSupabaseClient());
 }
 
 beforeEach(() => {
-  resetCollectionMock();
+  resetSupabaseMock();
 });
 
 describe('GET /api/tasks', () => {
@@ -78,74 +67,47 @@ describe('GET /api/tasks', () => {
 
   describe('happy path', () => {
     it('returns 400 when project does not exist', async () => {
-      // Default mock returns { exists: false } — project is not found
+      // Default mock returns { data: null } for every table — project not found
       const res = await GET(makeGetRequest('?projectId=nonexistent', AUTH_HEADER));
       expect(res.status).toBe(400);
     });
 
     it('returns 403 when user is not a project member', async () => {
-      (adminDb.collection as jest.Mock).mockImplementation((collectionName: string) => {
-        if (collectionName === 'projects') {
-          return {
-            doc: jest.fn(() => ({
-              get: jest.fn().mockResolvedValue({
-                exists: true,
-                data: () => ({
-                  name: 'Test Project',
-                  members: [{ userId: 'other-user', role: 'ADMIN' }],
-                }),
-              }),
-            })),
-          };
-        }
-        return {
-          doc: jest.fn(() => ({
-            get: jest.fn().mockResolvedValue({ exists: false, data: () => ({}) }),
-          })),
-          get: jest.fn().mockResolvedValue({ docs: [] }),
-          where: jest.fn(function () { return this; }),
-          orderBy: jest.fn(function () { return this; }),
-          limit: jest.fn(function () { return this; }),
-        };
-      });
+      (getSupabaseAdmin as jest.Mock).mockReturnValue(
+        createMockSupabaseClient({
+          projects: { data: { id: 'proj-1' }, error: null },
+          project_members: { data: null, error: null },
+        })
+      );
 
       const res = await GET(makeGetRequest('?projectId=proj-1', AUTH_HEADER));
       expect(res.status).toBe(403);
     });
 
     it('returns 200 with tasks when user is a project member', async () => {
-      (adminDb.collection as jest.Mock).mockImplementation((collectionName: string) => {
-        if (collectionName === 'projects') {
-          return {
-            doc: jest.fn(() => ({
-              get: jest.fn().mockResolvedValue({
-                exists: true,
-                data: () => ({
-                  name: 'Test Project',
-                  members: [{ userId: 'test-user-123', role: 'EDIT' }],
-                }),
-              }),
-            })),
-          };
-        }
-        return {
-          doc: jest.fn(() => ({
-            get: jest.fn().mockResolvedValue({ exists: false, data: () => ({}) }),
-          })),
-          get: jest.fn().mockResolvedValue({
-            docs: [
+      (getSupabaseAdmin as jest.Mock).mockReturnValue(
+        createMockSupabaseClient({
+          projects: { data: { id: 'proj-1' }, error: null },
+          project_members: { data: { user_id: 'test-user-123', role: 'EDIT' }, error: null },
+          tasks: {
+            data: [
               {
                 id: 'task-1',
-                data: () => ({ title: 'Hello', projectId: 'proj-1', status: 'todo' }),
+                project_id: 'proj-1',
+                title: 'Hello',
+                status: 'todo',
+                sub_tasks: [],
+                comments: [],
+                status_history: [],
+                images: [],
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
               },
             ],
-          }),
-          where: jest.fn(function () { return this; }),
-          orderBy: jest.fn(function () { return this; }),
-          limit: jest.fn(function () { return this; }),
-          startAfter: jest.fn(function () { return this; }),
-        };
-      });
+            error: null,
+          },
+        })
+      );
 
       const res = await GET(makeGetRequest('?projectId=proj-1', AUTH_HEADER));
       expect(res.status).toBe(200);
@@ -177,33 +139,29 @@ describe('POST /api/tasks', () => {
     });
 
     it('returns 400 when both title and description are empty', async () => {
-      (adminDb.collection as jest.Mock).mockImplementation((collectionName: string) => {
-        if (collectionName === 'projects') {
-          return {
-            doc: jest.fn(() => ({
-              get: jest.fn().mockResolvedValue({
-                exists: true,
-                data: () => ({
-                  members: [{ userId: 'test-user-123', role: 'EDIT' }],
-                }),
-              }),
-            })),
-          };
-        }
-        return {
-          doc: jest.fn(() => ({
-            get: jest.fn().mockResolvedValue({ exists: false, data: () => ({}) }),
-            set: jest.fn().mockResolvedValue(undefined),
-          })),
-          get: jest.fn().mockResolvedValue({ docs: [] }),
-          where: jest.fn(function () { return this; }),
-        };
-      });
+      (getSupabaseAdmin as jest.Mock).mockReturnValue(
+        createMockSupabaseClient({
+          project_members: { data: { role: 'EDIT' }, error: null },
+        })
+      );
 
       const res = await POST(
         makePostRequest({ projectId: 'proj-1', title: '', description: '' }, AUTH_HEADER)
       );
       expect(res.status).toBe(400);
+    });
+
+    it('returns 403 when user does not have EDIT permission', async () => {
+      (getSupabaseAdmin as jest.Mock).mockReturnValue(
+        createMockSupabaseClient({
+          project_members: { data: { role: 'VIEW' }, error: null },
+        })
+      );
+
+      const res = await POST(
+        makePostRequest({ projectId: 'proj-1', title: 'Test task' }, AUTH_HEADER)
+      );
+      expect(res.status).toBe(403);
     });
   });
 });

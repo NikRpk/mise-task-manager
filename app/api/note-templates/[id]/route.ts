@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import { adminDb } from '@/lib/firebase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { rowToNoteTemplate, NoteTemplateRow } from '@/lib/db-mappers';
 
 export async function PUT(
   request: NextRequest,
@@ -15,45 +16,40 @@ export async function PUT(
     try {
       const { id } = await params;
       const body = await request.json();
-      
-      // Prevent editing default template
+
       if (id === 'default') {
         return NextResponse.json(
           { error: 'Cannot edit default template' },
           { status: 400 }
         );
       }
-      
-      const templateRef = adminDb.collection('noteTemplates').doc(id);
-      const templateDoc = await templateRef.get();
-      
-      if (!templateDoc.exists) {
-        return NextResponse.json(
-          { error: 'Template not found' },
-          { status: 404 }
-        );
+
+      const db = getSupabaseAdmin();
+      const { data: existing, error: fetchError } = await db
+        .from('note_templates')
+        .select('created_by')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+      if (!existing) {
+        return NextResponse.json({ error: 'Template not found' }, { status: 404 });
       }
-      
-      const templateData = templateDoc.data();
-      
-      // Check if user owns this template
-      if (templateData?.createdBy !== user.uid) {
-        return NextResponse.json(
-          { error: 'Access denied' },
-          { status: 403 }
-        );
+
+      if (existing.created_by !== user.uid) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
-      
-      // Update template
-      const updatedTemplate = {
-        name: body.name,
-        sections: body.sections,
-        updatedAt: new Date().toISOString(),
-      };
-      
-      await templateRef.update(updatedTemplate);
-      
-      return NextResponse.json({ id, ...templateData, ...updatedTemplate });
+
+      const { data: updatedRow, error: updateError } = await db
+        .from('note_templates')
+        .update({ name: body.name, content: body.content })
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (updateError) throw updateError;
+
+      return NextResponse.json(rowToNoteTemplate(updatedRow as NoteTemplateRow));
     } catch (error) {
       console.error('Error updating template:', error);
       return NextResponse.json(
@@ -71,37 +67,33 @@ export async function DELETE(
   return withAuth(request, async (req, user) => {
     try {
       const { id } = await params;
-      
-      // Prevent deleting default template
+
       if (id === 'default') {
         return NextResponse.json(
           { error: 'Cannot delete default template' },
           { status: 400 }
         );
       }
-      
-      const templateRef = adminDb.collection('noteTemplates').doc(id);
-      const templateDoc = await templateRef.get();
-      
-      if (!templateDoc.exists) {
-        return NextResponse.json(
-          { error: 'Template not found' },
-          { status: 404 }
-        );
+
+      const db = getSupabaseAdmin();
+      const { data: existing, error: fetchError } = await db
+        .from('note_templates')
+        .select('created_by')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+      if (!existing) {
+        return NextResponse.json({ error: 'Template not found' }, { status: 404 });
       }
-      
-      const templateData = templateDoc.data();
-      
-      // Check if user owns this template
-      if (templateData?.createdBy !== user.uid) {
-        return NextResponse.json(
-          { error: 'Access denied' },
-          { status: 403 }
-        );
+
+      if (existing.created_by !== user.uid) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
-      
-      await templateRef.delete();
-      
+
+      const { error: deleteError } = await db.from('note_templates').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+
       return NextResponse.json({ success: true });
     } catch (error) {
       console.error('Error deleting template:', error);

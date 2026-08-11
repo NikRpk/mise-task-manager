@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { withAuth, checkProjectPermission } from '@/lib/auth-middleware';
 import { logger } from '@/lib/logger';
 import { DEFAULT_TOPIC_OPTIONS } from '@/lib/constants';
+import { rowToProject, ProjectRow } from '@/lib/db-mappers';
 
 /**
  * GET /api/projects/[id]/full
@@ -20,24 +21,20 @@ export async function GET(
       // Check permission (throws on failure)
       await checkProjectPermission(user.uid, projectId, 'VIEW');
 
-      // Fetch project and members in parallel
-      const [projectDoc, membersSnapshot] = await Promise.all([
-        adminDb.collection('projects').doc(projectId).get(),
-        adminDb.collection('projects').doc(projectId).collection('members').get(),
+      const db = getSupabaseAdmin();
+
+      const [{ data: projectRow, error: projectError }, { count: memberCount }] = await Promise.all([
+        db.from('projects').select('*').eq('id', projectId).maybeSingle(),
+        db.from('project_members').select('user_id', { count: 'exact', head: true }).eq('project_id', projectId),
       ]);
 
-      if (!projectDoc.exists) {
+      if (projectError || !projectRow) {
         return NextResponse.json({ error: 'Project not found' }, { status: 404 });
       }
 
-      const projectData = projectDoc.data();
-      const project = {
-        id: projectDoc.id,
-        ...projectData,
-      };
+      const project = rowToProject(projectRow as ProjectRow);
 
-      // Settings are stored in the project document itself, not a subcollection
-      const settings = projectData?.settings || {
+      const settings = project.settings || {
         statusOptions: [
           { id: 'todo', label: 'To Do', color: '#94a3b8' },
           { id: 'in-progress', label: 'In Progress', color: '#3b82f6' },
@@ -53,18 +50,16 @@ export async function GET(
         customFields: [],
       };
 
-      const memberCount = membersSnapshot.size;
-
       logger.info('Fetched full project data', {
         projectId,
         userId: user.uid,
-        memberCount,
+        memberCount: memberCount || 0,
       });
 
       return NextResponse.json({
         project,
         settings,
-        memberCount,
+        memberCount: memberCount || 0,
       });
     } catch (error) {
       logger.error('Error fetching full project data', error as Error, {

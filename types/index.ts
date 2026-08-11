@@ -196,7 +196,7 @@ export interface Person {
   updatedAt: string;
 }
 
-// Auth User type (Firebase User simplified)
+// Auth User type (Supabase auth.users simplified)
 export interface User {
   uid: string;
   email: string | null;

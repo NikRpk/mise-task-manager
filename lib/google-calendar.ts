@@ -4,7 +4,7 @@
  */
 
 import { google, Auth } from 'googleapis';
-import { adminDb } from './firebase-admin';
+import { getSupabaseAdmin } from './supabase/admin';
 import { CalendarEvent } from '@/types';
 import { logger } from './logger';
 import { CALENDAR_FETCH_DAYS, CALENDAR_LOOKBACK_HOURS } from './constants';
@@ -139,15 +139,17 @@ export async function getAccessTokenFromRefresh(
  */
 export async function getUserRefreshToken(userId: string): Promise<string | null> {
   try {
-    const userSettingsRef = adminDb.collection('userSettings').doc(userId);
-    const doc = await userSettingsRef.get();
-    
-    if (!doc.exists) {
+    const { data, error } = await getSupabaseAdmin()
+      .from('user_settings')
+      .select('google_calendar_refresh_token')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error || !data) {
       return null;
     }
-    
-    const data = doc.data();
-    return data?.googleCalendarRefreshToken || null;
+
+    return data.google_calendar_refresh_token || null;
   } catch (error) {
     logger.error('Failed to get user refresh token', error as Error, { userId });
     return null;
@@ -159,14 +161,15 @@ export async function getUserRefreshToken(userId: string): Promise<string | null
  */
 export async function storeUserRefreshToken(userId: string, refreshToken: string): Promise<void> {
   try {
-    const userSettingsRef = adminDb.collection('userSettings').doc(userId);
-    await userSettingsRef.set(
-      {
-        googleCalendarRefreshToken: refreshToken,
-        googleCalendarConnectedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    const { error } = await getSupabaseAdmin()
+      .from('user_settings')
+      .update({
+        google_calendar_refresh_token: refreshToken,
+        google_calendar_connected_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId);
+
+    if (error) throw error;
   } catch (error) {
     logger.error('Failed to store refresh token', error as Error, { userId });
     throw new Error('Failed to save Google Calendar connection');
@@ -178,11 +181,15 @@ export async function storeUserRefreshToken(userId: string, refreshToken: string
  */
 export async function removeUserRefreshToken(userId: string): Promise<void> {
   try {
-    const userSettingsRef = adminDb.collection('userSettings').doc(userId);
-    await userSettingsRef.update({
-      googleCalendarRefreshToken: null,
-      googleCalendarConnectedAt: null,
-    });
+    const { error } = await getSupabaseAdmin()
+      .from('user_settings')
+      .update({
+        google_calendar_refresh_token: null,
+        google_calendar_connected_at: null,
+      })
+      .eq('user_id', userId);
+
+    if (error) throw error;
   } catch (error) {
     logger.error('Failed to remove refresh token', error as Error, { userId });
     throw new Error('Failed to disconnect Google Calendar');

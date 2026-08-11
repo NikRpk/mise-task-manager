@@ -41,7 +41,6 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
-# Note: .env.production is NOT ignored - it contains public Firebase config and must be committed
 
 # vercel
 .vercel
@@ -53,12 +52,7 @@ next-env.d.ts
 # data
 /data
 
-# Firebase
-.firebase
-.firebaserc
-*-debug.log
-
-# Service account keys
+# Service account keys (Google Calendar / legacy scripts, never commit)
 *firebase-adminsdk*.json
 service-account*.json
 *-service-account-key.json

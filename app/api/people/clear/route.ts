@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import { adminDb } from '@/lib/firebase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { logger } from '@/lib/logger';
 
 /**
@@ -17,44 +17,31 @@ export async function DELETE(request: NextRequest) {
     try {
       const searchParams = request.nextUrl.searchParams;
       const source = searchParams.get('source') || 'calendar';
-      
-      let query: FirebaseFirestore.Query = adminDb.collection('people');
-      
-      // Filter by source if not clearing all
+
+      const db = getSupabaseAdmin();
+
+      let query = db.from('people').delete().select('email');
       if (source !== 'all') {
-        query = query.where('source', '==', source);
+        query = query.eq('source', source);
+      } else {
+        query = query.neq('email', ''); // Supabase requires a filter on delete
       }
-      
-      const snapshot = await query.get();
-      
-      // Firestore batch limit is 500 operations - need to chunk for large datasets
-      const docs = snapshot.docs;
-      const BATCH_SIZE = 500;
-      let deletedCount = 0;
-      
-      // Delete in chunks of 500
-      for (let i = 0; i < docs.length; i += BATCH_SIZE) {
-        const chunk = docs.slice(i, i + BATCH_SIZE);
-        const batch = adminDb.batch();
-        
-        chunk.forEach(doc => {
-          batch.delete(doc.ref);
-          deletedCount++;
-        });
-        
-        await batch.commit();
-      }
-      
-      logger.info('Cleared people database', { 
-        userId: user.uid, 
-        source, 
-        deletedCount 
+
+      const { data: deletedRows, error } = await query;
+      if (error) throw error;
+
+      const deletedCount = deletedRows?.length || 0;
+
+      logger.info('Cleared people database', {
+        userId: user.uid,
+        source,
+        deletedCount,
       });
-      
-      return NextResponse.json({ 
-        success: true, 
+
+      return NextResponse.json({
+        success: true,
         message: `Successfully deleted ${deletedCount} people from ${source} source`,
-        deletedCount 
+        deletedCount,
       });
     } catch (error) {
       logger.error('Failed to clear people database', error as Error, {

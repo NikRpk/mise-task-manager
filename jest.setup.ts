@@ -25,44 +25,42 @@ jest.mock('next/navigation', () => ({
   },
 }));
 
-// Mock Firebase
-jest.mock('./lib/firebase', () => ({
-  auth: {
-    currentUser: {
-      getIdToken: jest.fn(() => Promise.resolve('mock-token')),
-      uid: 'test-user-123',
-    },
-  },
-  db: {},
-  googleProvider: {},
-}));
+import { createMockSupabaseClient } from './__tests__/test-utils/supabase-mock';
 
-// Mock Firebase Admin
-jest.mock('./lib/firebase-admin', () => ({
-  adminAuth: {
-    verifyIdToken: jest.fn(() => Promise.resolve({
-      uid: 'test-user-123',
-      email: 'test@hellofresh.com',
-      name: 'Test User',
-    })),
-  },
-  adminDb: {
-    collection: jest.fn(() => ({
-      doc: jest.fn(() => ({
-        get: jest.fn(() => Promise.resolve({
-          exists: false,
-          data: () => ({}),
-        })),
-        set: jest.fn(() => Promise.resolve()),
-        update: jest.fn(() => Promise.resolve()),
-        delete: jest.fn(() => Promise.resolve()),
+// Mock Supabase admin client (server-side, service-role)
+jest.mock('./lib/supabase/admin', () => {
+  const mockClient = createMockSupabaseClient();
+  return {
+    getSupabaseAdmin: jest.fn(() => mockClient),
+    supabaseAdmin: mockClient,
+  };
+});
+
+// Mock Supabase browser client
+jest.mock('./lib/supabase/client', () => ({
+  createClient: jest.fn(() => ({
+    auth: {
+      getSession: jest.fn(() =>
+        Promise.resolve({ data: { session: { access_token: 'mock-token' } } })
+      ),
+      getUser: jest.fn(() =>
+        Promise.resolve({ data: { user: { id: 'test-user-123', email: 'test@example.com' } } })
+      ),
+      onAuthStateChange: jest.fn(() => ({
+        data: { subscription: { unsubscribe: jest.fn() } },
       })),
-      get: jest.fn(() => Promise.resolve({ docs: [] })),
-      where: jest.fn(function() { return this; }),
-      orderBy: jest.fn(function() { return this; }),
-      limit: jest.fn(function() { return this; }),
+      signInWithPassword: jest.fn(() => Promise.resolve({ data: {}, error: null })),
+      signUp: jest.fn(() => Promise.resolve({ data: {}, error: null })),
+      signInWithOAuth: jest.fn(() => Promise.resolve({ data: {}, error: null })),
+      signOut: jest.fn(() => Promise.resolve({ error: null })),
+    },
+    channel: jest.fn(() => ({
+      on: jest.fn().mockReturnThis(),
+      subscribe: jest.fn().mockReturnThis(),
+      unsubscribe: jest.fn(),
     })),
-  },
+    removeChannel: jest.fn(),
+  })),
 }));
 
 // Suppress console output in tests unless debugging

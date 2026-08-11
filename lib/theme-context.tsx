@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { auth } from './firebase';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { createClient } from './supabase/client';
 import { logger } from './logger';
 
 export interface ColorScheme {
@@ -215,17 +216,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    const supabase = createClient();
+
     // Load saved color scheme from settings
     const loadColorScheme = async () => {
       try {
-        const user = auth.currentUser;
-        if (!user) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
           // Wait for auth to initialize
           logger.debug('Theme: waiting for authentication');
           return;
         }
 
-        const token = await user.getIdToken();
+        const token = session.access_token;
         const res = await fetch('/api/settings', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -260,13 +263,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     };
     
     // Listen for auth state changes
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        loadColorScheme();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        if (session) {
+          loadColorScheme();
+        }
       }
-    });
+    );
     
-    return () => unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
   const setScheme = (schemeId: string) => {

@@ -1,23 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import { adminDb } from '@/lib/firebase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { handleApiError, successResponse } from '@/lib/api-errors';
 import { logger } from '@/lib/logger';
 import { UserSettings } from '@/types';
-
-// User-specific settings (global, not project-specific)
-// Removed - now imported from @/types
+import { rowToUserSettings, userSettingsToRow, UserSettingsRow } from '@/lib/db-mappers';
 
 export async function GET(request: NextRequest) {
   return withAuth(request, async (req, user) => {
     try {
       logger.apiRequest('GET', '/api/settings', { userId: user.uid });
 
-      const userSettingsRef = adminDb.collection('userSettings').doc(user.uid);
-      const userSettingsDoc = await userSettingsRef.get();
+      const db = getSupabaseAdmin();
+      const { data: row, error } = await db
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', user.uid)
+        .maybeSingle();
 
-      if (!userSettingsDoc.exists) {
-        // Return default settings
+      if (error) throw error;
+
+      if (!row) {
         const defaultSettings: UserSettings = {
           email: user.email,
           colorScheme: 'mise',
@@ -40,17 +43,11 @@ export async function GET(request: NextRequest) {
         return successResponse(defaultSettings);
       }
 
-      logger.apiResponse('GET', '/api/settings', 200, undefined, {
-        userId: user.uid,
-      });
+      logger.apiResponse('GET', '/api/settings', 200, undefined, { userId: user.uid });
 
-      return successResponse(userSettingsDoc.data());
+      return successResponse(rowToUserSettings(row as UserSettingsRow));
     } catch (error) {
-      return handleApiError(error, {
-        endpoint: '/api/settings',
-        method: 'GET',
-        userId: user.uid,
-      });
+      return handleApiError(error, { endpoint: '/api/settings', method: 'GET', userId: user.uid });
     }
   });
 }
@@ -62,7 +59,7 @@ export async function PUT(request: NextRequest) {
 
       logger.apiRequest('PUT', '/api/settings', { userId: user.uid });
 
-      const userSettingsRef = adminDb.collection('userSettings').doc(user.uid);
+      const db = getSupabaseAdmin();
 
       const settings: UserSettings = {
         email: user.email || body.email,
@@ -84,19 +81,16 @@ export async function PUT(request: NextRequest) {
         googleCalendarConnectedAt: body.googleCalendarConnectedAt,
       };
 
-      await userSettingsRef.set(settings, { merge: true });
+      const row = { user_id: user.uid, ...userSettingsToRow(settings) };
 
-      logger.apiResponse('PUT', '/api/settings', 200, undefined, {
-        userId: user.uid,
-      });
+      const { error } = await db.from('user_settings').upsert(row, { onConflict: 'user_id' });
+      if (error) throw error;
+
+      logger.apiResponse('PUT', '/api/settings', 200, undefined, { userId: user.uid });
 
       return successResponse(settings);
     } catch (error) {
-      return handleApiError(error, {
-        endpoint: '/api/settings',
-        method: 'PUT',
-        userId: user.uid,
-      });
+      return handleApiError(error, { endpoint: '/api/settings', method: 'PUT', userId: user.uid });
     }
   });
 }

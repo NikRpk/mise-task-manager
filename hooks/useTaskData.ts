@@ -165,7 +165,7 @@ export function useTaskData(
           });
         }
         
-        // The real-time Firestore listener will call fetchTasks once the new
+        // The Supabase Realtime listener will call fetchTasks once the new
         // document lands — no manual fetchTasks() call needed here, which would
         // race with the listener and could cause a duplicate to flash briefly.
       }

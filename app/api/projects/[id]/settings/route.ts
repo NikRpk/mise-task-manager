@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, checkProjectPermission } from '@/lib/auth-middleware';
-import { adminDb } from '@/lib/firebase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { logger } from '@/lib/logger';
 import { ProjectSettings } from '@/types';
 import { DEFAULT_TASK_COLOR_FIELD, DEFAULT_TOPIC_OPTIONS } from '@/lib/constants';
@@ -15,15 +15,14 @@ export async function GET(
 
       await checkProjectPermission(user.uid, id, 'VIEW');
 
-      const projectRef = adminDb.collection('projects').doc(id);
-      const projectDoc = await projectRef.get();
+      const db = getSupabaseAdmin();
+      const { data: row, error } = await db.from('projects').select('settings').eq('id', id).maybeSingle();
 
-      if (!projectDoc.exists) {
+      if (error || !row) {
         return NextResponse.json({ error: 'Project not found' }, { status: 404 });
       }
 
-      const projectData = projectDoc.data();
-      const settings = projectData?.settings || {
+      const settings = row.settings || {
         statusOptions: [],
         priorityOptions: [],
         topicOptions: DEFAULT_TOPIC_OPTIONS,
@@ -51,12 +50,7 @@ export async function PUT(
 
       await checkProjectPermission(user.uid, id, 'ADMIN');
 
-      const projectRef = adminDb.collection('projects').doc(id);
-      const projectDoc = await projectRef.get();
-
-      if (!projectDoc.exists) {
-        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-      }
+      const db = getSupabaseAdmin();
 
       const settings: ProjectSettings = {
         statusOptions: body.statusOptions || [],
@@ -67,10 +61,8 @@ export async function PUT(
         topicFieldLabel: body.topicFieldLabel || 'Topic',
       };
 
-      await projectRef.update({
-        settings,
-        updatedAt: new Date().toISOString(),
-      });
+      const { error } = await db.from('projects').update({ settings }).eq('id', id);
+      if (error) throw error;
 
       return NextResponse.json(settings);
     } catch (error) {

@@ -63,7 +63,7 @@ export default function NoteModal({
       // Fetch user timezone
       (async () => {
         try {
-          const token = await (await import('@/lib/firebase')).auth.currentUser?.getIdToken();
+          const token = (await (await import('@/lib/supabase/client')).createClient().auth.getSession()).data.session?.access_token;
           const res = await fetch('/api/settings', {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -96,7 +96,7 @@ export default function NoteModal({
         // Load template asynchronously
         (async () => {
           try {
-            const token = await (await import('@/lib/firebase')).auth.currentUser?.getIdToken();
+            const token = (await (await import('@/lib/supabase/client')).createClient().auth.getSession()).data.session?.access_token;
             const res = await fetch('/api/settings', {
               headers: {
                 'Authorization': `Bearer ${token}`,

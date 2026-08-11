@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sendNoteToAttendees } from '@/lib/slack-client';
-import { adminDb } from '@/lib/firebase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { logger } from '@/lib/logger';
 import { NoteTask } from '@/types';
 import { withAuth } from '@/lib/auth-middleware';
@@ -82,23 +82,25 @@ export async function POST(request: NextRequest) {
         attendeeCount: attendees.length,
       });
 
-      // Fetch custom template from first attendee's settings (if available)
+      // Fetch custom template from the first attendee's settings (if available).
       // In practice, you might want to fetch each user's template individually
       let customTemplate: string | undefined;
       try {
         const firstAttendee = attendees[0];
-        // Try to get user ID from email
-        const userSnapshot = await adminDb
-          .collection('users')
-          .where('email', '==', firstAttendee.email)
-          .limit(1)
-          .get();
+        const db = getSupabaseAdmin();
 
-        if (!userSnapshot.empty) {
-          const userId = userSnapshot.docs[0].id;
-          const userSettingsDoc = await adminDb.collection('userSettings').doc(userId).get();
-          const settings = userSettingsDoc.data();
-          customTemplate = settings?.slackTemplates?.meetingNote;
+        const { data: userList } = await db.auth.admin.listUsers();
+        const matchingUser = userList?.users?.find(u => u.email === firstAttendee.email);
+
+        if (matchingUser) {
+          const { data: settingsRow } = await db
+            .from('user_settings')
+            .select('slack_templates')
+            .eq('user_id', matchingUser.id)
+            .maybeSingle();
+
+          const slackTemplates = settingsRow?.slack_templates as { meetingNote?: string } | undefined;
+          customTemplate = slackTemplates?.meetingNote;
         }
       } catch (error) {
         logger.warn('Could not fetch custom Slack template, using default', {
