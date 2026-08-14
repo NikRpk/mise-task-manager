@@ -28,7 +28,7 @@ let cachedAt = 0;
 const CACHE_TTL_MS = 60_000;
 
 /**
- * Builds a displayName → email lookup from `user_settings` and `people`.
+ * Builds a displayName → email lookup from `mise_user_settings` and `people`.
  * Cached for 60s to avoid re-querying both tables on every task write.
  */
 async function loadDisplayNameToEmailMap(): Promise<Map<string, string>> {
@@ -39,7 +39,7 @@ async function loadDisplayNameToEmailMap(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
 
   const [{ data: settingsRows }, { data: peopleRows }] = await Promise.all([
-    getSupabaseAdmin().from('user_settings').select('display_name, email'),
+    getSupabaseAdmin().from('mise_user_settings').select('display_name, email'),
     getSupabaseAdmin().from('people').select('display_name, email'),
   ]);
 

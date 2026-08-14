@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
       const db = getSupabaseAdmin();
       const { data: settingsRow } = await db
-        .from('user_settings')
+        .from('mise_user_settings')
         .select('feedback_webhook_url')
         .eq('user_id', user.uid)
         .maybeSingle();

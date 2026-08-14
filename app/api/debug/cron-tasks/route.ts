@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   return withAuth(request, async () => {
     try {
       const db = getSupabaseAdmin();
-      const { data: settingsRows } = await db.from('user_settings').select('*');
+      const { data: settingsRows } = await db.from('mise_user_settings').select('*');
       const allUsersData = [];
 
       for (const settingsRow of settingsRows || []) {

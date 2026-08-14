@@ -33,13 +33,13 @@ export async function POST(request: NextRequest) {
     let settingsRow: { email?: string; display_name?: string; slack_templates?: unknown } | null = null;
 
     if (userId) {
-      const { data } = await db.from('user_settings').select('*').eq('user_id', userId).maybeSingle();
+      const { data } = await db.from('mise_user_settings').select('*').eq('user_id', userId).maybeSingle();
       if (data) {
         settingsRow = data;
         foundUserId = userId;
       }
     } else if (email) {
-      const { data } = await db.from('user_settings').select('*').eq('email', email).limit(1).maybeSingle();
+      const { data } = await db.from('mise_user_settings').select('*').eq('email', email).limit(1).maybeSingle();
       if (data) {
         settingsRow = data;
         foundUserId = data.user_id;
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!settingsRow) {
-      const { data: sampleUsers } = await db.from('user_settings').select('user_id, email, display_name').limit(5);
+      const { data: sampleUsers } = await db.from('mise_user_settings').select('user_id, email, display_name').limit(5);
       return NextResponse.json(
         {
           error: 'User not found',

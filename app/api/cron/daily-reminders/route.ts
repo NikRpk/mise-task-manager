@@ -41,7 +41,7 @@ async function handleDailyReminders(request: NextRequest, method: 'GET' | 'POST'
     const db = getSupabaseAdmin();
     const results: NotificationResult[] = [];
 
-    const { data: settingsRows, error: settingsError } = await db.from('user_settings').select('*');
+    const { data: settingsRows, error: settingsError } = await db.from('mise_user_settings').select('*');
     if (settingsError) throw settingsError;
 
     logger.info('Processing daily reminders', { totalUsers: settingsRows?.length || 0 });

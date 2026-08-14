@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
 
         if (matchingUser) {
           const { data: settingsRow } = await db
-            .from('user_settings')
+            .from('mise_user_settings')
             .select('slack_templates')
             .eq('user_id', matchingUser.id)
             .maybeSingle();

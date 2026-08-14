@@ -1,11 +1,11 @@
 /**
  * User Initialization Utility
- * Ensures every authenticated user has a row in user_settings.
+ * Ensures every authenticated user has a row in mise_user_settings.
  *
- * Note: a Postgres trigger (`handle_new_user` in db/schema.sql) already
- * creates this row at sign-up time, so in the common case this is a no-op.
- * It exists as a safety net for older accounts and for the email/password
- * flow before the trigger existed.
+ * Note: a Postgres trigger (`handle_new_mise_user_settings` in db/schema.sql)
+ * already creates this row at sign-up time, so in the common case this is a
+ * no-op. It exists as a safety net for older accounts and for the
+ * email/password flow before the trigger existed.
  */
 
 import { getSupabaseAdmin } from './supabase/admin';
@@ -18,7 +18,7 @@ export async function ensureUserSettings(
 ): Promise<void> {
   try {
     const { data: existing, error: fetchError } = await getSupabaseAdmin()
-      .from('user_settings')
+      .from('mise_user_settings')
       .select('user_id, email, display_name')
       .eq('user_id', uid)
       .maybeSingle();
@@ -26,7 +26,7 @@ export async function ensureUserSettings(
     if (fetchError) throw fetchError;
 
     if (!existing) {
-      const { error: insertError } = await getSupabaseAdmin().from('user_settings').insert({
+      const { error: insertError } = await getSupabaseAdmin().from('mise_user_settings').insert({
         user_id: uid,
         email,
         display_name: displayName,
@@ -38,7 +38,7 @@ export async function ensureUserSettings(
 
     if (!existing.email || !existing.display_name) {
       const { error: updateError } = await getSupabaseAdmin()
-        .from('user_settings')
+        .from('mise_user_settings')
         .update({
           email: existing.email || email,
           display_name: existing.display_name || displayName,

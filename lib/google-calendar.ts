@@ -140,7 +140,7 @@ export async function getAccessTokenFromRefresh(
 export async function getUserRefreshToken(userId: string): Promise<string | null> {
   try {
     const { data, error } = await getSupabaseAdmin()
-      .from('user_settings')
+      .from('mise_user_settings')
       .select('google_calendar_refresh_token')
       .eq('user_id', userId)
       .maybeSingle();
@@ -162,7 +162,7 @@ export async function getUserRefreshToken(userId: string): Promise<string | null
 export async function storeUserRefreshToken(userId: string, refreshToken: string): Promise<void> {
   try {
     const { error } = await getSupabaseAdmin()
-      .from('user_settings')
+      .from('mise_user_settings')
       .update({
         google_calendar_refresh_token: refreshToken,
         google_calendar_connected_at: new Date().toISOString(),
@@ -182,7 +182,7 @@ export async function storeUserRefreshToken(userId: string, refreshToken: string
 export async function removeUserRefreshToken(userId: string): Promise<void> {
   try {
     const { error } = await getSupabaseAdmin()
-      .from('user_settings')
+      .from('mise_user_settings')
       .update({
         google_calendar_refresh_token: null,
         google_calendar_connected_at: null,

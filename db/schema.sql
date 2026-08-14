@@ -125,7 +125,7 @@ create index idx_note_templates_created_by on note_templates(created_by);
 -- USER SETTINGS  (1 row per auth.users, keyed by user id)
 -- ============================================================================
 
-create table user_settings (
+create table mise_user_settings (
   user_id uuid primary key references auth.users(id) on delete cascade,
   email text,
   display_name text,
@@ -182,19 +182,19 @@ create trigger trg_notes_updated_at before update on notes
   for each row execute function set_updated_at();
 create trigger trg_note_templates_updated_at before update on note_templates
   for each row execute function set_updated_at();
-create trigger trg_user_settings_updated_at before update on user_settings
+create trigger trg_mise_user_settings_updated_at before update on mise_user_settings
   for each row execute function set_updated_at();
 create trigger trg_people_updated_at before update on people
   for each row execute function set_updated_at();
 
 -- ============================================================================
--- Auto-create a user_settings row on sign-up (mirrors ensureUserSettings())
+-- Auto-create a mise_user_settings row on sign-up (mirrors ensureUserSettings())
 -- ============================================================================
 
-create or replace function public.handle_new_user()
+create or replace function public.handle_new_mise_user_settings()
 returns trigger as $$
 begin
-  insert into public.user_settings (user_id, email, display_name)
+  insert into public.mise_user_settings (user_id, email, display_name)
   values (
     new.id,
     new.email,
@@ -205,9 +205,35 @@ begin
 end;
 $$ language plpgsql security definer set search_path = public;
 
-create trigger on_auth_user_created
+create trigger on_auth_user_created_mise_settings
   after insert on auth.users
-  for each row execute function public.handle_new_user();
+  for each row execute function public.handle_new_mise_user_settings();
+
+-- ============================================================================
+-- SHARED PLATFORM TABLE: public.users
+--
+-- bolmso.app hosts several apps in this one Supabase project (mise, betting
+-- site, and more to come at <name>.bolmso.app). `public.users` is the shared
+-- master identity table across all of them -- one row per auth.users,
+-- holding only the handful of fields every app cares about (email, display
+-- name, avatar). It is intentionally NOT owned by this app: don't add
+-- mise-specific columns here, use `mise_user_settings` for that. This block
+-- is idempotent (safe to re-run) and kept here purely for reference/bootstrap
+-- -- the canonical migration lives with whichever app touched it last.
+-- ============================================================================
+
+create table if not exists public.users (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  display_name text,
+  avatar_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- RLS policies, the updated_at trigger, and the auth.users signup trigger
+-- for this table are defined once for the whole project (not duplicated
+-- per app) -- see the betting-site repo's migration for the full version.
 
 -- ============================================================================
 -- ROW LEVEL SECURITY
@@ -224,7 +250,7 @@ alter table project_members enable row level security;
 alter table tasks enable row level security;
 alter table notes enable row level security;
 alter table note_templates enable row level security;
-alter table user_settings enable row level security;
+alter table mise_user_settings enable row level security;
 alter table people enable row level security;
 
 create or replace function public.is_project_member(p_project_id uuid, p_min_role project_role default 'VIEW')
@@ -279,8 +305,8 @@ create policy "insert own templates" on note_templates for insert with check (cr
 create policy "update own templates" on note_templates for update using (created_by = auth.uid());
 create policy "delete own templates" on note_templates for delete using (created_by = auth.uid());
 
-create policy "select own settings" on user_settings for select using (user_id = auth.uid());
-create policy "insert own settings" on user_settings for insert with check (user_id = auth.uid());
-create policy "update own settings" on user_settings for update using (user_id = auth.uid());
+create policy "select own settings" on mise_user_settings for select using (user_id = auth.uid());
+create policy "insert own settings" on mise_user_settings for insert with check (user_id = auth.uid());
+create policy "update own settings" on mise_user_settings for update using (user_id = auth.uid());
 
 create policy "select people" on people for select using (auth.role() = 'authenticated');

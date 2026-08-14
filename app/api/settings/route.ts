@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
       const db = getSupabaseAdmin();
       const { data: row, error } = await db
-        .from('user_settings')
+        .from('mise_user_settings')
         .select('*')
         .eq('user_id', user.uid)
         .maybeSingle();
@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest) {
 
       const row = { user_id: user.uid, ...userSettingsToRow(settings) };
 
-      const { error } = await db.from('user_settings').upsert(row, { onConflict: 'user_id' });
+      const { error } = await db.from('mise_user_settings').upsert(row, { onConflict: 'user_id' });
       if (error) throw error;
 
       logger.apiResponse('PUT', '/api/settings', 200, undefined, { userId: user.uid });

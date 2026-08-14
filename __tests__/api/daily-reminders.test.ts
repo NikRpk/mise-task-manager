@@ -30,7 +30,7 @@ beforeEach(() => {
   process.env.CRON_SECRET = CRON_SECRET;
   (getSupabaseAdmin as jest.Mock).mockReturnValue(
     createMockSupabaseClient({
-      user_settings: { data: [], error: null },
+      mise_user_settings: { data: [], error: null },
     })
   );
 });
@@ -70,7 +70,7 @@ describe('GET /api/cron/daily-reminders', () => {
     it('skips a user that has no Slack reminder configured', async () => {
       (getSupabaseAdmin as jest.Mock).mockReturnValue(
         createMockSupabaseClient({
-          user_settings: {
+          mise_user_settings: {
             data: [
               {
                 user_id: 'user-no-slack',
@@ -93,7 +93,7 @@ describe('GET /api/cron/daily-reminders', () => {
     it('skips a user that has no email in their settings', async () => {
       (getSupabaseAdmin as jest.Mock).mockReturnValue(
         createMockSupabaseClient({
-          user_settings: {
+          mise_user_settings: {
             data: [
               {
                 user_id: 'user-no-email',
