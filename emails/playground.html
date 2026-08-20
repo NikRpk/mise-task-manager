@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<!--
+  Mise email theme playground.
+
+  Open this file directly in a browser (double-click it, or `open emails/playground.html`).
+  For each color slot on the left, pick one of your brand colors from the dropdown,
+  or choose "Custom..." to type any hex. The preview on the right updates live.
+  When you're happy, click "Copy theme.json" and paste the result back — or just
+  tell me the new hex values and which token they go with.
+
+  This file intentionally duplicates the CSS structure of templates/base-cta.html
+  and templates/base-notice.html so the preview is representative. It is NOT used
+  by the build script — it's a design tool only.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mise email theme playground</title>
+<style>
+  :root {
+    --token-navy: #003366;
+    --token-navy-muted: #5A7897;
+    --token-porcelain: #FDFFFC;
+    --token-raspberry: #960050;
+    --token-amber: #FF9F1C;
+    --token-lime: #50C846;
+    --token-border: #E7EAE4;
+    --token-card-bg: #FFFFFF;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #1e1e1e;
+    color: #eee;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ---------- Controls sidebar ---------- */
+  .sidebar {
+    background: #262626;
+    padding: 24px;
+    overflow-y: auto;
+    border-right: 1px solid #3a3a3a;
+  }
+  .sidebar h1 { font-size: 16px; margin: 0 0 4px 0; }
+  .sidebar .sub { font-size: 12px; color: #999; margin: 0 0 20px 0; }
+
+  .token-row {
+    padding: 10px 0;
+    border-bottom: 1px solid #333;
+  }
+  .token-row .token-label { font-size: 13px; display: block; }
+  .token-row .used-for { display: block; font-size: 11px; color: #888; margin-top: 1px; margin-bottom: 6px; }
+  .token-row .row-controls { display: flex; align-items: center; gap: 8px; }
+  .swatch {
+    width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.2);
+  }
+  select.color-select {
+    flex: 1; background: #1a1a1a; color: #eee; border: 1px solid #4a4a4a; border-radius: 6px;
+    padding: 6px 8px; font-size: 12px;
+  }
+  input.custom-hex {
+    width: 84px; background: #1a1a1a; color: #eee; border: 1px solid #4a4a4a; border-radius: 6px;
+    padding: 6px 8px; font-size: 12px; font-family: monospace; display: none;
+  }
+  .token-row.custom-active input.custom-hex { display: inline-block; }
+
+  .controls-footer { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    background: #3a3a3a; color: #eee; border: 1px solid #4a4a4a; border-radius: 8px;
+    padding: 8px 14px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { background: #4a4a4a; }
+  button.primary { background: var(--token-amber); color: var(--token-navy); border-color: var(--token-amber); font-weight: 700; }
+  .copy-output {
+    margin-top: 12px; width: 100%; height: 140px; font-family: monospace; font-size: 11px;
+    background: #1a1a1a; color: #ccc; border: 1px solid #3a3a3a; border-radius: 8px; padding: 8px; resize: vertical;
+  }
+
+  .palette-legend {
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid #3a3a3a;
+  }
+  .palette-legend .title { font-size: 12px; color: #999; margin-bottom: 8px; }
+  .palette-item {
+    display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; color: #ccc;
+  }
+  .palette-item .swatch { width: 16px; height: 16px; }
+
+  /* ---------- Preview pane ---------- */
+  .preview-pane { padding: 32px; overflow-y: auto; }
+  .preview-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .preview-tabs button.tab { background: #2a2a2a; }
+  .preview-tabs button.tab.active { background: var(--token-amber); color: var(--token-navy); border-color: var(--token-amber); }
+
+  .email-page { background-color: var(--token-porcelain); padding: 40px 16px; border-radius: 8px; }
+  .email-card {
+    max-width: 480px; margin: 0 auto; background-color: var(--token-card-bg);
+    border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,51,102,0.10);
+  }
+  .accent-bar { height: 6px; }
+  .accent-bar.cta { background-color: var(--token-amber); }
+  .accent-bar.notice { background-color: var(--token-raspberry); }
+  .brand-row { padding: 28px 40px 0 40px; }
+  .brand-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background-color: var(--token-lime); margin-right: 8px; vertical-align: middle;
+  }
+  .brand-name { font-size: 20px; font-weight: 700; color: var(--token-navy); letter-spacing: -0.02em; vertical-align: middle; }
+  .heading { margin: 0; padding: 24px 40px 8px 40px; font-size: 22px; line-height: 1.3; color: var(--token-navy); font-weight: 600; }
+  .body-text { margin: 0; padding: 0 40px 24px 40px; font-size: 15px; line-height: 1.6; color: var(--token-navy-muted); }
+  .body-text.notice { padding-bottom: 32px; }
+  .button-row { padding: 0 40px 32px 40px; }
+  .cta-button {
+    display: inline-block; background-color: var(--token-amber); color: var(--token-navy);
+    text-decoration: none; font-size: 15px; font-weight: 700; padding: 12px 28px; border-radius: 8px;
+  }
+  .fallback-row { padding: 20px 40px 32px 40px; border-top: 1px solid var(--token-border); }
+  .fallback-label { margin: 0; font-size: 13px; line-height: 1.6; color: var(--token-navy-muted); }
+  .fallback-url { margin: 8px 0 0 0; font-size: 13px; line-height: 1.6; word-break: break-all; }
+  .fallback-link { color: var(--token-raspberry); }
+  .email-footer { margin: 24px 0 0 0; font-size: 12px; color: var(--token-navy-muted); text-align: center; }
+</style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <h1>Mise email theme</h1>
+    <p class="sub">Pick a color from the dropdown for each slot, or choose "Custom..." to type a hex. Preview updates live on the right.</p>
+    <div id="tokenList"></div>
+    <div class="controls-footer">
+      <button id="resetBtn">Reset to current</button>
+      <button id="copyBtn" class="primary">Copy theme.json</button>
+    </div>
+    <textarea id="output" class="copy-output" readonly placeholder="Click &quot;Copy theme.json&quot; to see the current values here..."></textarea>
+
+    <div class="palette-legend">
+      <div class="title">Brand palette (used to fill the dropdowns)</div>
+      <div id="paletteLegend"></div>
+    </div>
+  </div>
+
+  <div class="preview-pane">
+    <div class="preview-tabs">
+      <button class="tab active" data-template="cta" data-content="confirmation">Confirmation</button>
+      <button class="tab" data-template="cta" data-content="recovery">Password reset</button>
+      <button class="tab" data-template="cta" data-content="magic_link">Magic link</button>
+      <button class="tab" data-template="notice" data-content="password_changed">Password changed (notice)</button>
+    </div>
+
+    <div class="email-page">
+      <div class="email-card">
+        <div id="accentBar" class="accent-bar cta"></div>
+        <div class="brand-row">
+          <span class="brand-dot"></span>
+          <span class="brand-name">Mise</span>
+        </div>
+        <h1 id="heading" class="heading">Confirm your email</h1>
+        <p id="bodyText" class="body-text">Welcome to Mise! Click below to confirm your email address and finish setting up your account.</p>
+        <div id="buttonRow" class="button-row">
+          <a href="#" class="cta-button" onclick="return false;">Confirm email address</a>
+        </div>
+        <div id="fallbackRow" class="fallback-row">
+          <p class="fallback-label">If the button above doesn't work, copy and paste this link into your browser:</p>
+          <p class="fallback-url"><a href="#" class="fallback-link" onclick="return false;">{{ .ConfirmationURL }}</a></p>
+        </div>
+      </div>
+      <p id="footerText" class="email-footer">If you didn't create an account, you can safely ignore this email.</p>
+    </div>
+  </div>
+
+<script>
+  // The 5 brand colors + a couple of practical neutrals. Shown in every dropdown.
+  const PALETTE = [
+    { name: 'Oxford Navy', hex: '#003366' },
+    { name: 'Porcelain', hex: '#FDFFFC' },
+    { name: 'Dark Raspberry', hex: '#960050' },
+    { name: 'Amber Glow', hex: '#FF9F1C' },
+    { name: 'Lime Green', hex: '#50C846' },
+    { name: 'White', hex: '#FFFFFF' },
+    { name: 'Light Grey (divider)', hex: '#E7EAE4' },
+  ];
+
+  const TOKENS = [
+    { key: 'navy', var: '--token-navy', name: 'Oxford Navy', usedFor: 'Headings, wordmark, button text', default: '#003366' },
+    { key: 'navyMuted', var: '--token-navy-muted', name: 'Navy (muted)', usedFor: 'Body copy, footer text', default: '#5A7897' },
+    { key: 'porcelain', var: '--token-porcelain', name: 'Porcelain', usedFor: 'Page background', default: '#FDFFFC' },
+    { key: 'raspberry', var: '--token-raspberry', name: 'Dark Raspberry', usedFor: 'Fallback link, notice accent bar', default: '#960050' },
+    { key: 'amber', var: '--token-amber', name: 'Amber Glow', usedFor: 'CTA button, accent bar', default: '#FF9F1C' },
+    { key: 'lime', var: '--token-lime', name: 'Lime Green', usedFor: 'Logo accent dot', default: '#50C846' },
+    { key: 'border', var: '--token-border', name: 'Divider', usedFor: 'Card internal divider line', default: '#E7EAE4' },
+    { key: 'cardBackground', var: '--token-card-bg', name: 'Card background', usedFor: 'White card surface', default: '#FFFFFF' },
+  ];
+
+  const CONTENT = {
+    confirmation: {
+      template: 'cta',
+      heading: 'Confirm your email',
+      body: 'Welcome to Mise! Click below to confirm your email address and finish setting up your account.',
+      button: 'Confirm email address',
+      footer: "If you didn't create an account, you can safely ignore this email.",
+    },
+    recovery: {
+      template: 'cta',
+      heading: 'Reset your password',
+      body: 'We received a request to reset the password for your Mise account. Click below to choose a new one \u2014 this link will expire shortly.',
+      button: 'Reset password',
+      footer: "If you didn't request this, you can safely ignore this email \u2014 your password won't change.",
+    },
+    magic_link: {
+      template: 'cta',
+      heading: 'Your sign-in link',
+      body: 'Click below to sign in to Mise. This link expires shortly and can only be used once.',
+      button: 'Sign in to Mise',
+      footer: "If you didn't request this, you can safely ignore this email.",
+    },
+    password_changed: {
+      template: 'notice',
+      heading: 'Your password was changed',
+      body: 'The password for your Mise account was recently changed. If you made this change, no action is needed.',
+      footer: "If you didn't make this change, reset your password immediately.",
+    },
+  };
+
+  function findPaletteMatch(hex) {
+    return PALETTE.find(p => p.hex.toLowerCase() === hex.toLowerCase());
+  }
+
+  const sidebar = document.getElementById('tokenList');
+  TOKENS.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'token-row';
+    row.dataset.var = t.var;
+
+    const match = findPaletteMatch(t.default);
+    const optionsHtml = PALETTE.map(p =>
+      `<option value="${p.hex}" ${match && match.hex === p.hex ? 'selected' : ''}>${p.name} (${p.hex})</option>`
+    ).join('');
+
+    row.innerHTML = `
+      <span class="token-label">${t.name}</span>
+      <span class="used-for">${t.usedFor}</span>
+      <div class="row-controls">
+        <span class="swatch" data-swatch-for="${t.var}" style="background:${t.default};"></span>
+        <select class="color-select" data-var="${t.var}">
+          ${optionsHtml}
+          <option value="__custom__" ${!match ? 'selected' : ''}>Custom...</option>
+        </select>
+        <input type="text" class="custom-hex" data-hex-input-for="${t.var}" value="${t.default}" placeholder="#RRGGBB">
+      </div>
+    `;
+    if (!match) row.classList.add('custom-active');
+    sidebar.appendChild(row);
+  });
+
+  function applyVar(varName, value) {
+    document.documentElement.style.setProperty(varName, value);
+    const swatch = document.querySelector(`[data-swatch-for="${varName}"]`);
+    if (swatch) swatch.style.background = value;
+  }
+
+  sidebar.querySelectorAll('.token-row').forEach(row => {
+    const varName = row.dataset.var;
+    const select = row.querySelector('.color-select');
+    const hexInput = row.querySelector('.custom-hex');
+
+    select.addEventListener('change', () => {
+      if (select.value === '__custom__') {
+        row.classList.add('custom-active');
+        hexInput.focus();
+        applyVar(varName, hexInput.value);
+      } else {
+        row.classList.remove('custom-active');
+        hexInput.value = select.value;
+        applyVar(varName, select.value);
+      }
+    });
+
+    hexInput.addEventListener('input', () => {
+      const val = hexInput.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+        applyVar(varName, val);
+      }
+    });
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    sidebar.querySelectorAll('.token-row').forEach(row => {
+      const varName = row.dataset.var;
+      const token = TOKENS.find(t => t.var === varName);
+      const select = row.querySelector('.color-select');
+      const hexInput = row.querySelector('.custom-hex');
+      const match = findPaletteMatch(token.default);
+
+      hexInput.value = token.default;
+      if (match) {
+        select.value = match.hex;
+        row.classList.remove('custom-active');
+      } else {
+        select.value = '__custom__';
+        row.classList.add('custom-active');
+      }
+      applyVar(varName, token.default);
+    });
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    const colors = {};
+    TOKENS.forEach(t => {
+      const row = sidebar.querySelector(`.token-row[data-var="${t.var}"]`);
+      const hexInput = row.querySelector('.custom-hex');
+      colors[t.key] = { value: hexInput.value.toUpperCase(), name: t.name, usedFor: t.usedFor };
+    });
+    const json = JSON.stringify({ colors }, null, 2);
+    const output = document.getElementById('output');
+    output.value = json;
+    navigator.clipboard?.writeText(json).catch(() => {});
+  });
+
+  // Palette legend at the bottom of the sidebar
+  const legend = document.getElementById('paletteLegend');
+  PALETTE.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'palette-item';
+    item.innerHTML = `<span class="swatch" style="background:${p.hex};"></span> ${p.name} — ${p.hex}`;
+    legend.appendChild(item);
+  });
+
+  // ---- Preview content switching ----
+  const accentBar = document.getElementById('accentBar');
+  const heading = document.getElementById('heading');
+  const bodyText = document.getElementById('bodyText');
+  const buttonRow = document.getElementById('buttonRow');
+  const fallbackRow = document.getElementById('fallbackRow');
+  const footerText = document.getElementById('footerText');
+
+  function renderContent(key) {
+    const c = CONTENT[key];
+    heading.textContent = c.heading;
+    bodyText.textContent = c.body;
+    footerText.textContent = c.footer;
+    bodyText.classList.toggle('notice', c.template === 'notice');
+    accentBar.className = 'accent-bar ' + c.template;
+    buttonRow.style.display = c.template === 'cta' ? '' : 'none';
+    fallbackRow.style.display = c.template === 'cta' ? '' : 'none';
+    if (c.template === 'cta') {
+      buttonRow.querySelector('.cta-button').textContent = c.button;
+    }
+  }
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderContent(tab.dataset.content);
+    });
+  });
+
+  renderContent('confirmation');
+</script>
+</body>
+</html>
