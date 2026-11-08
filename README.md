@@ -56,7 +56,7 @@ Write meeting notes, capture decisions, and track tasks — all in one place, or
 | Framework | Next.js 16+ (App Router, SSR) |
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS + CSS variables |
-| Auth | Supabase Auth (Google OAuth + email/password) |
+| Auth | Central `bolmso.app/login?app=mise` SSO (Supabase Auth with `.bolmso.app` cookie via `@supabase/ssr`) |
 | Database | Supabase Postgres, with Row Level Security |
 | Realtime | Supabase Realtime (Postgres change streams) |
 | Hosting | Vercel |
